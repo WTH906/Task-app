@@ -13,6 +13,11 @@ export default function RetroPlanningPage() {
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState("");
 
+  const selectProject = (id: string | null) => {
+    setSelectedProject(id);
+    if (id) localStorage.setItem("retro_project", id);
+  };
+
   const today = toLocalDateStr(new Date());
 
   useEffect(() => {
@@ -23,6 +28,10 @@ export default function RetroPlanningPage() {
       setUserId(user.id);
       const { data } = await supabase.from("projects").select("*").eq("user_id", user.id).order("sort_order");
       setProjects(data || []);
+      const saved = localStorage.getItem("retro_project");
+      if (saved && (data || []).some((p: Project) => p.id === saved)) {
+        setSelectedProject(saved);
+      }
     };
     load();
   }, []);
@@ -117,7 +126,7 @@ export default function RetroPlanningPage() {
           <h1 className="font-title text-2xl text-bright">Retro Planning</h1>
           <p className="text-sm text-txt2 mt-0.5">Timeline view of project tasks and deadlines</p>
         </div>
-        <select value={selectedProject || ""} onChange={(e) => setSelectedProject(e.target.value || null)}
+        <select value={selectedProject || ""} onChange={(e) => selectProject(e.target.value || null)}
           className="bg-surface border border-border rounded-lg px-4 py-2 text-sm text-txt min-w-[200px]">
           <option value="">Select a project...</option>
           {projects.map((p) => (

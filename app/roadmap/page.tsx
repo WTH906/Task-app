@@ -37,6 +37,12 @@ function genId() { return crypto.randomUUID(); }
 export default function RoadmapPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
+
+  // Persist selection
+  const selectProject = (id: string | null) => {
+    setSelectedProject(id);
+    if (id) localStorage.setItem("roadmap_project", id);
+  };
   const [phases, setPhases] = useState<Phase[]>([]);
   const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([]);
   const [userId, setUserId] = useState("");
@@ -53,6 +59,11 @@ export default function RoadmapPage() {
       setUserId(user.id);
       const { data } = await supabase.from("projects").select("*").eq("user_id", user.id).order("sort_order");
       setProjects(data || []);
+      // Restore last selected project
+      const saved = localStorage.getItem("roadmap_project");
+      if (saved && (data || []).some((p: Project) => p.id === saved)) {
+        setSelectedProject(saved);
+      }
     };
     load();
   }, []);
@@ -252,7 +263,7 @@ export default function RoadmapPage() {
             {!saving && selectedProject && <span className="text-green-acc ml-2">· saved</span>}
           </p>
         </div>
-        <select value={selectedProject || ""} onChange={(e) => setSelectedProject(e.target.value || null)}
+        <select value={selectedProject || ""} onChange={(e) => selectProject(e.target.value || null)}
           className="bg-surface border border-border rounded-lg px-4 py-2 text-sm text-txt min-w-[200px]">
           <option value="">Select a project...</option>
           {projects.map((p) => (
@@ -313,10 +324,10 @@ export default function RoadmapPage() {
                         style={st === "active" ? { boxShadow: "0 0 0 4px rgba(124,111,255,0.12)" } : undefined} />
 
                       {/* Card */}
-                      <div className={cn("bg-surface border rounded-xl p-3 transition-all hover:border-border2 group/card",
-                        st === "done" && "border-l-[3px] border-l-green-acc border-border",
-                        st === "active" && "border-l-[3px] border-l-violet border-border",
-                        st === "future" && "border-border")}>
+                      <div className={cn("bg-surface rounded-xl p-3 transition-all group/card",
+                        st === "done" && "border-2 border-green-acc/60",
+                        st === "active" && "border-2 border-violet/60",
+                        st === "future" && "border border-border hover:border-border2")}>
 
                         {/* Top row */}
                         <div className="flex items-center gap-2 mb-2">
