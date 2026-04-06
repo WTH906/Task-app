@@ -27,6 +27,8 @@ export default function WeekPage() {
   const [linkParentTask, setLinkParentTask] = useState<string | null>(null);
   const [projectTasks, setProjectTasks] = useState<Array<{ id: string; name: string }>>([]);
 
+  const [jumpPickerOpen, setJumpPickerOpen] = useState(false);
+
   const today = toLocalDateStr(new Date());
 
   const loadData = useCallback(async () => {
@@ -173,6 +175,13 @@ export default function WeekPage() {
   const prevMonth = () => setMonthDate(new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1));
   const nextMonth = () => setMonthDate(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1));
 
+  const jumpToDate = (dateStr: string) => {
+    const d = new Date(dateStr + "T00:00:00");
+    setWeekStart(getMonday(d));
+    setMonthDate(d);
+    setJumpPickerOpen(false);
+  };
+
   // Stats
   const allTasks = Object.values(tasks).flat();
   const doneCount = allTasks.filter((t) => t.done).length;
@@ -235,8 +244,19 @@ export default function WeekPage() {
           </div>
           <button onClick={viewMode === "week" ? prevWeek : prevMonth}
             className="px-3 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt2 hover:text-txt hover:border-border2">‹</button>
-          <button onClick={goToday}
-            className="px-3 py-1.5 rounded-lg bg-violet/10 border border-violet/30 text-sm text-violet2 hover:bg-violet/20">Today</button>
+          <div className="relative">
+            <button onClick={goToday}
+              className="px-3 py-1.5 rounded-lg bg-violet/10 border border-violet/30 text-sm text-violet2 hover:bg-violet/20">Today</button>
+            <button onClick={() => setJumpPickerOpen(!jumpPickerOpen)}
+              className="ml-1 px-2 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt3 hover:text-txt hover:border-border2" title="Jump to date">📅</button>
+            {jumpPickerOpen && (
+              <div className="absolute top-full mt-1 right-0 z-50 bg-surface2 border border-border rounded-lg shadow-xl p-2">
+                <input type="date" autoFocus
+                  className="bg-surface border border-border rounded px-3 py-2 text-sm text-txt"
+                  onChange={(e) => { if (e.target.value) jumpToDate(e.target.value); }} />
+              </div>
+            )}
+          </div>
           <button onClick={viewMode === "week" ? nextWeek : nextMonth}
             className="px-3 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt2 hover:text-txt hover:border-border2">›</button>
         </div>
@@ -326,7 +346,8 @@ export default function WeekPage() {
                       <div key={t.id} className="flex items-start gap-1.5 text-xs group" onClick={(e) => e.stopPropagation()}>
                         <input type="checkbox" checked={t.done} onChange={() => toggleTaskDone(t)}
                           className="mt-0.5 w-3.5 h-3.5" style={{ accentColor: tagColor || color }} />
-                        <span className={cn("leading-tight", t.done && "task-done")}>
+                        <span className={cn("leading-tight", t.done && "task-done", t.project_id && "cursor-pointer hover:underline")}
+                          onClick={() => { if (t.project_id) window.location.href = `/projects/${t.project_id}`; }}>
                           {tagColor && <span className="font-medium" style={{ color: tagColor }}>{t.text.match(/^\[.*?\]/)?.[0]}{" "}</span>}
                           {t.text.replace(/^\[.*?\]\s*/, "")}
                         </span>
@@ -447,14 +468,19 @@ export default function WeekPage() {
                     <div className="flex-1 min-w-0">
                       <span className={cn("text-sm", t.done && "task-done")}>
                         {tagColor && (
-                          <span className="font-medium text-xs px-1.5 py-0.5 rounded mr-1.5"
-                            style={{ color: tagColor, backgroundColor: `${tagColor}15` }}>
+                          <span className="font-medium text-xs px-1.5 py-0.5 rounded mr-1.5 cursor-pointer hover:underline"
+                            style={{ color: tagColor, backgroundColor: `${tagColor}15` }}
+                            onClick={() => { if (t.project_id) window.location.href = `/projects/${t.project_id}`; }}>
                             {t.text.match(/^\[(.+?)\]/)?.[1]}
                           </span>
                         )}
                         {t.text.replace(/^\[.*?\]\s*/, "")}
                       </span>
                     </div>
+                    {t.project_id && (
+                      <button onClick={() => window.location.href = `/projects/${t.project_id}`}
+                        className="text-txt3 hover:text-violet2 opacity-0 group-hover:opacity-100 transition-all text-xs shrink-0" title="Go to project">→</button>
+                    )}
                     <button onClick={() => deleteTask(t.id)}
                       className="text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 transition-all text-sm shrink-0">✕</button>
                   </div>

@@ -71,7 +71,8 @@ export function Sidebar({ user }: { user: User }) {
 
   const navItems = [
     { href: "/", icon: "🏠", label: "Dashboard", accent: "violet", key: "D" },
-    { href: "/routine", icon: "☰", label: "Routine", accent: "red-acc", key: "R" },
+    { href: "/routine", icon: "☰", label: "Daily Routine", accent: "red-acc", key: "R" },
+    { href: "/weekly-routine", icon: "🔄", label: "Weekly Routine", accent: "violet", key: "" },
     { href: "/week", icon: "📅", label: "Week", accent: "violet", key: "W" },
     { href: "/retro", icon: "📊", label: "Retro Planning", accent: "violet", key: "" },
     { href: "/deadlines", icon: "⏳", label: "Deadlines", accent: "violet", key: "" },

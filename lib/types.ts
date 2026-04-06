@@ -60,3 +60,9 @@ export interface ActivityLog {
   id: string; user_id: string; project_id: string | null;
   action: string; detail: string; created_at: string;
 }
+
+export interface WeeklyRoutineTask {
+  id: string; user_id: string; text: string;
+  est_minutes: number; sort_order: number; created_at: string;
+  checked?: boolean;
+}

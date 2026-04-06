@@ -699,7 +699,7 @@ export default function ProjectDetailPage() {
                         >
                           Edit
                         </button>
-                        {(task.subtasks?.length || 0) < 5 && (
+                        {(task.subtasks?.length || 0) < 10 && (
                           <button
                             onClick={() => {
                               setEditTarget(null);
