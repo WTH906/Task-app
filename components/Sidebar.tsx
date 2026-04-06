@@ -74,6 +74,7 @@ export function Sidebar({ user }: { user: User }) {
     { href: "/routine", icon: "☰", label: "Daily Routine", accent: "red-acc", key: "R" },
     { href: "/weekly-routine", icon: "🔄", label: "Weekly Routine", accent: "violet", key: "" },
     { href: "/week", icon: "📅", label: "Week", accent: "violet", key: "W" },
+    { href: "/roadmap", icon: "🛤", label: "Roadmap", accent: "violet", key: "" },
     { href: "/retro", icon: "📊", label: "Retro Planning", accent: "violet", key: "" },
     { href: "/deadlines", icon: "⏳", label: "Deadlines", accent: "violet", key: "" },
   ];

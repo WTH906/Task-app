@@ -35,3 +35,20 @@ CREATE POLICY "wrt_delete" ON weekly_routine_tasks FOR DELETE USING (user_id = a
 CREATE POLICY "wrc_select" ON weekly_routine_checks FOR SELECT USING (user_id = auth.uid());
 CREATE POLICY "wrc_insert" ON weekly_routine_checks FOR INSERT WITH CHECK (user_id = auth.uid());
 CREATE POLICY "wrc_delete" ON weekly_routine_checks FOR DELETE USING (user_id = auth.uid());
+
+-- Roadmap data per project (JSONB phases)
+CREATE TABLE IF NOT EXISTS roadmap_data (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  phases JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, project_id)
+);
+
+ALTER TABLE roadmap_data ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "rd_select" ON roadmap_data FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "rd_insert" ON roadmap_data FOR INSERT WITH CHECK (user_id = auth.uid());
+CREATE POLICY "rd_update" ON roadmap_data FOR UPDATE USING (user_id = auth.uid());
+CREATE POLICY "rd_delete" ON roadmap_data FOR DELETE USING (user_id = auth.uid());
