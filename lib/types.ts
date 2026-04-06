@@ -25,7 +25,7 @@ export interface Subtask {
   id: string; task_id: string; user_id: string;
   name: string; est_minutes: number; deadline: string | null;
   progress: number; notes: string; sort_order: number;
-  created_at: string;
+  created_at: string; elapsed_seconds: number;
   file_url: string | null; file_name: string | null;
 }
 

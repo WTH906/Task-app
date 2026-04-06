@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { RoutineTask, Project, WeekTask, Deadline, ActivityLog } from "@/lib/types";
+import { RoutineTask, Project, WeekTask, Deadline, ActivityLog, ProjectTask } from "@/lib/types";
 import { ProgressBar } from "@/components/ProgressBar";
-import { formatSeconds, toLocalDateStr, cn, getMonday, addDays, formatDate } from "@/lib/utils";
+import { formatSeconds, toLocalDateStr, cn, getMonday, addDays, formatDate, progressColor } from "@/lib/utils";
 import Link from "next/link";
 
 export default function DashboardPage() {
@@ -16,6 +16,7 @@ export default function DashboardPage() {
   const [weekTasks, setWeekTasks] = useState<WeekTask[]>([]);
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [activity, setActivity] = useState<ActivityLog[]>([]);
+  const [overdueTasks, setOverdueTasks] = useState<Array<ProjectTask & { projectTitle: string; projectColor: string }>>([]);
   const [now, setNow] = useState(new Date());
   const [loading, setLoading] = useState(true);
 
@@ -58,6 +59,21 @@ export default function DashboardPage() {
       const { data: act } = await supabase.from("activity_log").select("*").eq("user_id", user.id)
         .order("created_at", { ascending: false }).limit(10);
       setActivity(act || []);
+
+      // Overdue tasks (past deadline, progress < 100)
+      const { data: allProjTasks } = await supabase
+        .from("project_tasks").select("*").eq("user_id", user.id)
+        .lt("deadline", today).lt("progress", 100).not("deadline", "is", null)
+        .order("deadline");
+
+      const projMap: Record<string, { title: string; color: string }> = {};
+      for (const p of projs || []) projMap[p.id] = { title: p.title, color: p.color || "#e05555" };
+
+      setOverdueTasks((allProjTasks || []).map((t: ProjectTask) => ({
+        ...t,
+        projectTitle: projMap[t.project_id]?.title || "Unknown",
+        projectColor: projMap[t.project_id]?.color || "#e05555",
+      })));
 
       setLoading(false);
     };
@@ -213,6 +229,47 @@ export default function DashboardPage() {
           </Link>
         );
       })()}
+
+      {/* Overdue tasks */}
+      {overdueTasks.length > 0 && (
+        <div className="bg-surface border border-danger/30 rounded-xl p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium text-danger">⚠ Overdue Tasks</h2>
+            <span className="text-xs text-danger font-mono">{overdueTasks.length} late</span>
+          </div>
+          <div className="space-y-2">
+            {overdueTasks.map((t) => {
+              const daysLate = Math.ceil((Date.now() - new Date(t.deadline + "T23:59:00").getTime()) / (1000 * 60 * 60 * 24));
+              return (
+                <div key={t.id} className="flex items-center gap-3 bg-surface2 rounded-lg px-3 py-2 group">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.projectColor }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium" style={{ color: t.projectColor }}>[{t.projectTitle}]</span>
+                      <span className="text-sm text-bright truncate">{t.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] text-danger font-mono">{daysLate}d late</span>
+                      <span className="text-[10px] text-txt3">was due {t.deadline}</span>
+                      <span className="text-[10px] font-mono" style={{ color: progressColor(t.progress) }}>{t.progress}%</span>
+                    </div>
+                  </div>
+                  <input type="date" className="bg-surface3 border border-border rounded px-2 py-1 text-xs text-txt opacity-0 group-hover:opacity-100 transition-opacity"
+                    onChange={async (e) => {
+                      const newDate = e.target.value;
+                      if (!newDate) return;
+                      const supabase = (await import("@/lib/supabase")).createClient();
+                      await supabase.from("project_tasks").update({ deadline: newDate }).eq("id", t.id);
+                      setOverdueTasks((prev) => prev.filter((x) => x.id !== t.id));
+                    }} />
+                  <Link href={`/projects/${t.project_id}`}
+                    className="text-xs text-txt3 hover:text-bright opacity-0 group-hover:opacity-100 transition-opacity">→</Link>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Middle row: Projects + Deadlines */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">

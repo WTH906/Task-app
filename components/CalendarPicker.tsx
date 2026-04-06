@@ -62,7 +62,8 @@ export function CalendarPicker({ value, onChange, className = "" }: CalendarPick
   const month = viewDate.getMonth();
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const today = new Date().toISOString().split("T")[0];
+  const nowLocal = new Date();
+  const today = `${nowLocal.getFullYear()}-${String(nowLocal.getMonth() + 1).padStart(2, "0")}-${String(nowLocal.getDate()).padStart(2, "0")}`;
 
   const days: (number | null)[] = [];
   for (let i = 0; i < firstDay; i++) days.push(null);

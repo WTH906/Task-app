@@ -26,6 +26,7 @@ export default function ProjectDetailPage() {
 
   // Timer
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [activeSubtaskId, setActiveSubtaskId] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState<Record<string, number>>({});
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
@@ -88,33 +89,38 @@ export default function ProjectDetailPage() {
 
     // Init elapsed
     const el: Record<string, number> = {};
-    for (const t of tasksWithSubs) el[t.id] = t.elapsed_seconds;
+    for (const t of tasksWithSubs) {
+      el[t.id] = t.elapsed_seconds;
+      for (const s of t.subtasks || []) el[`sub:${s.id}`] = s.elapsed_seconds || 0;
+    }
     setElapsed(el);
   }, [projectId, router]);
 
   useEffect(() => { loadProject(); }, [loadProject]);
 
-  // Timer logic
-  const startTimer = (taskId: string) => {
+  // Timer logic — supports both task IDs and "sub:subtaskId"
+  const startTimer = (timerId: string) => {
     if (activeTaskId) stopTimer();
-    setActiveTaskId(taskId);
+    setActiveTaskId(timerId);
     startTimeRef.current = Date.now();
-    startElapsedRef.current = elapsed[taskId] || 0;
+    startElapsedRef.current = elapsed[timerId] || 0;
 
     timerRef.current = setInterval(() => {
       const now = Date.now();
       const newElapsed = startElapsedRef.current + (now - startTimeRef.current) / 1000;
-      setElapsed((prev) => ({ ...prev, [taskId]: newElapsed }));
+      setElapsed((prev) => ({ ...prev, [timerId]: newElapsed }));
 
-      // 80% alarm check
-      const task = tasks.find((t) => t.id === taskId);
-      if (task && task.est_minutes > 0 && !project?.alarm_fired) {
-        const threshold = task.est_minutes * 60 * 0.8;
-        if (newElapsed >= threshold) {
-          playAlarm();
-          const supabase = createClient();
-          supabase.from("projects").update({ alarm_fired: true }).eq("id", projectId);
-          setProject((p) => p ? { ...p, alarm_fired: true } : p);
+      // 80% alarm check (only for main tasks)
+      if (!timerId.startsWith("sub:")) {
+        const task = tasks.find((t) => t.id === timerId);
+        if (task && task.est_minutes > 0 && !project?.alarm_fired) {
+          const threshold = task.est_minutes * 60 * 0.8;
+          if (newElapsed >= threshold) {
+            playAlarm();
+            const supabase = createClient();
+            supabase.from("projects").update({ alarm_fired: true }).eq("id", projectId);
+            setProject((p) => p ? { ...p, alarm_fired: true } : p);
+          }
         }
       }
     }, 1000);
@@ -126,23 +132,36 @@ export default function ProjectDetailPage() {
       const supabase = createClient();
       const finalElapsed = elapsed[activeTaskId] || 0;
       const sessionTime = finalElapsed - startElapsedRef.current;
-      await supabase
-        .from("project_tasks")
-        .update({ elapsed_seconds: finalElapsed })
-        .eq("id", activeTaskId);
-      const task = tasks.find((t) => t.id === activeTaskId);
-      if (sessionTime > 5) {
-        await logActivity(supabase, userId, projectId, "Timer stopped",
-          `${task?.name || "Task"} — ${formatSeconds(sessionTime)} tracked`);
+
+      if (activeTaskId.startsWith("sub:")) {
+        const subId = activeTaskId.replace("sub:", "");
+        await supabase.from("subtasks").update({ elapsed_seconds: finalElapsed }).eq("id", subId);
+        // Find subtask name for logging
+        let subName = "Subtask";
+        for (const t of tasks) {
+          const found = t.subtasks?.find((s) => s.id === subId);
+          if (found) { subName = found.name; break; }
+        }
+        if (sessionTime > 5) {
+          await logActivity(supabase, userId, projectId, "Timer stopped",
+            `↳ ${subName} — ${formatSeconds(sessionTime)} tracked`);
+        }
+      } else {
+        await supabase.from("project_tasks").update({ elapsed_seconds: finalElapsed }).eq("id", activeTaskId);
+        const task = tasks.find((t) => t.id === activeTaskId);
+        if (sessionTime > 5) {
+          await logActivity(supabase, userId, projectId, "Timer stopped",
+            `${task?.name || "Task"} — ${formatSeconds(sessionTime)} tracked`);
+        }
       }
     }
     timerRef.current = null;
     setActiveTaskId(null);
   };
 
-  const toggleTimer = (taskId: string) => {
-    if (activeTaskId === taskId) stopTimer();
-    else startTimer(taskId);
+  const toggleTimer = (timerId: string) => {
+    if (activeTaskId === timerId) stopTimer();
+    else startTimer(timerId);
   };
 
   // Cleanup timer on unmount
@@ -713,8 +732,27 @@ export default function ProjectDetailPage() {
                     {task.subtasks.map((sub) => (
                       <div
                         key={sub.id}
-                        className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border/50 last:border-b-0 text-xs"
+                        className={cn(
+                          "flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border/50 last:border-b-0 text-xs",
+                          activeTaskId === `sub:${sub.id}` && "bg-green-acc/5"
+                        )}
                       >
+                        <button
+                          onClick={() => toggleTimer(`sub:${sub.id}`)}
+                          className={cn(
+                            "w-6 h-6 rounded flex items-center justify-center text-[10px] shrink-0 transition-colors",
+                            activeTaskId === `sub:${sub.id}`
+                              ? "bg-green-acc/20 text-green-acc"
+                              : "bg-surface3 text-txt3 hover:text-red-acc"
+                          )}
+                        >
+                          {activeTaskId === `sub:${sub.id}` ? "⏸" : "▶"}
+                        </button>
+                        {activeTaskId === `sub:${sub.id}` && (
+                          <span className="font-mono text-[10px] text-green-acc">
+                            {formatSeconds(elapsed[`sub:${sub.id}`] || 0)}
+                          </span>
+                        )}
                         <div
                           className="w-2 h-2 rounded-full"
                           style={{ backgroundColor: progressColor(sub.progress) }}

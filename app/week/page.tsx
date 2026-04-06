@@ -9,7 +9,9 @@ import { syncWeekDoneToProject } from "@/lib/sync";
 
 export default function WeekPage() {
   const router = useRouter();
+  const [viewMode, setViewMode] = useState<"week" | "month">("week");
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
+  const [monthDate, setMonthDate] = useState(() => new Date());
   const [tasks, setTasks] = useState<Record<string, WeekTask[]>>({});
   const [dayMeta, setDayMeta] = useState<Record<string, WeekDay>>({});
   const [templates, setTemplates] = useState<Record<number, string>>({});
@@ -20,21 +22,35 @@ export default function WeekPage() {
   const [newTaskText, setNewTaskText] = useState("");
   const [editingTheme, setEditingTheme] = useState<string | null>(null);
   const [themeDraft, setThemeDraft] = useState("");
-  const [linkProject, setLinkProject] = useState<string | null>(null); // project id
+  const [linkProject, setLinkProject] = useState<string | null>(null);
   const [linkType, setLinkType] = useState<"none" | "main" | "subtask">("none");
   const [linkParentTask, setLinkParentTask] = useState<string | null>(null);
   const [projectTasks, setProjectTasks] = useState<Array<{ id: string; name: string }>>([]);
 
   const today = toLocalDateStr(new Date());
 
-  const loadWeek = useCallback(async () => {
+  const loadData = useCallback(async () => {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     setUserId(user.id);
 
+    // Calculate date range based on view mode
     const dates: string[] = [];
-    for (let i = 0; i < 7; i++) dates.push(formatDate(addDays(weekStart, i)));
+    if (viewMode === "week") {
+      for (let i = 0; i < 7; i++) dates.push(formatDate(addDays(weekStart, i)));
+    } else {
+      // Month view: get all days in the month + padding for complete weeks
+      const year = monthDate.getFullYear();
+      const month = monthDate.getMonth();
+      const firstOfMonth = new Date(year, month, 1);
+      const lastOfMonth = new Date(year, month + 1, 0);
+      // Pad to start on Monday
+      const startPad = firstOfMonth.getDay() === 0 ? 6 : firstOfMonth.getDay() - 1;
+      const startDate = addDays(firstOfMonth, -startPad);
+      // Pad to fill 6 rows (42 days)
+      for (let i = 0; i < 42; i++) dates.push(formatDate(addDays(startDate, i)));
+    }
 
     const { data: weekTasks } = await supabase.from("week_tasks").select("*").eq("user_id", user.id).in("date_key", dates).order("sort_order");
     const grouped: Record<string, WeekTask[]> = {};
@@ -54,9 +70,9 @@ export default function WeekPage() {
 
     const { data: projs } = await supabase.from("projects").select("id, title, color").eq("user_id", user.id);
     setProjects((projs || []) as Array<{ id: string; title: string; color: string }>);
-  }, [weekStart]);
+  }, [weekStart, monthDate, viewMode]);
 
-  useEffect(() => { loadWeek(); }, [loadWeek]);
+  useEffect(() => { loadData(); }, [loadData]);
   useEffect(() => { const iv = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(iv); }, []);
 
   // Map project titles to colors
@@ -123,7 +139,7 @@ export default function WeekPage() {
     setLinkType("none");
     setLinkParentTask(null);
     setProjectTasks([]);
-    loadWeek();
+    loadData();
   };
 
   const loadProjectTasksForLink = async (projectId: string) => {
@@ -136,7 +152,7 @@ export default function WeekPage() {
   const deleteTask = async (id: string) => {
     const supabase = createClient();
     await supabase.from("week_tasks").delete().eq("id", id);
-    loadWeek();
+    loadData();
   };
 
   const saveTheme = async (dateKey: string, value: string) => {
@@ -148,12 +164,14 @@ export default function WeekPage() {
       await supabase.from("week_days").upsert({ user_id: userId, date_key: dateKey, title: value, notes: "" }, { onConflict: "user_id,date_key" });
     }
     setEditingTheme(null);
-    loadWeek();
+    loadData();
   };
 
   const prevWeek = () => setWeekStart(addDays(weekStart, -7));
   const nextWeek = () => setWeekStart(addDays(weekStart, 7));
-  const goToday = () => setWeekStart(getMonday(new Date()));
+  const goToday = () => { setWeekStart(getMonday(new Date())); setMonthDate(new Date()); };
+  const prevMonth = () => setMonthDate(new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1));
+  const nextMonth = () => setMonthDate(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1));
 
   // Stats
   const allTasks = Object.values(tasks).flat();
@@ -172,7 +190,20 @@ export default function WeekPage() {
   }
 
   const weekEndDate = addDays(weekStart, 6);
-  const rangeLabel = `${weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${weekEndDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+  const rangeLabel = viewMode === "week"
+    ? `${weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${weekEndDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+    : monthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  // Month grid dates
+  const monthGridDates: string[] = [];
+  if (viewMode === "month") {
+    const year = monthDate.getFullYear();
+    const month = monthDate.getMonth();
+    const firstOfMonth = new Date(year, month, 1);
+    const startPad = firstOfMonth.getDay() === 0 ? 6 : firstOfMonth.getDay() - 1;
+    const startDate = addDays(firstOfMonth, -startPad);
+    for (let i = 0; i < 42; i++) monthGridDates.push(formatDate(addDays(startDate, i)));
+  }
 
   // Modal
   const modalDateObj = modalDate ? new Date(modalDate + "T00:00:00") : null;
@@ -187,13 +218,27 @@ export default function WeekPage() {
     <div className="p-4 md:p-6 flex flex-col h-[calc(100vh-0px)]">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <div>
-          <h1 className="font-title text-2xl text-bright">Weekly Planner</h1>
+          <h1 className="font-title text-2xl text-bright">Planner</h1>
           <p className="text-sm text-txt2 mt-0.5">{rangeLabel}</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={prevWeek} className="px-3 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt2 hover:text-txt hover:border-border2">‹ Prev</button>
-          <button onClick={goToday} className="px-3 py-1.5 rounded-lg bg-violet/10 border border-violet/30 text-sm text-violet2 hover:bg-violet/20">Today</button>
-          <button onClick={nextWeek} className="px-3 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt2 hover:text-txt hover:border-border2">Next ›</button>
+          {/* View toggle */}
+          <div className="flex rounded-lg border border-border overflow-hidden">
+            <button onClick={() => setViewMode("week")}
+              className={`px-3 py-1.5 text-xs transition-colors ${viewMode === "week" ? "bg-violet/15 text-violet2" : "text-txt3 hover:text-txt"}`}>
+              Week
+            </button>
+            <button onClick={() => setViewMode("month")}
+              className={`px-3 py-1.5 text-xs transition-colors ${viewMode === "month" ? "bg-violet/15 text-violet2" : "text-txt3 hover:text-txt"}`}>
+              Month
+            </button>
+          </div>
+          <button onClick={viewMode === "week" ? prevWeek : prevMonth}
+            className="px-3 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt2 hover:text-txt hover:border-border2">‹</button>
+          <button onClick={goToday}
+            className="px-3 py-1.5 rounded-lg bg-violet/10 border border-violet/30 text-sm text-violet2 hover:bg-violet/20">Today</button>
+          <button onClick={viewMode === "week" ? nextWeek : nextMonth}
+            className="px-3 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt2 hover:text-txt hover:border-border2">›</button>
         </div>
       </div>
 
@@ -228,80 +273,132 @@ export default function WeekPage() {
         )}
       </div>
 
-      {/* 7-column grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 flex-1 min-h-0">
-        {Array.from({ length: 7 }, (_, i) => {
-          const date = addDays(weekStart, i);
-          const dateKey = formatDate(date);
-          const dayNum = date.getDay();
-          const color = DAY_COLORS[dayNum];
-          const isToday = dateKey === today;
-          const dayTasks = tasks[dateKey] || [];
-          const doneTasks = dayTasks.filter((t) => t.done).length;
-          const theme = dayMeta[dateKey]?.title || templates[dayNum] || "";
-          const isEditingThis = editingTheme === dateKey;
+      {/* Week view */}
+      {viewMode === "week" && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 flex-1 min-h-0">
+          {Array.from({ length: 7 }, (_, i) => {
+            const date = addDays(weekStart, i);
+            const dateKey = formatDate(date);
+            const dayNum = date.getDay();
+            const color = DAY_COLORS[dayNum];
+            const isToday = dateKey === today;
+            const dayTasks = tasks[dateKey] || [];
+            const doneTasks = dayTasks.filter((t) => t.done).length;
+            const theme = dayMeta[dateKey]?.title || templates[dayNum] || "";
+            const isEditingThis = editingTheme === dateKey;
 
-          return (
-            <div key={dateKey}
-              className={cn("bg-surface border rounded-xl p-3 flex flex-col transition-all",
-                isToday ? "border-violet shadow-lg shadow-violet/10" : "border-border hover:border-border2")}>
-              <div className="mb-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider cursor-pointer" style={{ color }}
-                    onClick={() => { setModalDate(dateKey); setNewTaskText(""); setLinkProject(null); setLinkType("none"); setLinkParentTask(null); setProjectTasks([]); }}>
-                    {DAY_NAMES_FULL[dayNum].slice(0, 3)}
-                  </span>
-                  <span className="text-xs text-txt3">{date.getDate()}</span>
+            return (
+              <div key={dateKey}
+                className={cn("bg-surface border rounded-xl p-3 flex flex-col transition-all",
+                  isToday ? "border-violet shadow-lg shadow-violet/10" : "border-border hover:border-border2")}>
+                <div className="mb-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider cursor-pointer" style={{ color }}
+                      onClick={() => { setModalDate(dateKey); setNewTaskText(""); setLinkProject(null); setLinkType("none"); setLinkParentTask(null); setProjectTasks([]); }}>
+                      {DAY_NAMES_FULL[dayNum].slice(0, 3)}
+                    </span>
+                    <span className="text-xs text-txt3">{date.getDate()}</span>
+                  </div>
+                  {isEditingThis ? (
+                    <input value={themeDraft} onChange={(e) => setThemeDraft(e.target.value)}
+                      onBlur={() => saveTheme(dateKey, themeDraft)}
+                      onKeyDown={(e) => { if (e.key === "Enter") saveTheme(dateKey, themeDraft); if (e.key === "Escape") setEditingTheme(null); }}
+                      className="text-[10px] text-txt bg-surface3 border border-border rounded px-1 py-0.5 w-full mt-0.5 outline-none"
+                      autoFocus />
+                  ) : (
+                    <p className="text-[10px] text-txt3 mt-0.5 truncate cursor-pointer hover:text-txt2 transition-colors"
+                      onClick={(e) => { e.stopPropagation(); setEditingTheme(dateKey); setThemeDraft(theme); }}
+                      title="Click to name this day">
+                      {theme || "＋ name day"}
+                    </p>
+                  )}
+                  {isToday && (
+                    <p className="text-[10px] font-mono text-violet2 mt-0.5">
+                      {now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  )}
                 </div>
-                {/* Editable theme/name */}
-                {isEditingThis ? (
-                  <input value={themeDraft} onChange={(e) => setThemeDraft(e.target.value)}
-                    onBlur={() => saveTheme(dateKey, themeDraft)}
-                    onKeyDown={(e) => { if (e.key === "Enter") saveTheme(dateKey, themeDraft); if (e.key === "Escape") setEditingTheme(null); }}
-                    className="text-[10px] text-txt bg-surface3 border border-border rounded px-1 py-0.5 w-full mt-0.5 outline-none"
-                    autoFocus />
-                ) : (
-                  <p className="text-[10px] text-txt3 mt-0.5 truncate cursor-pointer hover:text-txt2 transition-colors"
-                    onClick={(e) => { e.stopPropagation(); setEditingTheme(dateKey); setThemeDraft(theme); }}
-                    title="Click to name this day">
-                    {theme || "＋ name day"}
-                  </p>
-                )}
-                {isToday && (
-                  <p className="text-[10px] font-mono text-violet2 mt-0.5">
-                    {now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                  </p>
-                )}
+                <div className="flex-1 space-y-1 overflow-y-auto min-h-0 cursor-pointer"
+                  onClick={() => { setModalDate(dateKey); setNewTaskText(""); setLinkProject(null); setLinkType("none"); setLinkParentTask(null); setProjectTasks([]); }}>
+                  {dayTasks.map((t) => {
+                    const tagColor = getTagColor(t.text);
+                    return (
+                      <div key={t.id} className="flex items-start gap-1.5 text-xs group" onClick={(e) => e.stopPropagation()}>
+                        <input type="checkbox" checked={t.done} onChange={() => toggleTaskDone(t)}
+                          className="mt-0.5 w-3.5 h-3.5" style={{ accentColor: tagColor || color }} />
+                        <span className={cn("leading-tight", t.done && "task-done")}>
+                          {tagColor && <span className="font-medium" style={{ color: tagColor }}>{t.text.match(/^\[.*?\]/)?.[0]}{" "}</span>}
+                          {t.text.replace(/^\[.*?\]\s*/, "")}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-end">
+                  {dayTasks.length > 0 && <span className="text-[10px] text-txt3 font-mono">{doneTasks}/{dayTasks.length}</span>}
+                </div>
               </div>
+            );
+          })}
+        </div>
+      )}
 
-              <div className="flex-1 space-y-1 overflow-y-auto min-h-0 cursor-pointer"
-                onClick={() => { setModalDate(dateKey); setNewTaskText(""); setLinkProject(null); setLinkType("none"); setLinkParentTask(null); setProjectTasks([]); }}>
-                {dayTasks.map((t) => {
-                  const tagColor = getTagColor(t.text);
-                  return (
-                    <div key={t.id} className="flex items-start gap-1.5 text-xs group" onClick={(e) => e.stopPropagation()}>
-                      <input type="checkbox" checked={t.done} onChange={() => toggleTaskDone(t)}
-                        className="mt-0.5 w-3.5 h-3.5" style={{ accentColor: tagColor || color }} />
-                      <span className={cn("leading-tight", t.done && "task-done")}>
-                        {tagColor && (
-                          <span className="font-medium" style={{ color: tagColor }}>
-                            {t.text.match(/^\[.*?\]/)?.[0]}{" "}
-                          </span>
-                        )}
-                        {t.text.replace(/^\[.*?\]\s*/, "")}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+      {/* Month view */}
+      {viewMode === "month" && (
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="grid grid-cols-7 gap-1 mb-1">
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => (
+              <div key={d} className="text-center text-[10px] text-txt3 uppercase tracking-wider py-1"
+                style={{ color: DAY_COLORS[[1,2,3,4,5,6,0][i]] }}>{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1 flex-1 min-h-0 auto-rows-fr">
+            {monthGridDates.map((dateKey) => {
+              const date = new Date(dateKey + "T00:00:00");
+              const dayNum = date.getDay();
+              const isToday = dateKey === today;
+              const isCurrentMonth = date.getMonth() === monthDate.getMonth();
+              const dayTasks = tasks[dateKey] || [];
+              const doneTasks = dayTasks.filter((t) => t.done).length;
+              const theme = dayMeta[dateKey]?.title || "";
 
-              <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-end">
-                {dayTasks.length > 0 && <span className="text-[10px] text-txt3 font-mono">{doneTasks}/{dayTasks.length}</span>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              return (
+                <div key={dateKey}
+                  onClick={() => { setModalDate(dateKey); setNewTaskText(""); setLinkProject(null); setLinkType("none"); setLinkParentTask(null); setProjectTasks([]); }}
+                  className={cn(
+                    "bg-surface border rounded-lg p-1.5 flex flex-col cursor-pointer transition-all overflow-hidden",
+                    isToday ? "border-violet shadow-md shadow-violet/10" : "border-border/50 hover:border-border2",
+                    !isCurrentMonth && "opacity-40"
+                  )}>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className={cn("text-[10px] font-bold", isToday ? "text-violet2" : "text-txt3")}
+                      style={isCurrentMonth ? { color: DAY_COLORS[dayNum] } : undefined}>
+                      {date.getDate()}
+                    </span>
+                    {dayTasks.length > 0 && (
+                      <span className="text-[8px] text-txt3 font-mono">{doneTasks}/{dayTasks.length}</span>
+                    )}
+                  </div>
+                  {theme && <p className="text-[8px] text-txt3 truncate">{theme}</p>}
+                  <div className="flex-1 space-y-0.5 overflow-hidden min-h-0">
+                    {dayTasks.slice(0, 3).map((t) => {
+                      const tagColor = getTagColor(t.text);
+                      return (
+                        <div key={t.id} className="flex items-center gap-1 text-[9px] leading-tight" onClick={(e) => e.stopPropagation()}>
+                          <input type="checkbox" checked={t.done} onChange={() => toggleTaskDone(t)}
+                            className="w-2.5 h-2.5 shrink-0" style={{ accentColor: tagColor || DAY_COLORS[dayNum] }} />
+                          <span className={cn("truncate", t.done && "task-done")}>{t.text.replace(/^\[.*?\]\s*/, "")}</span>
+                        </div>
+                      );
+                    })}
+                    {dayTasks.length > 3 && <p className="text-[8px] text-txt3">+{dayTasks.length - 3} more</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Day Detail Modal */}
       {modalDate && modalDateObj && (
