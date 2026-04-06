@@ -365,48 +365,62 @@ export default function WeekPage() {
               })}
             </div>
 
-            <div className="p-4 border-t border-border shrink-0 space-y-2">
-              {/* Project link selector */}
-              <div className="flex flex-wrap gap-2">
-                <select value={linkProject || ""} onChange={(e) => {
-                  const val = e.target.value || null;
-                  setLinkProject(val);
-                  setLinkType(val ? "main" : "none");
-                  setLinkParentTask(null);
-                  if (val) loadProjectTasksForLink(val);
-                  else setProjectTasks([]);
-                }}
-                  className="bg-surface border border-border rounded-lg px-2 py-1.5 text-xs text-txt2 min-w-[120px]">
-                  <option value="">No project</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>{p.title}</option>
-                  ))}
-                </select>
-
-                {linkProject && (
-                  <select value={linkType} onChange={(e) => {
-                    setLinkType(e.target.value as "main" | "subtask");
+            <div className="p-4 border-t border-border shrink-0 space-y-3">
+              {/* Step 1: Project link */}
+              <div>
+                <p className="text-[10px] text-txt3 uppercase tracking-wider mb-1.5">Link to project</p>
+                <div className="flex flex-wrap gap-2">
+                  <select value={linkProject || ""} onChange={(e) => {
+                    const val = e.target.value || null;
+                    setLinkProject(val);
+                    setLinkType(val ? "none" : "none");
                     setLinkParentTask(null);
+                    setProjectTasks([]);
+                    if (val) loadProjectTasksForLink(val);
                   }}
-                    className="bg-surface border border-border rounded-lg px-2 py-1.5 text-xs text-txt2">
-                    <option value="none">Just tag</option>
-                    <option value="main">Create as main task</option>
-                    {projectTasks.length > 0 && <option value="subtask">Create as subtask</option>}
-                  </select>
-                )}
-
-                {linkType === "subtask" && projectTasks.length > 0 && (
-                  <select value={linkParentTask || ""} onChange={(e) => setLinkParentTask(e.target.value || null)}
-                    className="bg-surface border border-border rounded-lg px-2 py-1.5 text-xs text-txt2 flex-1 min-w-[120px]">
-                    <option value="">Select parent task...</option>
-                    {projectTasks.map((t) => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
+                    className="bg-surface border border-border rounded-lg px-3 py-2 text-xs text-txt min-w-[140px]">
+                    <option value="">— No project —</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>● {p.title}</option>
                     ))}
                   </select>
+
+                  {linkProject && (
+                    <select value={linkType} onChange={(e) => {
+                      const val = e.target.value as "none" | "main" | "subtask";
+                      setLinkType(val);
+                      setLinkParentTask(null);
+                    }}
+                      className="bg-surface border border-border rounded-lg px-3 py-2 text-xs text-txt">
+                      <option value="none">Just tag it</option>
+                      <option value="main">→ Create as main task</option>
+                      {projectTasks.length > 0 && <option value="subtask">↳ Create as subtask of...</option>}
+                    </select>
+                  )}
+
+                  {linkProject && linkType === "subtask" && projectTasks.length > 0 && (
+                    <select value={linkParentTask || ""} onChange={(e) => setLinkParentTask(e.target.value || null)}
+                      className="bg-surface border border-border rounded-lg px-3 py-2 text-xs text-txt flex-1 min-w-[140px]">
+                      <option value="">— Pick parent task —</option>
+                      {projectTasks.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {/* Visual feedback of what will happen */}
+                {linkProject && (
+                  <p className="text-[10px] mt-1.5 px-1" style={{ color: projects.find(p => p.id === linkProject)?.color || "#7c6fff" }}>
+                    {linkType === "none" && "→ Will add a tagged task to this day only"}
+                    {linkType === "main" && "→ Will create a new main task in the project + add to this day"}
+                    {linkType === "subtask" && !linkParentTask && "→ Select which main task to add the subtask under"}
+                    {linkType === "subtask" && linkParentTask && `→ Will create a subtask under "${projectTasks.find(t => t.id === linkParentTask)?.name}" + add to this day`}
+                  </p>
                 )}
               </div>
 
-              {/* Task input */}
+              {/* Step 2: Task input */}
               <div className="flex gap-2">
                 <input type="text" value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addTask(modalDate)}

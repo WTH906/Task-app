@@ -25,7 +25,9 @@ export default function DayDetailPage() {
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [projects, setProjects] = useState<Array<{ id: string; title: string; color: string }>>([]);
   const [linkProject, setLinkProject] = useState<string | null>(null);
-  const [linkType, setLinkType] = useState<"none" | "main">("none");
+  const [linkType, setLinkType] = useState<"none" | "main" | "subtask">("none");
+  const [linkParentTask, setLinkParentTask] = useState<string | null>(null);
+  const [projectTasks, setProjectTasks] = useState<Array<{ id: string; name: string }>>([]);
 
   const today = toLocalDateStr(new Date());
   const isToday = dateKey === today;
@@ -131,6 +133,13 @@ export default function DayDetailPage() {
         notes: "", elapsed_seconds: 0, sort_order: 999,
       }).select().single();
       if (pt) projectTaskId = pt.id;
+    } else if (proj && linkType === "subtask" && linkParentTask) {
+      await supabase.from("subtasks").insert({
+        task_id: linkParentTask, user_id: userId, name: text,
+        est_minutes: 0, deadline: dateKey, progress: 0,
+        notes: "", sort_order: 999,
+      });
+      projectTaskId = linkParentTask;
     }
 
     await supabase.from("week_tasks").insert({
@@ -143,7 +152,16 @@ export default function DayDetailPage() {
     setNewTask("");
     setLinkProject(null);
     setLinkType("none");
+    setLinkParentTask(null);
+    setProjectTasks([]);
     load();
+  };
+
+  const loadProjectTasksForLink = async (projectId: string) => {
+    const supabase = createClient();
+    const { data } = await supabase.from("project_tasks")
+      .select("id, name").eq("project_id", projectId).order("sort_order");
+    setProjectTasks(data || []);
   };
 
   const deleteTask = async (id: string) => {
@@ -311,32 +329,63 @@ export default function DayDetailPage() {
       </div>
 
       {/* Add task */}
-      <div className="space-y-2 mb-6">
-        <div className="flex gap-2">
+      <div className="space-y-3 mb-6">
+        <p className="text-[10px] text-txt3 uppercase tracking-wider">Add new task</p>
+        <div className="flex flex-wrap gap-2">
           <select value={linkProject || ""} onChange={(e) => {
-            setLinkProject(e.target.value || null);
-            setLinkType(e.target.value ? "main" : "none");
+            const val = e.target.value || null;
+            setLinkProject(val);
+            setLinkType(val ? "none" : "none");
+            setLinkParentTask(null);
+            setProjectTasks([]);
+            if (val) loadProjectTasksForLink(val);
           }}
-            className="bg-surface border border-border rounded-lg px-2 py-2 text-xs text-txt2 min-w-[120px]">
-            <option value="">No project</option>
+            className="bg-surface border border-border rounded-lg px-3 py-2 text-xs text-txt min-w-[140px]">
+            <option value="">— No project —</option>
             {projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.title}</option>
+              <option key={p.id} value={p.id}>● {p.title}</option>
             ))}
           </select>
+
           {linkProject && (
-            <select value={linkType} onChange={(e) => setLinkType(e.target.value as "none" | "main")}
-              className="bg-surface border border-border rounded-lg px-2 py-2 text-xs text-txt2">
-              <option value="none">Just tag</option>
-              <option value="main">Create as task</option>
+            <select value={linkType} onChange={(e) => {
+              setLinkType(e.target.value as "none" | "main" | "subtask");
+              setLinkParentTask(null);
+            }}
+              className="bg-surface border border-border rounded-lg px-3 py-2 text-xs text-txt">
+              <option value="none">Just tag it</option>
+              <option value="main">→ Create as main task</option>
+              {projectTasks.length > 0 && <option value="subtask">↳ Create as subtask of...</option>}
+            </select>
+          )}
+
+          {linkProject && linkType === "subtask" && projectTasks.length > 0 && (
+            <select value={linkParentTask || ""} onChange={(e) => setLinkParentTask(e.target.value || null)}
+              className="bg-surface border border-border rounded-lg px-3 py-2 text-xs text-txt flex-1 min-w-[140px]">
+              <option value="">— Pick parent task —</option>
+              {projectTasks.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
             </select>
           )}
         </div>
+
+        {linkProject && (
+          <p className="text-[10px] px-1" style={{ color: projects.find(p => p.id === linkProject)?.color || "#7c6fff" }}>
+            {linkType === "none" && "→ Will add a tagged task to this day only"}
+            {linkType === "main" && "→ Will create a new main task in the project + add to this day"}
+            {linkType === "subtask" && !linkParentTask && "→ Select which main task to add the subtask under"}
+            {linkType === "subtask" && linkParentTask && `→ Will create a subtask under "${projectTasks.find(t => t.id === linkParentTask)?.name}" + add to this day`}
+          </p>
+        )}
+
         <div className="flex gap-2">
           <input value={newTask} onChange={(e) => setNewTask(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addTask()}
             placeholder={linkProject ? "Task name..." : "Add a task..."}
             className="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-sm text-txt placeholder-txt3" />
-          <button onClick={addTask} disabled={!newTask.trim()}
+          <button onClick={addTask}
+            disabled={!newTask.trim() || (linkType === "subtask" && !linkParentTask)}
             className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-white disabled:opacity-50 transition-colors">
             Add
           </button>

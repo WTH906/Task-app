@@ -73,6 +73,7 @@ export function Sidebar({ user }: { user: User }) {
     { href: "/", icon: "🏠", label: "Dashboard", accent: "violet", key: "D" },
     { href: "/routine", icon: "☰", label: "Routine", accent: "red-acc", key: "R" },
     { href: "/week", icon: "📅", label: "Week", accent: "violet", key: "W" },
+    { href: "/retro", icon: "📊", label: "Retro Planning", accent: "violet", key: "" },
     { href: "/deadlines", icon: "⏳", label: "Deadlines", accent: "violet", key: "" },
   ];
 

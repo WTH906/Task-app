@@ -10,6 +10,7 @@ export interface Project {
   active_task_id: string | null; alarm_fired: boolean;
   sort_order: number; created_at: string;
   color: string;
+  deadline: string | null;
 }
 
 export interface ProjectTask {

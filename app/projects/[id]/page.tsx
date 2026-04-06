@@ -407,6 +407,24 @@ export default function ProjectDetailPage() {
                 placeholder="Project title"
               />
             </div>
+            <div className="mt-1 flex items-center gap-3">
+              <CalendarPicker
+                value={project.deadline || null}
+                onChange={async (d) => {
+                  const supabase = createClient();
+                  await supabase.from("projects").update({ deadline: d }).eq("id", projectId);
+                  setProject({ ...project, deadline: d });
+                }}
+              />
+              {project.deadline && (() => {
+                const diff = new Date(project.deadline + "T23:59:00").getTime() - Date.now();
+                const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+                const color = days < 0 ? "#5c5a7a" : days <= 3 ? "#f43f5e" : days <= 7 ? "#f59e0b" : "#4caf50";
+                return <span className="text-xs font-mono" style={{ color }}>
+                  {days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? "Due today" : `${days}d left`}
+                </span>;
+              })()}
+            </div>
             <div className="mt-1">
               <InlineEdit
                 value={project.description}
