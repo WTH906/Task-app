@@ -69,3 +69,8 @@ CREATE POLICY "qt_select" ON quick_tasks FOR SELECT USING (user_id = auth.uid())
 CREATE POLICY "qt_insert" ON quick_tasks FOR INSERT WITH CHECK (user_id = auth.uid());
 CREATE POLICY "qt_update" ON quick_tasks FOR UPDATE USING (user_id = auth.uid());
 CREATE POLICY "qt_delete" ON quick_tasks FOR DELETE USING (user_id = auth.uid());
+
+-- Fix: Add missing columns to quick_tasks
+ALTER TABLE quick_tasks ADD COLUMN IF NOT EXISTS date_key DATE;
+ALTER TABLE quick_tasks ADD COLUMN IF NOT EXISTS deadline DATE;
+ALTER TABLE quick_tasks ADD COLUMN IF NOT EXISTS recurrence TEXT;

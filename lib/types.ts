@@ -70,5 +70,7 @@ export interface WeeklyRoutineTask {
 export interface QuickTask {
   id: string; user_id: string; name: string;
   priority: number; notes: string;
+  date_key: string | null; deadline: string | null;
+  recurrence: string | null;
   sort_order: number; created_at: string;
 }

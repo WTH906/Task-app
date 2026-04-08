@@ -41,7 +41,8 @@ export default function ProjectDetailPage() {
   const [parentTaskId, setParentTaskId] = useState<string | null>(null);
   const [formName, setFormName] = useState("");
   const [formEst, setFormEst] = useState(0);
-  const [formDeadline, setFormDeadline] = useState("");
+  const [formDate, setFormDate] = useState(""); // when to do it → calendar
+  const [formDeadline, setFormDeadline] = useState(""); // when it's due → deadlines
   const [formRecurrence, setFormRecurrence] = useState<string | null>(null);
   const [descModalOpen, setDescModalOpen] = useState(false);
   const [descDraft, setDescDraft] = useState("");
@@ -175,35 +176,42 @@ export default function ProjectDetailPage() {
   const saveTaskModal = async () => {
     if (!formName.trim()) return;
     const supabase = createClient();
-    const dl = formDeadline || null;
     const name = formName.trim();
+    const calDate = formDate || null;       // → appears on calendar
+    const deadline = formDeadline || null;   // → appears in deadlines
 
     if (modalMode === "task") {
       if (editTarget && "project_id" in editTarget) {
         // EDIT existing task
         await supabase
           .from("project_tasks")
-          .update({ name, est_minutes: formEst, deadline: dl })
+          .update({ name, est_minutes: formEst, deadline })
           .eq("id", editTarget.id);
-        // Sync deadline change to calendar + deadlines
+
+        // Sync calendar date
         if (project) {
-          await syncProjectTaskToWeek(supabase, userId, editTarget.id, name, projectId, project.title, dl, editTarget.deadline);
-          await syncTaskDeadlineToDeadlines(supabase, userId, editTarget.id, name, project.title, dl);
+          await syncProjectTaskToWeek(supabase, userId, editTarget.id, name, projectId, project.title, calDate, editTarget.deadline);
+        }
+        // Sync deadline
+        if (project) {
+          await syncTaskDeadlineToDeadlines(supabase, userId, editTarget.id, name, project.title, deadline);
         }
       } else {
-        // CREATE new task — get the ID back
+        // CREATE new task
         const { data: newTask } = await supabase.from("project_tasks").insert({
-          project_id: projectId,
-          user_id: userId,
-          name,
-          est_minutes: formEst,
-          deadline: dl,
-          sort_order: tasks.length,
+          project_id: projectId, user_id: userId, name,
+          est_minutes: formEst, deadline, sort_order: tasks.length,
         }).select().single();
-        // Sync to calendar + deadlines if deadline is set
-        if (newTask && dl && project) {
-          await syncProjectTaskToWeek(supabase, userId, newTask.id, name, projectId, project.title, dl, null);
-          await syncTaskDeadlineToDeadlines(supabase, userId, newTask.id, name, project.title, dl);
+
+        if (newTask && project) {
+          // Create calendar entry if date is set
+          if (calDate) {
+            await syncProjectTaskToWeek(supabase, userId, newTask.id, name, projectId, project.title, calDate, null);
+          }
+          // Create deadline entry if deadline is set
+          if (deadline) {
+            await syncTaskDeadlineToDeadlines(supabase, userId, newTask.id, name, project.title, deadline);
+          }
         }
       }
     } else if (modalMode === "subtask" && parentTaskId) {
@@ -211,31 +219,29 @@ export default function ProjectDetailPage() {
       if (editTarget && "task_id" in editTarget) {
         await supabase
           .from("subtasks")
-          .update({ name, est_minutes: formEst, deadline: dl })
+          .update({ name, est_minutes: formEst, deadline })
           .eq("id", editTarget.id);
       } else {
         await supabase.from("subtasks").insert({
-          task_id: parentTaskId,
-          user_id: userId,
-          name,
-          est_minutes: formEst,
-          deadline: dl,
+          task_id: parentTaskId, user_id: userId, name,
+          est_minutes: formEst, deadline,
           sort_order: (parent?.subtasks?.length || 0),
         });
       }
     }
 
     // Create recurring deadline if recurrence is set
-    if (formRecurrence && dl) {
-      await supabase.from("deadlines").insert({
+    if (formRecurrence && deadline) {
+      await supabase.from("deadlines").upsert({
         user_id: userId,
         label: `[${project?.title}] ${name}`,
-        target_datetime: `${dl}T23:59:00`,
+        target_datetime: `${deadline}T23:59:00`,
         recurrence: formRecurrence,
       });
     }
 
     setModalOpen(false);
+    setFormDate("");
     setFormDeadline("");
     setFormRecurrence(null);
     // Auto-expand parent task when adding a subtask
@@ -763,6 +769,7 @@ export default function ProjectDetailPage() {
                             setEditTarget(task);
                             setFormName(task.name);
                             setFormEst(task.est_minutes);
+                            setFormDate("");
                             setFormDeadline(task.deadline || "");
                             setFormRecurrence(null);
                             setModalMode("task");
@@ -780,6 +787,7 @@ export default function ProjectDetailPage() {
                               setParentTaskId(task.id);
                               setFormName("");
                               setFormEst(0);
+                              setFormDate("");
                               setFormDeadline("");
                               setFormRecurrence(null);
                               setModalMode("subtask");
@@ -920,6 +928,7 @@ export default function ProjectDetailPage() {
           setEditTarget(null);
           setFormName("");
           setFormEst(0);
+          setFormDate("");
           setFormDeadline("");
           setFormRecurrence(null);
           setModalMode("task");
@@ -963,28 +972,36 @@ export default function ProjectDetailPage() {
             />
           </div>
           <div>
-            <label className="block text-sm text-txt2 mb-1.5">Deadline</label>
+            <label className="block text-sm text-txt2 mb-1.5">📅 Schedule on calendar</label>
+            <input
+              type="date"
+              value={formDate}
+              onChange={(e) => setFormDate(e.target.value)}
+              className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm"
+            />
+            {formDate && <p className="text-[10px] text-violet2 mt-1">Task will appear on the calendar for this date</p>}
+          </div>
+          <div>
+            <label className="block text-sm text-txt2 mb-1.5">⏳ Deadline (due date)</label>
             <input
               type="date"
               value={formDeadline}
               onChange={(e) => setFormDeadline(e.target.value)}
               className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm"
             />
+            {formDeadline && <p className="text-[10px] text-danger mt-1">A countdown deadline will be created</p>}
           </div>
           {formDeadline && (
             <div>
-              <label className="block text-sm text-txt2 mb-1.5">Routine? (recurring)</label>
+              <label className="block text-sm text-txt2 mb-1.5">🔄 Recurring?</label>
               <select value={formRecurrence || ""} onChange={(e) => setFormRecurrence(e.target.value || null)}
                 className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm">
-                <option value="">No recurrence</option>
-                <option value="daily">🔄 Daily</option>
-                <option value="weekly">🔄 Weekly</option>
-                <option value="monthly">🔄 Monthly</option>
-                <option value="yearly">🔄 Yearly</option>
+                <option value="">No — one-time deadline</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
               </select>
-              {formRecurrence && (
-                <p className="text-[10px] text-violet2 mt-1">A recurring deadline will be created automatically</p>
-              )}
             </div>
           )}
           <div className="flex justify-end gap-2 pt-2">

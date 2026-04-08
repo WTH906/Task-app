@@ -3,23 +3,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { QuickTask } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, toLocalDateStr } from "@/lib/utils";
 import { GCalButton } from "@/components/GCalButton";
 
-const PRIORITY_COLORS: Record<number, { bg: string; border: string; text: string; label: string }> = {
-  1: { bg: "bg-green-acc/10", border: "border-green-acc/40", text: "text-green-acc", label: "Low" },
-  2: { bg: "bg-emerald-500/10", border: "border-emerald-500/40", text: "text-emerald-400", label: "Medium-Low" },
-  3: { bg: "bg-yellow-500/10", border: "border-yellow-500/40", text: "text-yellow-400", label: "Medium" },
-  4: { bg: "bg-orange-500/10", border: "border-orange-500/40", text: "text-orange-400", label: "High" },
-  5: { bg: "bg-red-500/10", border: "border-red-500/40", text: "text-red-400", label: "Critical" },
-};
-
-const PRIORITY_BORDER_STYLES: Record<number, string> = {
-  1: "#4ade80",
-  2: "#34d399",
-  3: "#eab308",
-  4: "#f97316",
-  5: "#ef4444",
+const PRIORITY_COLORS: Record<number, { border: string; bg: string; text: string; label: string }> = {
+  1: { border: "#4ade80", bg: "rgba(74,222,128,0.06)", text: "#4ade80", label: "Low" },
+  2: { border: "#34d399", bg: "rgba(52,211,153,0.06)", text: "#34d399", label: "Medium-Low" },
+  3: { border: "#eab308", bg: "rgba(234,179,8,0.06)", text: "#eab308", label: "Medium" },
+  4: { border: "#f97316", bg: "rgba(249,115,22,0.06)", text: "#f97316", label: "High" },
+  5: { border: "#ef4444", bg: "rgba(239,68,68,0.08)", text: "#ef4444", label: "Critical" },
 };
 
 export default function TaskListPage() {
@@ -28,10 +20,16 @@ export default function TaskListPage() {
   const [newName, setNewName] = useState("");
   const [newPriority, setNewPriority] = useState(3);
   const [newNotes, setNewNotes] = useState("");
+  const [newDate, setNewDate] = useState("");
+  const [newDeadline, setNewDeadline] = useState("");
+  const [newRecurrence, setNewRecurrence] = useState("");
   const [sortDir, setSortDir] = useState<"asc" | "desc" | "manual">("manual");
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [now] = useState(new Date());
+
+  const today = toLocalDateStr(now);
 
   const loadTasks = useCallback(async () => {
     const supabase = createClient();
@@ -49,11 +47,31 @@ export default function TaskListPage() {
     const supabase = createClient();
     await supabase.from("quick_tasks").insert({
       user_id: userId, name: newName.trim(), priority: newPriority,
-      notes: newNotes.trim(), sort_order: tasks.length,
+      notes: newNotes.trim(), date_key: newDate || null,
+      deadline: newDeadline || null, recurrence: newRecurrence || null,
+      sort_order: tasks.length,
     });
-    setNewName("");
-    setNewPriority(3);
-    setNewNotes("");
+
+    // Also create a week_task if date is set
+    if (newDate) {
+      await supabase.from("week_tasks").insert({
+        user_id: userId, date_key: newDate, text: newName.trim(),
+        sort_order: 999, done: false,
+      });
+    }
+
+    // Create deadline entry if deadline is set
+    if (newDeadline) {
+      await supabase.from("deadlines").insert({
+        user_id: userId,
+        label: newName.trim(),
+        target_datetime: `${newDeadline}T23:59:00`,
+        recurrence: newRecurrence || null,
+      });
+    }
+
+    setNewName(""); setNewPriority(3); setNewNotes("");
+    setNewDate(""); setNewDeadline(""); setNewRecurrence("");
     loadTasks();
   };
 
@@ -90,19 +108,22 @@ export default function TaskListPage() {
     setDragIdx(null);
     if (sortDir !== "manual") return;
     const supabase = createClient();
-    const updates = tasks.map((t, i) => supabase.from("quick_tasks").update({ sort_order: i }).eq("id", t.id));
-    await Promise.all(updates);
+    await Promise.all(tasks.map((t, i) => supabase.from("quick_tasks").update({ sort_order: i }).eq("id", t.id)));
   };
 
+  // Stats
+  const totalTasks = tasks.length;
+  const criticalCount = tasks.filter((t) => t.priority >= 4).length;
+  const withDeadline = tasks.filter((t) => t.deadline).length;
+
   return (
-    <div className="p-4 md:p-8 max-w-3xl mx-auto">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+    <div className="p-4 md:p-8 max-w-3xl mx-auto animate-fade-in">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
         <div>
           <h1 className="font-title text-2xl text-bright">Task List</h1>
-          <p className="text-sm text-txt2 mt-0.5">Quick tasks, appointments & reminders</p>
+          <p className="text-sm text-txt2 mt-0.5">Quick tasks, appointments & reminders — no project needed</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-txt3 uppercase">Sort:</span>
           <button onClick={() => setSortDir(sortDir === "asc" ? "desc" : sortDir === "desc" ? "manual" : "asc")}
             className={cn("px-3 py-1.5 rounded-lg border text-xs font-mono transition-colors",
               sortDir === "manual" ? "border-border text-txt3" : "border-violet/30 text-violet2 bg-violet/10")}>
@@ -110,6 +131,15 @@ export default function TaskListPage() {
           </button>
         </div>
       </div>
+
+      {/* Stats */}
+      {totalTasks > 0 && (
+        <div className="flex items-center gap-3 mb-4 text-xs text-txt3">
+          <span>{totalTasks} tasks</span>
+          {criticalCount > 0 && <span className="text-red-400">{criticalCount} high priority</span>}
+          {withDeadline > 0 && <span>{withDeadline} with deadlines</span>}
+        </div>
+      )}
 
       {/* Add form */}
       <div className="bg-surface border border-border rounded-xl p-4 mb-6 space-y-3">
@@ -121,18 +151,43 @@ export default function TaskListPage() {
           <select value={newPriority} onChange={(e) => setNewPriority(parseInt(e.target.value))}
             className="bg-surface2 border border-border rounded-lg px-3 py-2 text-xs text-txt">
             {[1,2,3,4,5].map((p) => (
-              <option key={p} value={p}>{p} — {PRIORITY_COLORS[p].label}</option>
+              <option key={p} value={p}>P{p} — {PRIORITY_COLORS[p].label}</option>
             ))}
           </select>
         </div>
-        <div className="flex gap-2">
-          <input value={newNotes} onChange={(e) => setNewNotes(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addTask()}
-            placeholder="Short note (optional)..."
-            className="flex-1 bg-surface2 border border-border rounded-lg px-3 py-2 text-xs text-txt placeholder-txt3" />
+        <input value={newNotes} onChange={(e) => setNewNotes(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addTask()}
+          placeholder="Short note (optional)..."
+          className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-xs text-txt placeholder-txt3" />
+        <div className="flex flex-wrap gap-2">
+          <div className="flex-1 min-w-[140px]">
+            <label className="block text-[10px] text-txt3 uppercase tracking-wider mb-1">📅 Calendar date</label>
+            <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)}
+              className="w-full bg-surface2 border border-border rounded-lg px-3 py-1.5 text-xs text-txt" />
+          </div>
+          <div className="flex-1 min-w-[140px]">
+            <label className="block text-[10px] text-txt3 uppercase tracking-wider mb-1">⏳ Deadline</label>
+            <input type="date" value={newDeadline} onChange={(e) => setNewDeadline(e.target.value)}
+              className="w-full bg-surface2 border border-border rounded-lg px-3 py-1.5 text-xs text-txt" />
+          </div>
+          {newDeadline && (
+            <div className="flex-1 min-w-[140px]">
+              <label className="block text-[10px] text-txt3 uppercase tracking-wider mb-1">🔄 Recurring</label>
+              <select value={newRecurrence} onChange={(e) => setNewRecurrence(e.target.value)}
+                className="w-full bg-surface2 border border-border rounded-lg px-3 py-1.5 text-xs text-txt">
+                <option value="">No</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end">
           <button onClick={addTask} disabled={!newName.trim()}
-            className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-white disabled:opacity-50 transition-colors">
-            Add
+            className="px-5 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-white disabled:opacity-50 transition-colors">
+            Add Task
           </button>
         </div>
       </div>
@@ -141,7 +196,10 @@ export default function TaskListPage() {
       <div className="space-y-2">
         {sortedTasks.map((task, idx) => {
           const pc = PRIORITY_COLORS[task.priority] || PRIORITY_COLORS[3];
-          const borderColor = PRIORITY_BORDER_STYLES[task.priority] || "#eab308";
+          const daysUntilDeadline = task.deadline
+            ? Math.ceil((new Date(task.deadline + "T23:59:00").getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+            : null;
+          const isOverdue = daysUntilDeadline !== null && daysUntilDeadline < 0;
 
           return (
             <div key={task.id}
@@ -150,13 +208,16 @@ export default function TaskListPage() {
               onDragOver={(e) => handleDragOver(e, idx)}
               onDragEnd={handleDragEnd}
               className={cn(
-                "bg-surface border-l-[3px] border border-border rounded-lg px-4 py-3 group transition-all",
+                "rounded-xl p-4 group transition-all border-2",
                 dragIdx === idx && "opacity-50 scale-[0.98]"
               )}
-              style={{ borderLeftColor: borderColor }}>
-              <div className="flex items-center gap-3">
+              style={{
+                borderColor: pc.border,
+                backgroundColor: pc.bg,
+              }}>
+              <div className="flex items-start gap-3">
                 {sortDir === "manual" && (
-                  <span className="cursor-grab text-txt3 opacity-0 group-hover:opacity-100 transition-opacity select-none shrink-0">⠿</span>
+                  <span className="cursor-grab text-txt3 opacity-30 group-hover:opacity-100 transition-opacity select-none mt-0.5 shrink-0">⠿</span>
                 )}
 
                 <div className="flex-1 min-w-0">
@@ -168,26 +229,53 @@ export default function TaskListPage() {
                       className="text-sm font-medium text-bright bg-transparent border-b border-violet outline-none w-full"
                       autoFocus />
                   ) : (
-                    <p className="text-sm font-medium text-bright truncate cursor-pointer"
+                    <p className="text-sm font-medium text-bright cursor-pointer hover:underline"
                       onClick={() => setEditingId(task.id)}>{task.name}</p>
                   )}
-                  {task.notes && <p className="text-xs text-txt3 mt-0.5 truncate">{task.notes}</p>}
+                  {task.notes && <p className="text-xs text-txt3 mt-0.5">{task.notes}</p>}
+
+                  {/* Date/deadline info */}
+                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                    {task.date_key && (
+                      <span className="text-[10px] text-violet2 bg-violet/10 px-1.5 py-0.5 rounded">
+                        📅 {task.date_key}
+                      </span>
+                    )}
+                    {task.deadline && (
+                      <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-mono",
+                        isOverdue ? "text-red-400 bg-red-400/10" : "text-txt3 bg-surface3")}>
+                        ⏳ {task.deadline}
+                        {daysUntilDeadline !== null && (
+                          <span className="ml-1">
+                            {isOverdue ? `${Math.abs(daysUntilDeadline)}d late` : daysUntilDeadline === 0 ? "today" : `${daysUntilDeadline}d`}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                    {task.recurrence && (
+                      <span className="text-[10px] text-txt3">🔄 {task.recurrence}</span>
+                    )}
+                  </div>
                 </div>
 
-                <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded shrink-0", pc.bg, pc.text)}>
+                {/* Priority badge */}
+                <span className="text-[10px] font-bold px-2 py-1 rounded shrink-0"
+                  style={{ color: pc.text, backgroundColor: `${pc.border}15` }}>
                   P{task.priority}
                 </span>
 
+                {/* Priority changer */}
                 <select value={task.priority}
                   onChange={(e) => updateTask(task.id, "priority", parseInt(e.target.value))}
-                  className="bg-transparent border-none text-[10px] text-txt3 opacity-0 group-hover:opacity-100 transition-opacity w-8">
+                  className="bg-transparent border-none text-[10px] text-txt3 opacity-0 group-hover:opacity-100 transition-opacity w-8 shrink-0">
                   {[1,2,3,4,5].map((p) => <option key={p} value={p}>{p}</option>)}
                 </select>
 
-                <GCalButton title={task.name} date={null} description={task.notes} />
+                <GCalButton title={task.name} date={task.date_key || task.deadline} description={task.notes} />
 
                 <button onClick={() => setConfirmId(task.id)}
-                  className="text-xs px-2 py-1 rounded border border-border text-txt3 opacity-0 group-hover:opacity-100 hover:border-green-acc hover:text-green-acc transition-all shrink-0">
+                  className="text-xs px-2.5 py-1.5 rounded-lg border text-txt3 opacity-0 group-hover:opacity-100 hover:border-green-acc hover:text-green-acc hover:bg-green-acc/10 transition-all shrink-0"
+                  style={{ borderColor: pc.border + "40" }}>
                   Done ✓
                 </button>
               </div>
