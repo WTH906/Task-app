@@ -32,7 +32,7 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; 
   done: { bg: "bg-green-acc/10", text: "text-green-acc", border: "border-green-acc/30", dot: "bg-green-acc border-green-acc" },
 };
 
-function genId() { return crypto.randomUUID(); }
+function genId() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
 export default function RoadmapPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -350,7 +350,8 @@ export default function RoadmapPage() {
                         {/* Title — with task picker */}
                         <div className="flex items-center gap-2 mb-1">
                           <input value={ms.title} onChange={(e) => updateMilestone(pi, mi, "title", e.target.value)}
-                            className="flex-1 text-sm font-bold text-bright bg-transparent border-b border-transparent focus:border-violet outline-none"
+                            className={cn("flex-1 text-sm font-bold bg-transparent border-b border-transparent focus:border-violet outline-none",
+                              taskProgress !== null && taskProgress >= 100 ? "text-txt3 line-through" : "text-bright")}
                             placeholder="Milestone title..." spellCheck={false} />
                           <select value={ms.project_task_id || ""} onChange={(e) => linkTaskToMilestone(pi, mi, e.target.value || null)}
                             className="bg-surface3 border border-border rounded px-1.5 py-0.5 text-[10px] text-txt3 max-w-[120px] opacity-0 group-hover/card:opacity-100 transition-opacity"
@@ -382,7 +383,8 @@ export default function RoadmapPage() {
                                   <span className="w-8 shrink-0" />
                                 )}
                                 <input value={ck.text} onChange={(e) => updateCheck(pi, mi, ci, e.target.value)}
-                                  className="flex-1 text-xs text-txt2 bg-transparent border-b border-transparent focus:border-border2 outline-none"
+                                  className={cn("flex-1 text-xs bg-transparent border-b border-transparent focus:border-border2 outline-none",
+                                    subProgress !== null && subProgress >= 100 ? "text-txt3 line-through" : "text-txt2")}
                                   placeholder="Task..." spellCheck={false} />
                                 <select value={ck.subtask_id || ""} onChange={(e) => linkSubtaskToCheck(pi, mi, ci, e.target.value || null)}
                                   className="bg-transparent border-none text-[9px] text-txt3 max-w-[100px] opacity-0 group-hover/ck:opacity-100"

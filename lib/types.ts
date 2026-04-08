@@ -66,3 +66,9 @@ export interface WeeklyRoutineTask {
   est_minutes: number; sort_order: number; created_at: string;
   checked?: boolean;
 }
+
+export interface QuickTask {
+  id: string; user_id: string; name: string;
+  priority: number; notes: string;
+  sort_order: number; created_at: string;
+}

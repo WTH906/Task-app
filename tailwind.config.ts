@@ -17,7 +17,7 @@ const config: Config = {
         border2: "#3a3a55",
         txt: "#e8e6ff",
         txt2: "#9896b8",
-        txt3: "#5c5a7a",
+        txt3: "#7b79a0",
         bright: "#f0eeff",
         "red-acc": "#e05555",
         "red-dark": "#b83a3a",

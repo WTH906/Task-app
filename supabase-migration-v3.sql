@@ -52,3 +52,20 @@ CREATE POLICY "rd_select" ON roadmap_data FOR SELECT USING (user_id = auth.uid()
 CREATE POLICY "rd_insert" ON roadmap_data FOR INSERT WITH CHECK (user_id = auth.uid());
 CREATE POLICY "rd_update" ON roadmap_data FOR UPDATE USING (user_id = auth.uid());
 CREATE POLICY "rd_delete" ON roadmap_data FOR DELETE USING (user_id = auth.uid());
+
+-- Quick tasks (task dump list)
+CREATE TABLE IF NOT EXISTS quick_tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL,
+  name TEXT NOT NULL,
+  priority INT DEFAULT 3, -- 1-5
+  notes TEXT DEFAULT '',
+  sort_order INT DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE quick_tasks ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "qt_select" ON quick_tasks FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "qt_insert" ON quick_tasks FOR INSERT WITH CHECK (user_id = auth.uid());
+CREATE POLICY "qt_update" ON quick_tasks FOR UPDATE USING (user_id = auth.uid());
+CREATE POLICY "qt_delete" ON quick_tasks FOR DELETE USING (user_id = auth.uid());

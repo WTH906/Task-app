@@ -43,7 +43,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <Sidebar user={user} />
-      <main className="flex-1 ml-0 md:ml-60 min-h-screen">
+      <main className="flex-1 ml-0 md:ml-60 min-h-screen animate-fade-in">
         {children}
       </main>
     </div>

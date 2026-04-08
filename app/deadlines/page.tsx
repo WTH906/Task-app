@@ -2,36 +2,64 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
-import { Deadline } from "@/lib/types";
-import { cn } from "@/lib/utils";
-import { Modal } from "@/components/Modal";
+import { Deadline, Project, ProjectTask } from "@/lib/types";
+import { cn, toLocalDateStr } from "@/lib/utils";
+
+interface AggregatedDeadline {
+  id: string;
+  label: string;
+  date: string;
+  projectTitle: string;
+  projectColor: string;
+  source: "deadline" | "task";
+  recurrence: string | null;
+}
 
 export default function DeadlinesPage() {
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [taskDeadlines, setTaskDeadlines] = useState<AggregatedDeadline[]>([]);
   const [userId, setUserId] = useState("");
   const [now, setNow] = useState(new Date());
-  const [modalOpen, setModalOpen] = useState(false);
-  const [formLabel, setFormLabel] = useState("");
-  const [formDate, setFormDate] = useState("");
-  const [formTime, setFormTime] = useState("23:59");
-  const [formRecurrence, setFormRecurrence] = useState<string | null>(null);
+  const [showAllModal, setShowAllModal] = useState(false);
 
   const load = useCallback(async () => {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     setUserId(user.id);
-    const { data } = await supabase.from("deadlines").select("*").eq("user_id", user.id).order("target_datetime");
-    setDeadlines(data || []);
+
+    const { data: dls } = await supabase.from("deadlines").select("*").eq("user_id", user.id).order("target_datetime");
+    setDeadlines(dls || []);
+
+    const { data: projs } = await supabase.from("projects").select("*").eq("user_id", user.id);
+    setProjects(projs || []);
+
+    // Load all project task deadlines
+    const { data: tasks } = await supabase.from("project_tasks").select("id, name, deadline, project_id, progress")
+      .eq("user_id", user.id).not("deadline", "is", null);
+
+    const projMap: Record<string, { title: string; color: string }> = {};
+    for (const p of projs || []) projMap[p.id] = { title: p.title, color: p.color || "#e05555" };
+
+    const tds: AggregatedDeadline[] = [];
+    for (const t of tasks || []) {
+      if (t.deadline && (t as ProjectTask).progress < 100) {
+        tds.push({
+          id: t.id, label: t.name, date: t.deadline,
+          projectTitle: projMap[t.project_id]?.title || "Unknown",
+          projectColor: projMap[t.project_id]?.color || "#e05555",
+          source: "task", recurrence: null,
+        });
+      }
+    }
+    setTaskDeadlines(tds);
   }, []);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => {
-    const iv = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(iv);
-  }, []);
+  useEffect(() => { const iv = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(iv); }, []);
 
-  // Auto-renew recurring deadlines that have passed
+  // Auto-renew recurring deadlines
   useEffect(() => {
     const renewRecurring = async () => {
       const supabase = createClient();
@@ -39,7 +67,6 @@ export default function DeadlinesPage() {
         if (!d.recurrence) continue;
         const target = new Date(d.target_datetime);
         if (target.getTime() > now.getTime()) continue;
-
         let next = new Date(target);
         while (next.getTime() <= now.getTime()) {
           switch (d.recurrence) {
@@ -49,33 +76,13 @@ export default function DeadlinesPage() {
             case "yearly": next.setFullYear(next.getFullYear() + 1); break;
           }
         }
-
-        await supabase.from("deadlines")
-          .update({ target_datetime: next.toISOString() })
-          .eq("id", d.id);
+        await supabase.from("deadlines").update({ target_datetime: next.toISOString() }).eq("id", d.id);
       }
       load();
     };
-
-    const hasExpiredRecurring = deadlines.some(
-      (d) => d.recurrence && new Date(d.target_datetime).getTime() <= now.getTime()
-    );
-    if (hasExpiredRecurring) renewRecurring();
+    const hasExpired = deadlines.some((d) => d.recurrence && new Date(d.target_datetime).getTime() <= now.getTime());
+    if (hasExpired) renewRecurring();
   }, [deadlines, now, load]);
-
-  const addDeadline = async () => {
-    if (!formLabel.trim() || !formDate) return;
-    const supabase = createClient();
-    await supabase.from("deadlines").insert({
-      user_id: userId,
-      label: formLabel.trim(),
-      target_datetime: `${formDate}T${formTime}:00`,
-      recurrence: formRecurrence,
-    });
-    setModalOpen(false);
-    setFormLabel(""); setFormDate(""); setFormTime("23:59"); setFormRecurrence(null);
-    load();
-  };
 
   const removeDeadline = async (id: string) => {
     const supabase = createClient();
@@ -109,122 +116,112 @@ export default function DeadlinesPage() {
     daily: "🔄 Daily", weekly: "🔄 Weekly", monthly: "🔄 Monthly", yearly: "🔄 Yearly",
   };
 
+  // All deadlines combined for the modal
+  const allDeadlines: AggregatedDeadline[] = [
+    ...deadlines.map((d) => ({
+      id: d.id, label: d.label, date: d.target_datetime.split("T")[0],
+      projectTitle: "", projectColor: "#7c6fff", source: "deadline" as const,
+      recurrence: d.recurrence,
+    })),
+    ...taskDeadlines,
+  ].sort((a, b) => a.date.localeCompare(b.date));
+
+  const today = toLocalDateStr(new Date());
+
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="font-title text-2xl text-bright">Deadlines</h1>
-          <p className="text-sm text-txt2 mt-0.5">{deadlines.length} countdowns</p>
+          <p className="text-sm text-txt2 mt-0.5">{deadlines.length} countdowns · {taskDeadlines.length} task deadlines</p>
         </div>
-        <button onClick={() => setModalOpen(true)}
+        <button onClick={() => setShowAllModal(true)}
           className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-white transition-colors">
-          ＋ Add Deadline
+          Show All Deadlines
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+      {/* Countdown cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {deadlines.map((d) => {
-          const countdown = getCountdown(d.target_datetime);
+          const { text, passed } = getCountdown(d.target_datetime);
           const color = getColor(d.target_datetime);
-          const targetDate = new Date(d.target_datetime);
+          const dateStr = new Date(d.target_datetime).toLocaleDateString("en-US", {
+            weekday: "short", month: "short", day: "numeric", year: "numeric",
+            hour: "2-digit", minute: "2-digit",
+          });
 
           return (
-            <div key={d.id} className={cn(
-              "bg-surface border rounded-xl p-4 transition-all",
-              countdown.passed ? "border-border opacity-60" : "border-border hover:border-border2"
-            )}>
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h3 className="text-bright font-medium text-sm">{d.label}</h3>
-                  {d.recurrence && (
-                    <span className="text-[10px] text-violet2 bg-violet/10 px-1.5 py-0.5 rounded mt-1 inline-block">
-                      {recurrenceLabels[d.recurrence] || d.recurrence}
-                    </span>
-                  )}
-                </div>
+            <div key={d.id} className="bg-surface border border-border rounded-xl p-4 group"
+              style={{ borderLeftWidth: 3, borderLeftColor: color }}>
+              <div className="flex items-start justify-between mb-2">
+                <h3 className={cn("text-sm font-medium", passed ? "text-txt3" : "text-bright")}>{d.label}</h3>
                 <button onClick={() => removeDeadline(d.id)}
-                  className="text-txt3 hover:text-danger text-sm transition-colors">✕</button>
+                  className="text-xs text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 transition-all">✕</button>
               </div>
-
-              <p className="text-xs text-txt3 mb-2">
-                {targetDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}{" "}
-                {targetDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-              </p>
-
-              <p className="font-mono text-lg mb-3" style={{ color }}>{countdown.text}</p>
-
-              <div className="w-full h-1.5 bg-surface3 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{
-                  backgroundColor: color,
-                  width: countdown.passed ? "100%" :
-                    `${Math.max(0, Math.min(100, ((now.getTime() - new Date(d.created_at).getTime()) / (targetDate.getTime() - new Date(d.created_at).getTime())) * 100))}%`,
-                }} />
-              </div>
+              <p className="font-mono text-lg font-bold mb-1" style={{ color }}>{text}</p>
+              <p className="text-[10px] text-txt3">{dateStr}</p>
+              {d.recurrence && (
+                <p className="text-[10px] mt-1" style={{ color }}>{recurrenceLabels[d.recurrence]}</p>
+              )}
             </div>
           );
         })}
       </div>
 
-      {deadlines.length === 0 && (
+      {deadlines.length === 0 && !showAllModal && (
         <div className="text-center py-16 text-txt3">
-          <p className="text-lg mb-2">No deadlines set</p>
-          <p className="text-sm mb-4">Add a countdown to track important dates</p>
-          <button onClick={() => setModalOpen(true)}
-            className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-white transition-colors">
-            Add Deadline
-          </button>
+          <p className="text-4xl mb-3 opacity-30">⏳</p>
+          <p className="text-lg font-medium text-txt2 mb-1">No countdown deadlines</p>
+          <p className="text-sm">Deadlines are created automatically when you set dates on tasks</p>
         </div>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add Deadline">
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-txt2 mb-1.5">Label</label>
-            <input type="text" value={formLabel} onChange={(e) => setFormLabel(e.target.value)}
-              className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm"
-              placeholder="e.g. Project deadline" autoFocus />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm text-txt2 mb-1.5">Date</label>
-              <input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)}
-                className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm" />
+      {/* Show All Deadlines Modal */}
+      {showAllModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAllModal(false); }}>
+          <div className="bg-surface2 border border-border rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
+              <div>
+                <h2 className="font-title text-lg text-bright">All Deadlines</h2>
+                <p className="text-xs text-txt3 mt-0.5">{allDeadlines.length} total · sorted by date</p>
+              </div>
+              <button onClick={() => setShowAllModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface3 text-txt3 hover:text-txt">✕</button>
             </div>
-            <div>
-              <label className="block text-sm text-txt2 mb-1.5">Time</label>
-              <input type="time" value={formTime} onChange={(e) => setFormTime(e.target.value)}
-                className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm" />
+            <div className="flex-1 overflow-y-auto p-4 space-y-1.5">
+              {allDeadlines.length === 0 && <p className="text-sm text-txt3 text-center py-8">No deadlines found</p>}
+              {allDeadlines.map((d) => {
+                const isPast = d.date < today;
+                const isToday = d.date === today;
+                return (
+                  <div key={`${d.source}-${d.id}`}
+                    className={cn("flex items-center gap-3 bg-surface border border-border rounded-lg px-3 py-2.5",
+                      isPast && "opacity-50")}>
+                    <span className="font-mono text-[11px] text-txt3 w-24 shrink-0">
+                      {isToday ? <span className="text-danger font-bold">TODAY</span> : d.date}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-bright truncate">{d.label}</p>
+                      {d.projectTitle && (
+                        <p className="text-[10px] mt-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full inline-block mr-1" style={{ backgroundColor: d.projectColor }} />
+                          <span style={{ color: d.projectColor }}>{d.projectTitle}</span>
+                        </p>
+                      )}
+                    </div>
+                    <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded",
+                      d.source === "task" ? "bg-violet/10 text-violet2" : "bg-surface3 text-txt3")}>
+                      {d.source === "task" ? "task" : d.recurrence ? recurrenceLabels[d.recurrence] : "countdown"}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
-          </div>
-          <div>
-            <label className="block text-sm text-txt2 mb-1.5">Repeat</label>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { value: null, label: "None" },
-                { value: "daily", label: "Daily" },
-                { value: "weekly", label: "Weekly" },
-                { value: "monthly", label: "Monthly" },
-                { value: "yearly", label: "Yearly" },
-              ].map((opt) => (
-                <button key={opt.label} onClick={() => setFormRecurrence(opt.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
-                    formRecurrence === opt.value
-                      ? "bg-violet/15 border-violet/30 text-violet2"
-                      : "bg-surface border-border text-txt3 hover:text-txt"
-                  }`}>
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button onClick={() => setModalOpen(false)}
-              className="px-4 py-2 rounded-lg text-sm text-txt2 hover:bg-surface3">Cancel</button>
-            <button onClick={addDeadline} disabled={!formLabel.trim() || !formDate}
-              className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-white disabled:opacity-50">Add</button>
           </div>
         </div>
-      </Modal>
+      )}
     </div>
   );
 }

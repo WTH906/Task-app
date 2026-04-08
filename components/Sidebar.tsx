@@ -62,7 +62,12 @@ export function Sidebar({ user }: { user: User }) {
       // Quick nav shortcuts
       if (e.key === "d") { e.preventDefault(); window.location.href = "/"; }
       if (e.key === "r") { e.preventDefault(); window.location.href = "/routine"; }
+      if (e.key === "e") { e.preventDefault(); window.location.href = "/weekly-routine"; }
       if (e.key === "w") { e.preventDefault(); window.location.href = "/week"; }
+      if (e.key === "q") { e.preventDefault(); window.location.href = "/tasks"; }
+      if (e.key === "m") { e.preventDefault(); window.location.href = "/roadmap"; }
+      if (e.key === "t") { e.preventDefault(); window.location.href = "/retro"; }
+      if (e.key === "l") { e.preventDefault(); window.location.href = "/deadlines"; }
       if (e.key === "n") { e.preventDefault(); handleNewProject(); }
     };
     document.addEventListener("keydown", handler);
@@ -72,11 +77,12 @@ export function Sidebar({ user }: { user: User }) {
   const navItems = [
     { href: "/", icon: "🏠", label: "Dashboard", accent: "violet", key: "D" },
     { href: "/routine", icon: "☰", label: "Daily Routine", accent: "red-acc", key: "R" },
-    { href: "/weekly-routine", icon: "🔄", label: "Weekly Routine", accent: "violet", key: "" },
-    { href: "/week", icon: "📅", label: "Week", accent: "violet", key: "W" },
-    { href: "/roadmap", icon: "🛤", label: "Roadmap", accent: "violet", key: "" },
-    { href: "/retro", icon: "📊", label: "Retro Planning", accent: "violet", key: "" },
-    { href: "/deadlines", icon: "⏳", label: "Deadlines", accent: "violet", key: "" },
+    { href: "/weekly-routine", icon: "🔄", label: "Weekly Routine", accent: "violet", key: "E" },
+    { href: "/week", icon: "📅", label: "Calendar", accent: "violet", key: "W" },
+    { href: "/tasks", icon: "📝", label: "Task List", accent: "violet", key: "Q" },
+    { href: "/roadmap", icon: "🛤", label: "Roadmap", accent: "violet", key: "M" },
+    { href: "/retro", icon: "📊", label: "Retro Planning", accent: "violet", key: "T" },
+    { href: "/deadlines", icon: "⏳", label: "Deadlines", accent: "violet", key: "L" },
   ];
 
   const handleSignOut = async () => {
@@ -227,7 +233,7 @@ export function Sidebar({ user }: { user: User }) {
         </nav>
 
         <div className="p-3 border-t border-border text-[10px] text-txt3 px-5 space-y-0.5">
-          <p><kbd className="bg-surface3 px-1 py-0.5 rounded">⌘K</kbd> Search · <kbd className="bg-surface3 px-1 py-0.5 rounded">D</kbd> Dashboard · <kbd className="bg-surface3 px-1 py-0.5 rounded">R</kbd> Routine · <kbd className="bg-surface3 px-1 py-0.5 rounded">W</kbd> Week · <kbd className="bg-surface3 px-1 py-0.5 rounded">N</kbd> New</p>
+          <p><kbd className="bg-surface3 px-1 py-0.5 rounded">⌘K</kbd> Search · <kbd className="bg-surface3 px-1 py-0.5 rounded">D</kbd> Home · <kbd className="bg-surface3 px-1 py-0.5 rounded">R</kbd> Routine · <kbd className="bg-surface3 px-1 py-0.5 rounded">W</kbd> Calendar · <kbd className="bg-surface3 px-1 py-0.5 rounded">M</kbd> Map · <kbd className="bg-surface3 px-1 py-0.5 rounded">N</kbd> New</p>
         </div>
         <div className="p-3 border-t border-border">
           <button onClick={handleSignOut}

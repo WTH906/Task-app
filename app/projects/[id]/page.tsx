@@ -41,6 +41,8 @@ export default function ProjectDetailPage() {
   const [parentTaskId, setParentTaskId] = useState<string | null>(null);
   const [formName, setFormName] = useState("");
   const [formEst, setFormEst] = useState(0);
+  const [formDeadline, setFormDeadline] = useState("");
+  const [formRecurrence, setFormRecurrence] = useState<string | null>(null);
   const [descModalOpen, setDescModalOpen] = useState(false);
   const [descDraft, setDescDraft] = useState("");
   const [gcalModalOpen, setGcalModalOpen] = useState(false);
@@ -173,41 +175,73 @@ export default function ProjectDetailPage() {
   const saveTaskModal = async () => {
     if (!formName.trim()) return;
     const supabase = createClient();
+    const dl = formDeadline || null;
+    const name = formName.trim();
 
     if (modalMode === "task") {
       if (editTarget && "project_id" in editTarget) {
+        // EDIT existing task
         await supabase
           .from("project_tasks")
-          .update({ name: formName.trim(), est_minutes: formEst })
+          .update({ name, est_minutes: formEst, deadline: dl })
           .eq("id", editTarget.id);
+        // Sync deadline change to calendar + deadlines
+        if (project) {
+          await syncProjectTaskToWeek(supabase, userId, editTarget.id, name, projectId, project.title, dl, editTarget.deadline);
+          await syncTaskDeadlineToDeadlines(supabase, userId, editTarget.id, name, project.title, dl);
+        }
       } else {
-        await supabase.from("project_tasks").insert({
+        // CREATE new task — get the ID back
+        const { data: newTask } = await supabase.from("project_tasks").insert({
           project_id: projectId,
           user_id: userId,
-          name: formName.trim(),
+          name,
           est_minutes: formEst,
+          deadline: dl,
           sort_order: tasks.length,
-        });
+        }).select().single();
+        // Sync to calendar + deadlines if deadline is set
+        if (newTask && dl && project) {
+          await syncProjectTaskToWeek(supabase, userId, newTask.id, name, projectId, project.title, dl, null);
+          await syncTaskDeadlineToDeadlines(supabase, userId, newTask.id, name, project.title, dl);
+        }
       }
     } else if (modalMode === "subtask" && parentTaskId) {
       const parent = tasks.find((t) => t.id === parentTaskId);
       if (editTarget && "task_id" in editTarget) {
         await supabase
           .from("subtasks")
-          .update({ name: formName.trim(), est_minutes: formEst })
+          .update({ name, est_minutes: formEst, deadline: dl })
           .eq("id", editTarget.id);
       } else {
         await supabase.from("subtasks").insert({
           task_id: parentTaskId,
           user_id: userId,
-          name: formName.trim(),
+          name,
           est_minutes: formEst,
+          deadline: dl,
           sort_order: (parent?.subtasks?.length || 0),
         });
       }
     }
 
+    // Create recurring deadline if recurrence is set
+    if (formRecurrence && dl) {
+      await supabase.from("deadlines").insert({
+        user_id: userId,
+        label: `[${project?.title}] ${name}`,
+        target_datetime: `${dl}T23:59:00`,
+        recurrence: formRecurrence,
+      });
+    }
+
     setModalOpen(false);
+    setFormDeadline("");
+    setFormRecurrence(null);
+    // Auto-expand parent task when adding a subtask
+    if (modalMode === "subtask" && parentTaskId) {
+      setExpandedTasks((prev) => new Set(prev).add(parentTaskId));
+    }
     if (!editTarget) {
       const supabase2 = createClient();
       await logActivity(supabase2, userId, projectId,
@@ -244,9 +278,10 @@ export default function ProjectDetailPage() {
     const supabase = createClient();
     await supabase.from("project_tasks").update({ [field]: value }).eq("id", taskId);
 
+    const task = tasks.find((t) => t.id === taskId);
+
     // Sync deadline to week + deadlines tab
     if (field === "deadline") {
-      const task = tasks.find((t) => t.id === taskId);
       if (task && project) {
         await syncProjectTaskToWeek(
           supabase, userId, taskId, task.name, projectId, project.title,
@@ -256,6 +291,24 @@ export default function ProjectDetailPage() {
           supabase, userId, taskId, task.name, project.title,
           value as string | null
         );
+      }
+    }
+
+    // When progress changes, sync to week_tasks and deadlines
+    if (field === "progress" && task) {
+      const progress = value as number;
+      // Mark linked week_task as done/undone
+      const { data: linkedWeek } = await supabase
+        .from("week_tasks")
+        .select("id")
+        .eq("project_task_id", taskId)
+        .eq("user_id", userId);
+      for (const wt of linkedWeek || []) {
+        await supabase.from("week_tasks").update({ done: progress >= 100 }).eq("id", wt.id);
+      }
+      // If 100%, remove the deadline entry
+      if (progress >= 100 && project) {
+        await syncTaskDeadlineToDeadlines(supabase, userId, taskId, task.name, project.title, null);
       }
     }
 
@@ -275,6 +328,16 @@ export default function ProjectDetailPage() {
         );
         const avg = Math.round(subs.reduce((s, st) => s + st.progress, 0) / subs.length);
         await supabase.from("project_tasks").update({ progress: avg }).eq("id", parentId);
+
+        // Sync parent completion to calendar + deadlines
+        const { data: linkedWeek } = await supabase
+          .from("week_tasks").select("id").eq("project_task_id", parentId).eq("user_id", userId);
+        for (const wt of linkedWeek || []) {
+          await supabase.from("week_tasks").update({ done: avg >= 100 }).eq("id", wt.id);
+        }
+        if (avg >= 100 && project) {
+          await syncTaskDeadlineToDeadlines(supabase, userId, parentId, parent.name, project.title, null);
+        }
       }
     }
 
@@ -593,7 +656,7 @@ export default function ProjectDetailPage() {
                     {task.name}
                   </span>
                   {isActive && (
-                    <span className="font-mono text-sm text-green-acc">
+                    <span className="font-mono text-sm text-green-acc timer-active">
                       {formatSeconds(elapsed[task.id] || 0)}
                     </span>
                   )}
@@ -606,30 +669,39 @@ export default function ProjectDetailPage() {
                     {formatMinutes(task.est_minutes)}
                   </span>
 
-                  {/* Deadline */}
-                  <CalendarPicker
-                    value={task.deadline}
-                    onChange={(d) => updateTaskField(task.id, "deadline", d)}
-                  />
-                  <GCalButton
-                    title={`[${project.title}] ${task.name}`}
-                    date={task.deadline}
-                    description={task.notes}
-                  />
+                  {/* Deadline — hidden when task is 100% */}
+                  {task.progress < 100 && (
+                    <>
+                      <CalendarPicker
+                        value={task.deadline}
+                        onChange={(d) => updateTaskField(task.id, "deadline", d)}
+                      />
+                      <GCalButton
+                        title={`[${project.title}] ${task.name}`}
+                        date={task.deadline}
+                        description={task.notes}
+                      />
+                    </>
+                  )}
+                  {task.progress >= 100 && task.deadline && (
+                    <span className="text-[10px] text-green-acc font-mono">✓ done</span>
+                  )}
 
                   {/* Progress */}
-                  <div className="flex items-center gap-1">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: progressColor(task.progress) }}
-                    />
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-16 h-1.5 bg-surface3 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full transition-all" style={{
+                        width: `${Math.min(task.progress, 100)}%`,
+                        backgroundColor: progressColor(task.progress),
+                      }} />
+                    </div>
                     <InlineEdit
                       value={String(task.progress)}
                       onSave={(v) => updateTaskField(task.id, "progress", parseInt(v) || 0)}
                       type="number"
                       min={0}
                       max={100}
-                      className="w-12 text-xs"
+                      className="w-10 text-xs"
                     />
                     <span className="text-txt3">%</span>
                   </div>
@@ -691,6 +763,8 @@ export default function ProjectDetailPage() {
                             setEditTarget(task);
                             setFormName(task.name);
                             setFormEst(task.est_minutes);
+                            setFormDeadline(task.deadline || "");
+                            setFormRecurrence(null);
                             setModalMode("task");
                             setModalOpen(true);
                             setMenuOpen(null);
@@ -706,6 +780,8 @@ export default function ProjectDetailPage() {
                               setParentTaskId(task.id);
                               setFormName("");
                               setFormEst(0);
+                              setFormDeadline("");
+                              setFormRecurrence(null);
                               setModalMode("subtask");
                               setModalOpen(true);
                               setMenuOpen(null);
@@ -749,7 +825,7 @@ export default function ProjectDetailPage() {
                           {activeTaskId === `sub:${sub.id}` ? "⏸" : "▶"}
                         </button>
                         {activeTaskId === `sub:${sub.id}` && (
-                          <span className="font-mono text-[10px] text-green-acc">
+                          <span className="font-mono text-[10px] text-green-acc timer-active">
                             {formatSeconds(elapsed[`sub:${sub.id}`] || 0)}
                           </span>
                         )}
@@ -783,10 +859,14 @@ export default function ProjectDetailPage() {
                           />
                           <span className="text-txt3">%</span>
                         </div>
-                        <CalendarPicker
-                          value={sub.deadline}
-                          onChange={(d) => updateSubtaskField(sub.id, task.id, "deadline", d)}
-                        />
+                        {sub.progress < 100 ? (
+                          <CalendarPicker
+                            value={sub.deadline}
+                            onChange={(d) => updateSubtaskField(sub.id, task.id, "deadline", d)}
+                          />
+                        ) : sub.deadline ? (
+                          <span className="text-[10px] text-green-acc font-mono">✓</span>
+                        ) : null}
                         <div className="flex-1 min-w-[80px]">
                           <InlineEdit
                             value={sub.notes}
@@ -840,6 +920,8 @@ export default function ProjectDetailPage() {
           setEditTarget(null);
           setFormName("");
           setFormEst(0);
+          setFormDeadline("");
+          setFormRecurrence(null);
           setModalMode("task");
           setModalOpen(true);
         }}
@@ -880,6 +962,31 @@ export default function ProjectDetailPage() {
               className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm"
             />
           </div>
+          <div>
+            <label className="block text-sm text-txt2 mb-1.5">Deadline</label>
+            <input
+              type="date"
+              value={formDeadline}
+              onChange={(e) => setFormDeadline(e.target.value)}
+              className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm"
+            />
+          </div>
+          {formDeadline && (
+            <div>
+              <label className="block text-sm text-txt2 mb-1.5">Routine? (recurring)</label>
+              <select value={formRecurrence || ""} onChange={(e) => setFormRecurrence(e.target.value || null)}
+                className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm">
+                <option value="">No recurrence</option>
+                <option value="daily">🔄 Daily</option>
+                <option value="weekly">🔄 Weekly</option>
+                <option value="monthly">🔄 Monthly</option>
+                <option value="yearly">🔄 Yearly</option>
+              </select>
+              {formRecurrence && (
+                <p className="text-[10px] text-violet2 mt-1">A recurring deadline will be created automatically</p>
+              )}
+            </div>
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <button
               onClick={() => setModalOpen(false)}

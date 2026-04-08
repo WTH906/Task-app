@@ -73,7 +73,7 @@ export async function syncWeekDoneToProject(
 ) {
   const { data: weekTask } = await supabase
     .from("week_tasks")
-    .select("project_task_id")
+    .select("project_task_id, project_id, text")
     .eq("id", weekTaskId)
     .maybeSingle();
 
@@ -97,6 +97,33 @@ export async function syncWeekDoneToProject(
     .from("project_tasks")
     .update({ progress: newProgress })
     .eq("id", weekTask.project_task_id);
+
+  // If completing, remove associated deadline
+  if (done) {
+    const { data: task } = await supabase
+      .from("project_tasks")
+      .select("name, project_id")
+      .eq("id", weekTask.project_task_id)
+      .maybeSingle();
+    if (task) {
+      const { data: proj } = await supabase
+        .from("projects")
+        .select("title")
+        .eq("id", task.project_id)
+        .maybeSingle();
+      if (proj) {
+        // Remove deadline for this task
+        const { data: dl } = await supabase
+          .from("deadlines")
+          .select("id")
+          .like("label", `[${proj.title}] ${task.name}%`)
+          .maybeSingle();
+        if (dl) {
+          await supabase.from("deadlines").delete().eq("id", dl.id);
+        }
+      }
+    }
+  }
 }
 
 /**

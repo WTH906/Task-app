@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { WeekTask, WeekDay, WeekTemplate } from "@/lib/types";
 import { getMonday, addDays, formatDate, DAY_COLORS, DAY_NAMES_FULL, cn, toLocalDateStr } from "@/lib/utils";
-import { syncWeekDoneToProject } from "@/lib/sync";
 
 export default function WeekPage() {
   const router = useRouter();
@@ -90,13 +89,47 @@ export default function WeekPage() {
   const toggleTaskDone = async (task: WeekTask) => {
     const supabase = createClient();
     const newDone = !task.done;
+
+    // Optimistic UI update
     setTasks((prev) => {
       const copy = { ...prev };
       copy[task.date_key] = copy[task.date_key].map((t) => t.id === task.id ? { ...t, done: newDone } : t);
       return copy;
     });
+
+    // Update week_task
     await supabase.from("week_tasks").update({ done: newDone }).eq("id", task.id);
-    if (task.project_task_id) await syncWeekDoneToProject(supabase, task.id, newDone);
+
+    // Sync to project if linked
+    if (task.project_task_id) {
+      // Check if project task has subtasks
+      const { data: subs } = await supabase
+        .from("subtasks").select("id").eq("task_id", task.project_task_id).limit(1);
+
+      if (!subs || subs.length === 0) {
+        // No subtasks — set progress directly
+        const newProgress = newDone ? 100 : 0;
+        await supabase.from("project_tasks")
+          .update({ progress: newProgress })
+          .eq("id", task.project_task_id);
+
+        // If completing, also remove the deadline entry
+        if (newDone && task.project_id) {
+          const { data: pt } = await supabase
+            .from("project_tasks").select("name").eq("id", task.project_task_id).maybeSingle();
+          const { data: proj } = await supabase
+            .from("projects").select("title").eq("id", task.project_id).maybeSingle();
+          if (pt && proj) {
+            const { data: dl } = await supabase
+              .from("deadlines").select("id")
+              .eq("user_id", userId)
+              .like("label", `[${proj.title}] ${pt.name}%`)
+              .maybeSingle();
+            if (dl) await supabase.from("deadlines").delete().eq("id", dl.id);
+          }
+        }
+      }
+    }
   };
 
   const addTask = async (dateKey: string) => {
@@ -325,12 +358,18 @@ export default function WeekPage() {
                       onKeyDown={(e) => { if (e.key === "Enter") saveTheme(dateKey, themeDraft); if (e.key === "Escape") setEditingTheme(null); }}
                       className="text-[10px] text-txt bg-surface3 border border-border rounded px-1 py-0.5 w-full mt-0.5 outline-none"
                       autoFocus />
-                  ) : (
-                    <p className="text-[10px] text-txt3 mt-0.5 truncate cursor-pointer hover:text-txt2 transition-colors"
+                  ) : theme ? (
+                    <p className="text-[11px] text-txt2 mt-0.5 truncate cursor-pointer hover:text-bright transition-colors"
                       onClick={(e) => { e.stopPropagation(); setEditingTheme(dateKey); setThemeDraft(theme); }}
-                      title="Click to name this day">
-                      {theme || "＋ name day"}
+                      title="Click to edit day name">
+                      {theme}
                     </p>
+                  ) : (
+                    <button className="text-[10px] text-txt3 mt-0.5 px-1.5 py-0.5 border border-dashed border-border rounded hover:border-violet/50 hover:text-violet2 transition-colors"
+                      onClick={(e) => { e.stopPropagation(); setEditingTheme(dateKey); setThemeDraft(""); }}
+                      title="Name this day">
+                      ＋ name
+                    </button>
                   )}
                   {isToday && (
                     <p className="text-[10px] font-mono text-violet2 mt-0.5">
@@ -346,7 +385,7 @@ export default function WeekPage() {
                       <div key={t.id} className="flex items-start gap-1.5 text-xs group" onClick={(e) => e.stopPropagation()}>
                         <input type="checkbox" checked={t.done} onChange={() => toggleTaskDone(t)}
                           className="mt-0.5 w-3.5 h-3.5" style={{ accentColor: tagColor || color }} />
-                        <span className={cn("leading-tight", t.done && "task-done", t.project_id && "cursor-pointer hover:underline")}
+                        <span className={cn("leading-tight", t.done && "line-through text-txt3 opacity-60", t.project_id && "cursor-pointer hover:underline")}
                           onClick={() => { if (t.project_id) window.location.href = `/projects/${t.project_id}`; }}>
                           {tagColor && <span className="font-medium" style={{ color: tagColor }}>{t.text.match(/^\[.*?\]/)?.[0]}{" "}</span>}
                           {t.text.replace(/^\[.*?\]\s*/, "")}
@@ -373,7 +412,7 @@ export default function WeekPage() {
                 style={{ color: DAY_COLORS[[1,2,3,4,5,6,0][i]] }}>{d}</div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-1 flex-1 min-h-0 auto-rows-fr">
+          <div className="grid grid-cols-7 gap-1 flex-1 min-h-0" style={{ gridTemplateRows: "repeat(6, minmax(60px, 1fr))" }}>
             {monthGridDates.map((dateKey) => {
               const date = new Date(dateKey + "T00:00:00");
               const dayNum = date.getDay();
@@ -387,11 +426,11 @@ export default function WeekPage() {
                 <div key={dateKey}
                   onClick={() => { setModalDate(dateKey); setNewTaskText(""); setLinkProject(null); setLinkType("none"); setLinkParentTask(null); setProjectTasks([]); }}
                   className={cn(
-                    "bg-surface border rounded-lg p-1.5 flex flex-col cursor-pointer transition-all overflow-hidden",
+                    "bg-surface border rounded-lg p-1.5 flex flex-col cursor-pointer transition-all overflow-hidden min-h-[60px]",
                     isToday ? "border-violet shadow-md shadow-violet/10" : "border-border/50 hover:border-border2",
                     !isCurrentMonth && "opacity-40"
                   )}>
-                  <div className="flex items-center justify-between mb-0.5">
+                  <div className="flex items-center justify-between mb-0.5 shrink-0">
                     <span className={cn("text-[10px] font-bold", isToday ? "text-violet2" : "text-txt3")}
                       style={isCurrentMonth ? { color: DAY_COLORS[dayNum] } : undefined}>
                       {date.getDate()}
@@ -400,19 +439,19 @@ export default function WeekPage() {
                       <span className="text-[8px] text-txt3 font-mono">{doneTasks}/{dayTasks.length}</span>
                     )}
                   </div>
-                  {theme && <p className="text-[8px] text-txt3 truncate">{theme}</p>}
+                  {theme && <p className="text-[8px] text-txt3 truncate shrink-0">{theme}</p>}
                   <div className="flex-1 space-y-0.5 overflow-hidden min-h-0">
                     {dayTasks.slice(0, 3).map((t) => {
                       const tagColor = getTagColor(t.text);
                       return (
-                        <div key={t.id} className="flex items-center gap-1 text-[9px] leading-tight" onClick={(e) => e.stopPropagation()}>
+                        <div key={t.id} className="flex items-center gap-1 text-[9px] leading-tight shrink-0" onClick={(e) => e.stopPropagation()}>
                           <input type="checkbox" checked={t.done} onChange={() => toggleTaskDone(t)}
                             className="w-2.5 h-2.5 shrink-0" style={{ accentColor: tagColor || DAY_COLORS[dayNum] }} />
-                          <span className={cn("truncate", t.done && "task-done")}>{t.text.replace(/^\[.*?\]\s*/, "")}</span>
+                          <span className={cn("truncate", t.done && "line-through text-txt3 opacity-60")}>{t.text.replace(/^\[.*?\]\s*/, "")}</span>
                         </div>
                       );
                     })}
-                    {dayTasks.length > 3 && <p className="text-[8px] text-txt3">+{dayTasks.length - 3} more</p>}
+                    {dayTasks.length > 3 && <p className="text-[8px] text-txt3 shrink-0">+{dayTasks.length - 3} more</p>}
                   </div>
                 </div>
               );
@@ -466,7 +505,7 @@ export default function WeekPage() {
                     <input type="checkbox" checked={t.done} onChange={() => toggleTaskDone(t)}
                       className="w-4 h-4 shrink-0" style={{ accentColor: tagColor || modalColor }} />
                     <div className="flex-1 min-w-0">
-                      <span className={cn("text-sm", t.done && "task-done")}>
+                      <span className={cn("text-sm", t.done && "line-through text-txt3 opacity-60")}>
                         {tagColor && (
                           <span className="font-medium text-xs px-1.5 py-0.5 rounded mr-1.5 cursor-pointer hover:underline"
                             style={{ color: tagColor, backgroundColor: `${tagColor}15` }}

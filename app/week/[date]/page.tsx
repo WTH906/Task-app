@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { WeekTask, WeekDay } from "@/lib/types";
 import { DAY_COLORS, DAY_NAMES_FULL, cn, addDays, toLocalDateStr } from "@/lib/utils";
-import { syncWeekDoneToProject } from "@/lib/sync";
 
 export default function DayDetailPage() {
   const params = useParams();
@@ -113,7 +112,11 @@ export default function DayDetailPage() {
     setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, done: newDone } : t));
     await supabase.from("week_tasks").update({ done: newDone }).eq("id", task.id);
     if (task.project_task_id) {
-      await syncWeekDoneToProject(supabase, task.id, newDone);
+      // Check subtasks
+      const { data: subs } = await supabase.from("subtasks").select("id").eq("task_id", task.project_task_id).limit(1);
+      if (!subs || subs.length === 0) {
+        await supabase.from("project_tasks").update({ progress: newDone ? 100 : 0 }).eq("id", task.project_task_id);
+      }
     }
   };
 
@@ -310,7 +313,7 @@ export default function DayDetailPage() {
               onChange={() => toggleDone(task)}
               style={{ accentColor: color }}
             />
-            <span className={cn("flex-1 text-sm", task.done && "task-done")}>
+            <span className={cn("flex-1 text-sm", task.done && "line-through text-txt3 opacity-60")}>
               {task.project_id && (
                 <span className="text-violet2 font-medium text-xs">
                   {task.text.match(/^\[.*?\]/)?.[0]}{" "}
