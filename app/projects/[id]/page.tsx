@@ -275,11 +275,9 @@ export default function ProjectDetailPage() {
     const name = formName.trim();
     const calDate = formDate || null;       // → calendar (when to work on it)
     const deadline = formDeadline || null;  // → deadline dashboard (when it's due)
-    let savedTaskId: string | null = null;
 
     if (modalMode === "task") {
       if (editTarget && "project_id" in editTarget) {
-        savedTaskId = editTarget.id;
         await supabase
           .from("project_tasks")
           .update({ name, est_minutes: formEst, deadline, date_key: calDate })
@@ -289,7 +287,7 @@ export default function ProjectDetailPage() {
 
         if (project) {
           await syncProjectTaskToWeek(supabase, userId, editTarget.id, name, projectId, project.title, calDate, (editTarget as ProjectTask).date_key);
-          await syncTaskDeadlineToDeadlines(supabase, userId, editTarget.id, name, project.title, deadline);
+          await syncTaskDeadlineToDeadlines(supabase, userId, editTarget.id, name, project.title, deadline, formRecurrence);
         }
       } else {
         const { data: newTask } = await supabase.from("project_tasks").insert({
@@ -298,13 +296,12 @@ export default function ProjectDetailPage() {
         }).select().single();
 
         if (newTask && project) {
-          savedTaskId = newTask.id;
           addTaskLocal(newTask as ProjectTask);
           if (calDate) {
             await syncProjectTaskToWeek(supabase, userId, newTask.id, name, projectId, project.title, calDate, null);
           }
           if (deadline) {
-            await syncTaskDeadlineToDeadlines(supabase, userId, newTask.id, name, project.title, deadline);
+            await syncTaskDeadlineToDeadlines(supabase, userId, newTask.id, name, project.title, deadline, formRecurrence);
           }
         }
       }
@@ -316,6 +313,13 @@ export default function ProjectDetailPage() {
           .update({ name, est_minutes: formEst, deadline, date_key: calDate })
           .eq("id", editTarget.id);
         updateSubtaskLocal(parentTaskId, editTarget.id, { name, est_minutes: formEst, deadline, date_key: calDate });
+        // Recalc parent est_minutes
+        if (parent?.subtasks) {
+          const subs = parent.subtasks.map((s) => s.id === editTarget.id ? { ...s, est_minutes: formEst } : s);
+          const totalEst = subs.reduce((s, st) => s + st.est_minutes, 0);
+          await supabase.from("project_tasks").update({ est_minutes: totalEst }).eq("id", parentTaskId);
+          updateTaskLocal(parentTaskId, { est_minutes: totalEst });
+        }
       } else {
         const { data: newSub } = await supabase.from("subtasks").insert({
           task_id: parentTaskId, user_id: userId, name,
@@ -324,11 +328,12 @@ export default function ProjectDetailPage() {
         }).select().single();
         if (newSub) {
           addSubtaskLocal(parentTaskId, newSub as Subtask);
-          // Recalc parent progress to account for the new 0% subtask
+          // Recalc parent progress and est_minutes to account for new subtask
           const allSubs = [...(parent?.subtasks || []), newSub as Subtask];
           const avg = Math.round(allSubs.reduce((s, st) => s + st.progress, 0) / allSubs.length);
-          await supabase.from("project_tasks").update({ progress: avg }).eq("id", parentTaskId);
-          updateTaskLocal(parentTaskId, { progress: avg });
+          const totalEst = allSubs.reduce((s, st) => s + st.est_minutes, 0);
+          await supabase.from("project_tasks").update({ progress: avg, est_minutes: totalEst }).eq("id", parentTaskId);
+          updateTaskLocal(parentTaskId, { progress: avg, est_minutes: totalEst });
         }
       }
       // Sync subtask to calendar
@@ -366,16 +371,6 @@ export default function ProjectDetailPage() {
       }
     }
 
-    if (formRecurrence && deadline) {
-      await supabase.from("deadlines").insert({
-        user_id: userId,
-        label: `[${project?.title}] ${name}`,
-        target_datetime: `${deadline}T23:59:00`,
-        recurrence: formRecurrence,
-        source_task_id: savedTaskId,
-      });
-    }
-
     setModalOpen(false);
     setFormDate("");
     setFormDeadline("");
@@ -409,13 +404,18 @@ export default function ProjectDetailPage() {
     const supabase = createClient();
     await supabase.from("subtasks").delete().eq("id", subtaskId);
     removeSubtaskLocal(parentId, subtaskId);
-    // Recalc parent progress from remaining subtasks
+    // Recalc parent progress and est_minutes from remaining subtasks
     const parent = tasks.find((t) => t.id === parentId);
     const remaining = (parent?.subtasks || []).filter((s) => s.id !== subtaskId);
     if (remaining.length > 0) {
       const avg = Math.round(remaining.reduce((s, st) => s + st.progress, 0) / remaining.length);
-      await supabase.from("project_tasks").update({ progress: avg }).eq("id", parentId);
-      updateTaskLocal(parentId, { progress: avg });
+      const totalEst = remaining.reduce((s, st) => s + st.est_minutes, 0);
+      await supabase.from("project_tasks").update({ progress: avg, est_minutes: totalEst }).eq("id", parentId);
+      updateTaskLocal(parentId, { progress: avg, est_minutes: totalEst });
+    } else {
+      // No subtasks left — reset est_minutes to 0
+      await supabase.from("project_tasks").update({ est_minutes: 0 }).eq("id", parentId);
+      updateTaskLocal(parentId, { est_minutes: 0 });
     }
   };
 
@@ -574,6 +574,19 @@ export default function ProjectDetailPage() {
       }
     }
 
+    if (field === "est_minutes") {
+      // Recalc parent est_minutes = sum of all subtask est_minutes
+      const parent = tasks.find((t) => t.id === parentId);
+      if (parent?.subtasks) {
+        const subs = parent.subtasks.map((s) =>
+          s.id === subtaskId ? { ...s, est_minutes: value as number } : s
+        );
+        const totalEst = subs.reduce((s, st) => s + st.est_minutes, 0);
+        await supabase.from("project_tasks").update({ est_minutes: totalEst }).eq("id", parentId);
+        updateTaskLocal(parentId, { est_minutes: totalEst });
+      }
+    }
+
     if (field === "progress") {
       const parent = tasks.find((t) => t.id === parentId);
       if (parent?.subtasks) {
@@ -619,9 +632,13 @@ export default function ProjectDetailPage() {
   };
 
   // Calculations
+  // If task has subtasks, its est_minutes = sum of subtask est (already rolled up in DB)
+  // If task has no subtasks, use its own est_minutes
   const totalEst = tasks.reduce((s, t) => {
-    const subEst = (t.subtasks || []).reduce((ss, sub) => ss + sub.est_minutes, 0);
-    return s + t.est_minutes + subEst;
+    if (t.subtasks && t.subtasks.length > 0) {
+      return s + (t.subtasks || []).reduce((ss, sub) => ss + sub.est_minutes, 0);
+    }
+    return s + t.est_minutes;
   }, 0);
   const totalElapsed = tasks.reduce((s, t) => {
     const taskTime = elapsed[t.id] || t.elapsed_seconds;

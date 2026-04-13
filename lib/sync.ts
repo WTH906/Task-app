@@ -83,7 +83,8 @@ export async function syncTaskDeadlineToDeadlines(
   taskId: string,
   taskName: string,
   projectTitle: string,
-  deadline: string | null
+  deadline: string | null,
+  recurrence?: string | null
 ): Promise<{ error?: string }> {
   try {
     const label = `[${projectTitle}] ${taskName}`;
@@ -112,7 +113,7 @@ export async function syncTaskDeadlineToDeadlines(
     if (existing) {
       const { error } = await supabase
         .from("deadlines")
-        .update({ label, target_datetime })
+        .update({ label, target_datetime, ...(recurrence !== undefined ? { recurrence } : {}) })
         .eq("id", existing.id);
       if (error) return { error: error.message };
     } else {
@@ -121,6 +122,7 @@ export async function syncTaskDeadlineToDeadlines(
         label,
         target_datetime,
         source_task_id: taskId,
+        ...(recurrence ? { recurrence } : {}),
       });
       if (error) return { error: error.message };
     }

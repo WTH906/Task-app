@@ -38,9 +38,7 @@ export function InlineEdit({
     editingRef.current = editing;
     if (editing && inputRef.current) {
       inputRef.current.focus();
-      if (type !== "number") {
-        inputRef.current.select();
-      }
+      inputRef.current.select();
     }
   }, [editing, type]);
 
@@ -125,6 +123,12 @@ export function InlineEdit({
       type={type}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
+      onFocus={(e) => {
+        if (type === "number" && (draft === "0" || draft === "")) {
+          setDraft("");
+        }
+        e.target.select();
+      }}
       onBlur={() => save(draft)}
       onKeyDown={(e) => {
         if (e.key === "Enter") save(draft);
