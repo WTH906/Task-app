@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { cleanDeadline, detectFileType } from "@/lib/import-helpers";
+import { Download, FolderOpen, Folder } from "lucide-react";
 
 interface ImportModalProps {
   open: boolean;
@@ -150,7 +151,7 @@ export function ImportModal({ open, onClose, userId, onComplete }: ImportModalPr
     let count = 0;
     for (const p of list) {
       const { data: existing } = await supabase
-        .from("projects").select("id").eq("user_id", userId).eq("title", p.title).maybeSingle();
+        .from("projects").select("id").eq("user_id", userId).eq("title", p.title).is("archived_at", null).maybeSingle();
       if (existing) continue;
       await supabase.from("projects").insert({ user_id: userId, title: p.title, sort_order: 999 + count });
       count++;
@@ -204,7 +205,7 @@ export function ImportModal({ open, onClose, userId, onComplete }: ImportModalPr
       <div className="bg-surface2 border border-border rounded-xl max-w-lg w-full max-h-[85vh] overflow-hidden shadow-2xl flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
           <div>
-            <h2 className="font-title text-bright text-lg">📥 Import Data</h2>
+            <h2 className="font-title text-bright text-lg flex items-center gap-2"><Download size={18} /> Import Data</h2>
             <p className="text-xs text-txt3 mt-0.5">Drag & drop JSON files or click to browse</p>
           </div>
           {!importing && (
@@ -226,7 +227,7 @@ export function ImportModal({ open, onClose, userId, onComplete }: ImportModalPr
                   : "border-border2 hover:border-violet/50 hover:bg-violet/5"
               }`}
             >
-              <p className="text-3xl mb-3">{dragging ? "📂" : "📁"}</p>
+              <div className="text-3xl mb-3 flex justify-center">{dragging ? <FolderOpen size={40} className="text-violet2" /> : <Folder size={40} className="text-txt3" />}</div>
               <p className="text-sm text-bright mb-1">
                 {dragging ? "Drop files here!" : "Drag & drop your JSON files here"}
               </p>
@@ -237,7 +238,7 @@ export function ImportModal({ open, onClose, userId, onComplete }: ImportModalPr
                 <span className="bg-surface3 px-2 py-1 rounded">projects.json</span>
                 <span className="bg-surface3 px-2 py-1 rounded">tasks.json</span>
               </div>
-              <input ref={inputRef} type="file" accept=".json" multiple onChange={handleFileSelect} className="hidden" />
+              <input ref={inputRef} type="file" accept=".json,.csv" multiple onChange={handleFileSelect} className="hidden" />
             </div>
           )}
 

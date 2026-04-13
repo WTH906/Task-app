@@ -2,55 +2,57 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
-import { Project, ProjectTask } from "@/lib/types";
-import { progressColor, cn, toLocalDateStr, formatMinutes } from "@/lib/utils";
+import { Project, ProjectTask, Subtask } from "@/lib/types";
+import { progressColor, cn, formatDate, formatMinutes } from "@/lib/utils";
 import { ProgressBar } from "@/components/ProgressBar";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
+import { fetchProjects, fetchProjectTasksWithSubs } from "@/lib/queries";
+import { useToast } from "@/components/Toast";
 
 export default function RetroPlanningPage() {
+  const { userId } = useCurrentUser();
+  const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
   const [loading, setLoading] = useState(false);
-  const [userId, setUserId] = useState("");
 
   const selectProject = (id: string | null) => {
     setSelectedProject(id);
     if (id) localStorage.setItem("retro_project", id);
   };
 
-  const today = toLocalDateStr(new Date());
+  const today = formatDate(new Date());
 
   useEffect(() => {
+    if (!userId) return;
     const load = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      setUserId(user.id);
-      const { data } = await supabase.from("projects").select("*").eq("user_id", user.id).order("sort_order");
-      setProjects(data || []);
-      const saved = localStorage.getItem("retro_project");
-      if (saved && (data || []).some((p: Project) => p.id === saved)) {
-        setSelectedProject(saved);
+      try {
+        const supabase = createClient();
+        const data = await fetchProjects(supabase, userId);
+        setProjects(data);
+        const saved = localStorage.getItem("retro_project");
+        if (saved && data.some((p) => p.id === saved)) {
+          setSelectedProject(saved);
+        }
+      } catch (err) {
+        console.error("Retro projects load failed:", err);
       }
     };
     load();
-  }, []);
+  }, [userId]);
 
   const loadProject = useCallback(async (projectId: string) => {
     setLoading(true);
-    const supabase = createClient();
-    const { data: taskData } = await supabase
-      .from("project_tasks").select("*").eq("project_id", projectId).order("sort_order");
-
-    const tasksWithSubs: ProjectTask[] = [];
-    for (const t of taskData || []) {
-      const { data: subs } = await supabase
-        .from("subtasks").select("*").eq("task_id", t.id).order("sort_order");
-      tasksWithSubs.push({ ...t, subtasks: subs || [] });
+    try {
+      const supabase = createClient();
+      setTasks(await fetchProjectTasksWithSubs(supabase, projectId));
+    } catch (err) {
+      console.error("Retro project load failed:", err);
+      toast("Failed to load project timeline", "error");
     }
-    setTasks(tasksWithSubs);
     setLoading(false);
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (selectedProject) loadProject(selectedProject);
@@ -95,7 +97,7 @@ export default function RetroPlanningPage() {
   cursor.setDate(1);
   if (cursor < startDate) cursor.setMonth(cursor.getMonth() + 1);
   while (cursor <= endDate) {
-    const dateStr = toLocalDateStr(cursor);
+    const dateStr = formatDate(cursor);
     months.push({
       label: cursor.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
       pos: dateToPos(dateStr),
@@ -109,7 +111,7 @@ export default function RetroPlanningPage() {
   const dow = wCursor.getDay();
   wCursor.setDate(wCursor.getDate() + (dow === 0 ? 0 : 7 - dow));
   while (wCursor <= endDate) {
-    weeks.push(dateToPos(toLocalDateStr(wCursor)));
+    weeks.push(dateToPos(formatDate(wCursor)));
     wCursor.setDate(wCursor.getDate() + 7);
   }
 

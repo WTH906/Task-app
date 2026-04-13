@@ -3,7 +3,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { Deadline, Project, ProjectTask } from "@/lib/types";
-import { cn, toLocalDateStr } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
+import { fetchDeadlines, fetchProjects, fetchTaskDeadlines } from "@/lib/queries";
+import { useToast } from "@/components/Toast";
 
 interface AggregatedDeadline {
   id: string;
@@ -16,45 +19,48 @@ interface AggregatedDeadline {
 }
 
 export default function DeadlinesPage() {
+  const { userId } = useCurrentUser();
+  const { toast } = useToast();
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [taskDeadlines, setTaskDeadlines] = useState<AggregatedDeadline[]>([]);
-  const [userId, setUserId] = useState("");
   const [now, setNow] = useState(new Date());
   const [showAllModal, setShowAllModal] = useState(false);
 
   const load = useCallback(async () => {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    setUserId(user.id);
+    if (!userId) return;
+    try {
+      const supabase = createClient();
 
-    const { data: dls } = await supabase.from("deadlines").select("*").eq("user_id", user.id).order("target_datetime");
-    setDeadlines(dls || []);
+      const [dls, projs, tasks] = await Promise.all([
+        fetchDeadlines(supabase, userId),
+        fetchProjects(supabase, userId),
+        fetchTaskDeadlines(supabase, userId),
+      ]);
 
-    const { data: projs } = await supabase.from("projects").select("*").eq("user_id", user.id);
-    setProjects(projs || []);
+      setDeadlines(dls);
+      setProjects(projs);
 
-    // Load all project task deadlines
-    const { data: tasks } = await supabase.from("project_tasks").select("id, name, deadline, project_id, progress")
-      .eq("user_id", user.id).not("deadline", "is", null);
+      const projMap: Record<string, { title: string; color: string }> = {};
+      for (const p of projs) projMap[p.id] = { title: p.title, color: p.color || "#e05555" };
 
-    const projMap: Record<string, { title: string; color: string }> = {};
-    for (const p of projs || []) projMap[p.id] = { title: p.title, color: p.color || "#e05555" };
-
-    const tds: AggregatedDeadline[] = [];
-    for (const t of tasks || []) {
-      if (t.deadline && (t as ProjectTask).progress < 100) {
-        tds.push({
-          id: t.id, label: t.name, date: t.deadline,
-          projectTitle: projMap[t.project_id]?.title || "Unknown",
-          projectColor: projMap[t.project_id]?.color || "#e05555",
-          source: "task", recurrence: null,
-        });
+      const tds: AggregatedDeadline[] = [];
+      for (const t of tasks) {
+        if (t.deadline && t.progress < 100) {
+          tds.push({
+            id: t.id, label: t.name, date: t.deadline,
+            projectTitle: projMap[t.project_id]?.title || "Unknown",
+            projectColor: projMap[t.project_id]?.color || "#e05555",
+            source: "task", recurrence: null,
+          });
+        }
       }
+      setTaskDeadlines(tds);
+    } catch (err) {
+      console.error("Deadlines load failed:", err);
+      toast("Failed to load deadlines", "error");
     }
-    setTaskDeadlines(tds);
-  }, []);
+  }, [userId, toast]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { const iv = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(iv); }, []);
@@ -63,6 +69,7 @@ export default function DeadlinesPage() {
   useEffect(() => {
     const renewRecurring = async () => {
       const supabase = createClient();
+      const updates: Array<{ id: string; newDatetime: string }> = [];
       for (const d of deadlines) {
         if (!d.recurrence) continue;
         const target = new Date(d.target_datetime);
@@ -76,18 +83,25 @@ export default function DeadlinesPage() {
             case "yearly": next.setFullYear(next.getFullYear() + 1); break;
           }
         }
-        await supabase.from("deadlines").update({ target_datetime: next.toISOString() }).eq("id", d.id);
+        const iso = next.toISOString();
+        await supabase.from("deadlines").update({ target_datetime: iso }).eq("id", d.id);
+        updates.push({ id: d.id, newDatetime: iso });
       }
-      load();
+      if (updates.length > 0) {
+        setDeadlines((prev) => prev.map((d) => {
+          const upd = updates.find((u) => u.id === d.id);
+          return upd ? { ...d, target_datetime: upd.newDatetime } : d;
+        }));
+      }
     };
     const hasExpired = deadlines.some((d) => d.recurrence && new Date(d.target_datetime).getTime() <= now.getTime());
     if (hasExpired) renewRecurring();
-  }, [deadlines, now, load]);
+  }, [deadlines, now]);
 
   const removeDeadline = async (id: string) => {
     const supabase = createClient();
     await supabase.from("deadlines").delete().eq("id", id);
-    load();
+    setDeadlines((prev) => prev.filter((d) => d.id !== id));
   };
 
   const getCountdown = (target: string) => {
@@ -126,7 +140,7 @@ export default function DeadlinesPage() {
     ...taskDeadlines,
   ].sort((a, b) => a.date.localeCompare(b.date));
 
-  const today = toLocalDateStr(new Date());
+  const today = formatDate(new Date());
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto">

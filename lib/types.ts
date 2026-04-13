@@ -11,19 +11,23 @@ export interface Project {
   sort_order: number; created_at: string;
   color: string;
   deadline: string | null;
+  archived_at: string | null;
 }
 
 export interface ProjectTask {
   id: string; project_id: string; user_id: string;
   name: string; est_minutes: number; deadline: string | null;
+  date_key: string | null;
   progress: number; notes: string; elapsed_seconds: number;
   sort_order: number; created_at: string; subtasks?: Subtask[];
   file_url: string | null; file_name: string | null;
+  archived_at: string | null;
 }
 
 export interface Subtask {
   id: string; task_id: string; user_id: string;
   name: string; est_minutes: number; deadline: string | null;
+  date_key: string | null;
   progress: number; notes: string; sort_order: number;
   created_at: string; elapsed_seconds: number;
   file_url: string | null; file_name: string | null;
@@ -62,6 +66,12 @@ export interface ActivityLog {
 }
 
 export interface WeeklyRoutineTask {
+  id: string; user_id: string; text: string;
+  est_minutes: number; sort_order: number; created_at: string;
+  checked?: boolean;
+}
+
+export interface MonthlyRoutineTask {
   id: string; user_id: string; text: string;
   est_minutes: number; sort_order: number; created_at: string;
   checked?: boolean;

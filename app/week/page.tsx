@@ -3,20 +3,31 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { WeekTask, WeekDay, WeekTemplate } from "@/lib/types";
-import { getMonday, addDays, formatDate, DAY_COLORS, DAY_NAMES_FULL, cn, toLocalDateStr } from "@/lib/utils";
+import { WeekTask, WeekDay, WeekTemplate, QuickTask } from "@/lib/types";
+import { getMonday, addDays, formatDate, DAY_COLORS, DAY_NAMES_FULL, cn } from "@/lib/utils";
+import { syncTaskCompletion } from "@/lib/sync";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
+import { fetchWeekTasksGrouped, fetchWeekDayMeta, fetchWeekTemplates, fetchProjectsSlim, fetchProjectTasksSlim, fetchQuickTasks } from "@/lib/queries";
+import { useToast } from "@/components/Toast";
+import { CalendarDays, List } from "lucide-react";
+
+const PRIORITY_COLORS: Record<number, string> = {
+  1: "#4ade80", 2: "#34d399", 3: "#eab308", 4: "#f97316", 5: "#ef4444",
+};
 
 export default function WeekPage() {
   const router = useRouter();
-  const [viewMode, setViewMode] = useState<"week" | "month">("week");
+  const { userId } = useCurrentUser();
+  const { toast } = useToast();
+  const [viewMode, setViewMode] = useState<"week" | "month" | "planner">("week");
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
   const [monthDate, setMonthDate] = useState(() => new Date());
   const [tasks, setTasks] = useState<Record<string, WeekTask[]>>({});
   const [dayMeta, setDayMeta] = useState<Record<string, WeekDay>>({});
   const [templates, setTemplates] = useState<Record<number, string>>({});
   const [projects, setProjects] = useState<Array<{ id: string; title: string; color: string }>>([]);
+  const [quickTasks, setQuickTasks] = useState<QuickTask[]>([]);
   const [now, setNow] = useState(new Date());
-  const [userId, setUserId] = useState("");
   const [modalDate, setModalDate] = useState<string | null>(null);
   const [newTaskText, setNewTaskText] = useState("");
   const [editingTheme, setEditingTheme] = useState<string | null>(null);
@@ -28,50 +39,43 @@ export default function WeekPage() {
 
   const [jumpPickerOpen, setJumpPickerOpen] = useState(false);
 
-  const today = toLocalDateStr(new Date());
+  const today = formatDate(new Date());
 
   const loadData = useCallback(async () => {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    setUserId(user.id);
+    if (!userId) return;
+    try {
+      const supabase = createClient();
 
-    // Calculate date range based on view mode
-    const dates: string[] = [];
-    if (viewMode === "week") {
-      for (let i = 0; i < 7; i++) dates.push(formatDate(addDays(weekStart, i)));
-    } else {
-      // Month view: get all days in the month + padding for complete weeks
-      const year = monthDate.getFullYear();
-      const month = monthDate.getMonth();
-      const firstOfMonth = new Date(year, month, 1);
-      const lastOfMonth = new Date(year, month + 1, 0);
-      // Pad to start on Monday
-      const startPad = firstOfMonth.getDay() === 0 ? 6 : firstOfMonth.getDay() - 1;
-      const startDate = addDays(firstOfMonth, -startPad);
-      // Pad to fill 6 rows (42 days)
-      for (let i = 0; i < 42; i++) dates.push(formatDate(addDays(startDate, i)));
+      const dates: string[] = [];
+      if (viewMode === "week" || viewMode === "planner") {
+        for (let i = 0; i < 7; i++) dates.push(formatDate(addDays(weekStart, i)));
+      } else {
+        const year = monthDate.getFullYear();
+        const month = monthDate.getMonth();
+        const firstOfMonth = new Date(year, month, 1);
+        const startPad = firstOfMonth.getDay() === 0 ? 6 : firstOfMonth.getDay() - 1;
+        const startDate = addDays(firstOfMonth, -startPad);
+        for (let i = 0; i < 42; i++) dates.push(formatDate(addDays(startDate, i)));
+      }
+
+      const [grouped, meta, tmpl, projs, qt] = await Promise.all([
+        fetchWeekTasksGrouped(supabase, userId, dates),
+        fetchWeekDayMeta(supabase, userId, dates),
+        fetchWeekTemplates(supabase, userId),
+        fetchProjectsSlim(supabase, userId),
+        fetchQuickTasks(supabase, userId),
+      ]);
+
+      setTasks(grouped);
+      setDayMeta(meta);
+      setTemplates(tmpl);
+      setProjects(projs);
+      setQuickTasks(qt);
+    } catch (err) {
+      console.error("Week load failed:", err);
+      toast("Failed to load planner", "error");
     }
-
-    const { data: weekTasks } = await supabase.from("week_tasks").select("*").eq("user_id", user.id).in("date_key", dates).order("sort_order");
-    const grouped: Record<string, WeekTask[]> = {};
-    dates.forEach((d) => (grouped[d] = []));
-    (weekTasks || []).forEach((t: WeekTask) => { if (!grouped[t.date_key]) grouped[t.date_key] = []; grouped[t.date_key].push(t); });
-    setTasks(grouped);
-
-    const { data: days } = await supabase.from("week_days").select("*").eq("user_id", user.id).in("date_key", dates);
-    const meta: Record<string, WeekDay> = {};
-    (days || []).forEach((d: WeekDay) => (meta[d.date_key] = d));
-    setDayMeta(meta);
-
-    const { data: tmpl } = await supabase.from("week_templates").select("*").eq("user_id", user.id);
-    const t: Record<number, string> = {};
-    (tmpl || []).forEach((wt: WeekTemplate) => (t[wt.weekday] = wt.title));
-    setTemplates(t);
-
-    const { data: projs } = await supabase.from("projects").select("id, title, color").eq("user_id", user.id);
-    setProjects((projs || []) as Array<{ id: string; title: string; color: string }>);
-  }, [weekStart, monthDate, viewMode]);
+  }, [weekStart, monthDate, viewMode, userId, toast]);
 
   useEffect(() => { loadData(); }, [loadData]);
   useEffect(() => { const iv = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(iv); }, []);
@@ -80,10 +84,26 @@ export default function WeekPage() {
   const projectColorMap: Record<string, string> = {};
   for (const p of projects) { projectColorMap[p.title] = p.color || "#e05555"; }
 
+  // Map quick task names to priority colors
+  const PRIORITY_TEXT_COLORS: Record<number, string> = {
+    1: "#4ade80", 2: "#34d399", 3: "#eab308", 4: "#f97316", 5: "#ef4444",
+  };
+  const quickTaskColorMap: Record<string, string> = {};
+  for (const qt of quickTasks) {
+    quickTaskColorMap[qt.name] = PRIORITY_TEXT_COLORS[qt.priority] || "#eab308";
+  }
+
   const getTagColor = (text: string): string | null => {
     const match = text.match(/^\[(.+?)\]/);
     if (!match) return null;
     return projectColorMap[match[1]] || "#7c6fff";
+  };
+
+  const getTaskColor = (t: WeekTask): string | null => {
+    const tagColor = getTagColor(t.text);
+    if (tagColor) return tagColor;
+    // For non-project tasks, use quick task priority color
+    return quickTaskColorMap[t.text] || null;
   };
 
   const toggleTaskDone = async (task: WeekTask) => {
@@ -98,37 +118,68 @@ export default function WeekPage() {
     });
 
     // Update week_task
-    await supabase.from("week_tasks").update({ done: newDone }).eq("id", task.id);
+    const { error } = await supabase.from("week_tasks").update({ done: newDone }).eq("id", task.id);
+    if (error) {
+      // Revert optimistic update
+      setTasks((prev) => {
+        const copy = { ...prev };
+        copy[task.date_key] = copy[task.date_key].map((t) => t.id === task.id ? { ...t, done: !newDone } : t);
+        return copy;
+      });
+      return;
+    }
 
     // Sync to project if linked
     if (task.project_task_id) {
-      // Check if project task has subtasks
-      const { data: subs } = await supabase
-        .from("subtasks").select("id").eq("task_id", task.project_task_id).limit(1);
+      const isSubtaskEntry = task.text.includes("↳");
+      const newProgress = newDone ? 100 : 0;
 
-      if (!subs || subs.length === 0) {
-        // No subtasks — set progress directly
-        const newProgress = newDone ? 100 : 0;
-        await supabase.from("project_tasks")
-          .update({ progress: newProgress })
-          .eq("id", task.project_task_id);
-
-        // If completing, also remove the deadline entry
-        if (newDone && task.project_id) {
-          const { data: pt } = await supabase
-            .from("project_tasks").select("name").eq("id", task.project_task_id).maybeSingle();
-          const { data: proj } = await supabase
-            .from("projects").select("title").eq("id", task.project_id).maybeSingle();
-          if (pt && proj) {
-            const { data: dl } = await supabase
-              .from("deadlines").select("id")
-              .eq("user_id", userId)
-              .like("label", `[${proj.title}] ${pt.name}%`)
-              .maybeSingle();
-            if (dl) await supabase.from("deadlines").delete().eq("id", dl.id);
-          }
+      if (isSubtaskEntry) {
+        // Subtask entry — update only that specific subtask, then recalc parent
+        const subName = task.text.split("↳").pop()?.trim() || "";
+        const { data: matchedSub } = await supabase
+          .from("subtasks").select("id").eq("task_id", task.project_task_id)
+          .ilike("name", subName).limit(1).maybeSingle();
+        if (matchedSub) {
+          await supabase.from("subtasks").update({ progress: newProgress }).eq("id", matchedSub.id);
         }
+        const { data: allSubs } = await supabase
+          .from("subtasks").select("progress").eq("task_id", task.project_task_id);
+        if (allSubs && allSubs.length > 0) {
+          const avg = Math.round(allSubs.reduce((s, st) => s + st.progress, 0) / allSubs.length);
+          await supabase.from("project_tasks").update({ progress: avg }).eq("id", task.project_task_id);
+          await syncTaskCompletion(supabase, userId, task.project_task_id, avg);
+        }
+      } else {
+        // Main task entry
+        const { data: subs } = await supabase
+          .from("subtasks").select("id").eq("task_id", task.project_task_id).limit(1);
+
+        if (!subs || subs.length === 0) {
+          const { error: ptError } = await supabase.from("project_tasks")
+            .update({ progress: newProgress })
+            .eq("id", task.project_task_id);
+          if (ptError) {
+            toast("Failed to sync project progress", "error");
+            await supabase.from("week_tasks").update({ done: !newDone }).eq("id", task.id);
+            setTasks((prev) => {
+              const copy = { ...prev };
+              copy[task.date_key] = copy[task.date_key].map((t) => t.id === task.id ? { ...t, done: !newDone } : t);
+              return copy;
+            });
+            return;
+          }
+        } else {
+          await supabase.from("subtasks").update({ progress: newProgress }).eq("task_id", task.project_task_id);
+          await supabase.from("project_tasks").update({ progress: newProgress }).eq("id", task.project_task_id);
+        }
+        await syncTaskCompletion(supabase, userId, task.project_task_id, newProgress);
       }
+    }
+    // If marking done and this came from a quick task, remove it from quick_tasks
+    if (newDone && !task.project_task_id) {
+      await supabase.from("quick_tasks").delete()
+        .eq("user_id", userId).eq("name", task.text).eq("date_key", task.date_key);
     }
   };
 
@@ -138,13 +189,13 @@ export default function WeekPage() {
     const existing = tasks[dateKey] || [];
     const text = newTaskText.trim();
 
-    // Find project info for tagging
     const proj = linkProject ? projects.find((p) => p.id === linkProject) : null;
-    const taggedText = proj ? `[${proj.title}] ${text}` : text;
+    const taggedText = proj
+      ? (linkType === "subtask" ? `[${proj.title}] ↳ ${text}` : `[${proj.title}] ${text}`)
+      : text;
 
     let projectTaskId: string | null = null;
 
-    // Create project task/subtask if linked
     if (proj && linkType === "main") {
       const { data: pt } = await supabase.from("project_tasks").insert({
         project_id: proj.id, user_id: userId, name: text,
@@ -158,36 +209,54 @@ export default function WeekPage() {
         est_minutes: 0, deadline: dateKey, progress: 0,
         notes: "", sort_order: 999,
       }).select().single();
-      // For subtasks, link to the parent task
-      if (sub) projectTaskId = linkParentTask;
+      if (sub) {
+        projectTaskId = linkParentTask;
+        // Recalc parent progress to include the new 0% subtask
+        const { data: allSubs } = await supabase
+          .from("subtasks").select("progress").eq("task_id", linkParentTask);
+        if (allSubs && allSubs.length > 0) {
+          const avg = Math.round(allSubs.reduce((s: number, st: { progress: number }) => s + st.progress, 0) / allSubs.length);
+          await supabase.from("project_tasks").update({ progress: avg }).eq("id", linkParentTask);
+        }
+      }
     }
 
-    await supabase.from("week_tasks").insert({
+    const { data: newWeekTask } = await supabase.from("week_tasks").insert({
       user_id: userId, date_key: dateKey, text: taggedText,
       sort_order: existing.length,
       project_id: proj?.id || null,
       project_task_id: projectTaskId,
-    });
+    }).select().single();
+
+    if (newWeekTask) {
+      setTasks((prev) => ({
+        ...prev,
+        [dateKey]: [...(prev[dateKey] || []), newWeekTask as WeekTask],
+      }));
+    }
 
     setNewTaskText("");
     setLinkProject(null);
     setLinkType("none");
     setLinkParentTask(null);
     setProjectTasks([]);
-    loadData();
   };
 
   const loadProjectTasksForLink = async (projectId: string) => {
     const supabase = createClient();
-    const { data } = await supabase.from("project_tasks")
-      .select("id, name").eq("project_id", projectId).order("sort_order");
-    setProjectTasks(data || []);
+    setProjectTasks(await fetchProjectTasksSlim(supabase, projectId));
   };
 
   const deleteTask = async (id: string) => {
     const supabase = createClient();
     await supabase.from("week_tasks").delete().eq("id", id);
-    loadData();
+    setTasks((prev) => {
+      const copy: Record<string, WeekTask[]> = {};
+      for (const [key, list] of Object.entries(prev)) {
+        copy[key] = list.filter((t) => t.id !== id);
+      }
+      return copy;
+    });
   };
 
   const saveTheme = async (dateKey: string, value: string) => {
@@ -195,11 +264,15 @@ export default function WeekPage() {
     const existing = dayMeta[dateKey];
     if (existing) {
       await supabase.from("week_days").update({ title: value }).eq("id", existing.id);
+      setDayMeta((prev) => ({ ...prev, [dateKey]: { ...existing, title: value } }));
     } else {
-      await supabase.from("week_days").upsert({ user_id: userId, date_key: dateKey, title: value, notes: "" }, { onConflict: "user_id,date_key" });
+      const { data } = await supabase.from("week_days").upsert(
+        { user_id: userId, date_key: dateKey, title: value, notes: "" },
+        { onConflict: "user_id,date_key" }
+      ).select().single();
+      if (data) setDayMeta((prev) => ({ ...prev, [dateKey]: data as WeekDay }));
     }
     setEditingTheme(null);
-    loadData();
   };
 
   const prevWeek = () => setWeekStart(addDays(weekStart, -7));
@@ -224,8 +297,8 @@ export default function WeekPage() {
   const tagStats: Record<string, { done: number; total: number; color: string }> = {};
   for (const t of allTasks) {
     const match = t.text.match(/^\[(.+?)\]/);
-    const tag = match ? match[1] : "No project";
-    const color = match ? (projectColorMap[match[1]] || "#7c6fff") : "#5c5a7a";
+    const tag = match ? match[1] : "Task list";
+    const color = match ? (projectColorMap[match[1]] || "#7c6fff") : "#eab308";
     if (!tagStats[tag]) tagStats[tag] = { done: 0, total: 0, color };
     tagStats[tag].total++;
     if (t.done) tagStats[tag].done++;
@@ -234,6 +307,8 @@ export default function WeekPage() {
   const weekEndDate = addDays(weekStart, 6);
   const rangeLabel = viewMode === "week"
     ? `${weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${weekEndDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+    : viewMode === "planner"
+    ? `${quickTasks.length} tasks`
     : monthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   // Month grid dates
@@ -260,7 +335,8 @@ export default function WeekPage() {
     <div className="p-4 md:p-6 flex flex-col h-[calc(100vh-0px)]">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <div>
-          <h1 className="font-title text-2xl text-bright">Planner</h1>
+          <h1 className="font-title text-2xl text-bright cursor-pointer hover:text-violet2 transition-colors"
+            onClick={() => setViewMode("week")}>Planner</h1>
           <p className="text-sm text-txt2 mt-0.5">{rangeLabel}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -274,28 +350,37 @@ export default function WeekPage() {
               className={`px-3 py-1.5 text-xs transition-colors ${viewMode === "month" ? "bg-violet/15 text-violet2" : "text-txt3 hover:text-txt"}`}>
               Month
             </button>
+            <button onClick={() => setViewMode("planner")}
+              className={`px-3 py-1.5 text-xs transition-colors flex items-center gap-1 ${viewMode === "planner" ? "bg-violet/15 text-violet2" : "text-txt3 hover:text-txt"}`}>
+              <List size={12} /> List
+            </button>
           </div>
-          <button onClick={viewMode === "week" ? prevWeek : prevMonth}
-            className="px-3 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt2 hover:text-txt hover:border-border2">‹</button>
-          <div className="relative">
-            <button onClick={goToday}
-              className="px-3 py-1.5 rounded-lg bg-violet/10 border border-violet/30 text-sm text-violet2 hover:bg-violet/20">Today</button>
-            <button onClick={() => setJumpPickerOpen(!jumpPickerOpen)}
-              className="ml-1 px-2 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt3 hover:text-txt hover:border-border2" title="Jump to date">📅</button>
-            {jumpPickerOpen && (
-              <div className="absolute top-full mt-1 right-0 z-50 bg-surface2 border border-border rounded-lg shadow-xl p-2">
-                <input type="date" autoFocus
-                  className="bg-surface border border-border rounded px-3 py-2 text-sm text-txt"
-                  onChange={(e) => { if (e.target.value) jumpToDate(e.target.value); }} />
+          {viewMode !== "planner" && (
+            <>
+              <button onClick={viewMode === "week" ? prevWeek : prevMonth}
+                className="px-3 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt2 hover:text-txt hover:border-border2">‹</button>
+              <div className="relative">
+                <button onClick={goToday}
+                  className="px-3 py-1.5 rounded-lg bg-violet/10 border border-violet/30 text-sm text-violet2 hover:bg-violet/20">Today</button>
+                <button onClick={() => setJumpPickerOpen(!jumpPickerOpen)}
+                  className="ml-1 px-2 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt3 hover:text-txt hover:border-border2" title="Jump to date"><CalendarDays size={14} /></button>
+                {jumpPickerOpen && (
+                  <div className="absolute top-full mt-1 right-0 z-50 bg-surface2 border border-border rounded-lg shadow-xl p-2">
+                    <input type="date" autoFocus
+                      className="bg-surface border border-border rounded px-3 py-2 text-sm text-txt"
+                      onChange={(e) => { if (e.target.value) jumpToDate(e.target.value); }} />
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-          <button onClick={viewMode === "week" ? nextWeek : nextMonth}
-            className="px-3 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt2 hover:text-txt hover:border-border2">›</button>
+              <button onClick={viewMode === "week" ? nextWeek : nextMonth}
+                className="px-3 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt2 hover:text-txt hover:border-border2">›</button>
+            </>
+          )}
         </div>
       </div>
 
       {/* Weekly stats */}
+      {viewMode !== "planner" && (
       <div className="mb-4 space-y-2">
         <div className="flex items-center gap-3 text-sm">
           <span className="text-txt3">Week:</span>
@@ -325,6 +410,7 @@ export default function WeekPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Week view */}
       {viewMode === "week" && (
@@ -381,12 +467,14 @@ export default function WeekPage() {
                   onClick={() => { setModalDate(dateKey); setNewTaskText(""); setLinkProject(null); setLinkType("none"); setLinkParentTask(null); setProjectTasks([]); }}>
                   {dayTasks.map((t) => {
                     const tagColor = getTagColor(t.text);
+                    const taskColor = getTaskColor(t);
                     return (
                       <div key={t.id} className="flex items-start gap-1.5 text-xs group" onClick={(e) => e.stopPropagation()}>
                         <input type="checkbox" checked={t.done} onChange={() => toggleTaskDone(t)}
-                          className="mt-0.5 w-3.5 h-3.5" style={{ accentColor: tagColor || color }} />
+                          className="mt-0.5 w-3.5 h-3.5" style={{ accentColor: taskColor || color }} />
                         <span className={cn("leading-tight", t.done && "line-through text-txt3 opacity-60", t.project_id && "cursor-pointer hover:underline")}
-                          onClick={() => { if (t.project_id) window.location.href = `/projects/${t.project_id}`; }}>
+                          onClick={() => { if (t.project_id) router.push(`/projects/${t.project_id}`); }}
+                          style={!tagColor && taskColor && !t.done ? { color: taskColor } : undefined}>
                           {tagColor && <span className="font-medium" style={{ color: tagColor }}>{t.text.match(/^\[.*?\]/)?.[0]}{" "}</span>}
                           {t.text.replace(/^\[.*?\]\s*/, "")}
                         </span>
@@ -443,11 +531,13 @@ export default function WeekPage() {
                   <div className="flex-1 space-y-0.5 overflow-hidden min-h-0">
                     {dayTasks.slice(0, 3).map((t) => {
                       const tagColor = getTagColor(t.text);
+                      const taskColor = getTaskColor(t);
                       return (
                         <div key={t.id} className="flex items-center gap-1 text-[9px] leading-tight shrink-0" onClick={(e) => e.stopPropagation()}>
                           <input type="checkbox" checked={t.done} onChange={() => toggleTaskDone(t)}
-                            className="w-2.5 h-2.5 shrink-0" style={{ accentColor: tagColor || DAY_COLORS[dayNum] }} />
-                          <span className={cn("truncate", t.done && "line-through text-txt3 opacity-60")}>{t.text.replace(/^\[.*?\]\s*/, "")}</span>
+                            className="w-2.5 h-2.5 shrink-0" style={{ accentColor: taskColor || DAY_COLORS[dayNum] }} />
+                          <span className={cn("truncate", t.done && "line-through text-txt3 opacity-60")}
+                            style={!tagColor && taskColor && !t.done ? { color: taskColor } : undefined}>{t.text.replace(/^\[.*?\]\s*/, "")}</span>
                         </div>
                       );
                     })}
@@ -459,6 +549,88 @@ export default function WeekPage() {
           </div>
         </div>
       )}
+
+      {/* Planner view — Task List */}
+      {viewMode === "planner" && (() => {
+        const dated = quickTasks.filter((t) => t.date_key);
+        const undated = quickTasks.filter((t) => !t.date_key);
+        const grouped: Record<string, QuickTask[]> = {};
+        for (const t of dated) {
+          const k = t.date_key!;
+          if (!grouped[k]) grouped[k] = [];
+          grouped[k].push(t);
+        }
+        const sortedDates = Object.keys(grouped).sort();
+
+        const completeQuickTask = async (id: string) => {
+          if (!confirm("Task completed? This will remove it.")) return;
+          const supabase = createClient();
+          await supabase.from("quick_tasks").delete().eq("id", id);
+          setQuickTasks((prev) => prev.filter((t) => t.id !== id));
+          toast("Task completed!", "success");
+        };
+
+        return (
+          <div className="flex-1 overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-txt2">{quickTasks.length} tasks · {dated.length} scheduled</p>
+              <a href="/tasks" className="text-xs text-violet2 hover:underline">Open full task list →</a>
+            </div>
+
+            {sortedDates.map((dateKey) => {
+              const dayTasks = grouped[dateKey];
+              const d = new Date(dateKey + "T00:00:00");
+              const label = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+              const isToday = dateKey === today;
+              const isPast = dateKey < today;
+              return (
+                <div key={dateKey} className="mb-4">
+                  <h3 className={cn("text-xs font-medium mb-2 uppercase tracking-wider",
+                    isToday ? "text-violet2" : isPast ? "text-danger" : "text-txt3")}>
+                    {isToday ? "Today" : label} {isPast && !isToday && "· overdue"}
+                  </h3>
+                  <div className="space-y-1.5">
+                    {dayTasks.map((t) => (
+                      <div key={t.id} className="bg-surface border border-border rounded-lg px-3 py-2 flex items-center gap-3 group"
+                        style={{ borderLeftWidth: 3, borderLeftColor: PRIORITY_COLORS[t.priority] || "#eab308" }}>
+                        <button onClick={() => completeQuickTask(t.id)}
+                          className="w-4 h-4 rounded border border-border hover:border-green-acc transition-colors shrink-0" />
+                        <span className="text-sm flex-1" style={{ color: PRIORITY_COLORS[t.priority] || "#eab308" }}>{t.name}</span>
+                        {t.notes && <span className="text-[10px] text-txt3 truncate max-w-[150px]">{t.notes}</span>}
+                        <span className="text-[9px] font-mono text-txt3">{dateKey}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+
+            {undated.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-xs font-medium mb-2 uppercase tracking-wider text-txt3">Unscheduled</h3>
+                <div className="space-y-1.5">
+                  {undated.map((t) => (
+                    <div key={t.id} className="bg-surface border border-border rounded-lg px-3 py-2 flex items-center gap-3 group"
+                      style={{ borderLeftWidth: 3, borderLeftColor: PRIORITY_COLORS[t.priority] || "#eab308" }}>
+                      <button onClick={() => completeQuickTask(t.id)}
+                        className="w-4 h-4 rounded border border-border hover:border-green-acc transition-colors shrink-0" />
+                      <span className="text-sm flex-1" style={{ color: PRIORITY_COLORS[t.priority] || "#eab308" }}>{t.name}</span>
+                      {t.notes && <span className="text-[10px] text-txt3 truncate max-w-[150px]">{t.notes}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {quickTasks.length === 0 && (
+              <div className="text-center py-16 text-txt3">
+                <p className="text-lg font-medium text-txt2 mb-1">No quick tasks</p>
+                <p className="text-sm">Add tasks in the <a href="/tasks" className="text-violet2 hover:underline">Task List</a></p>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Day Detail Modal */}
       {modalDate && modalDateObj && (
@@ -500,16 +672,18 @@ export default function WeekPage() {
               {modalTasks.length === 0 && <p className="text-sm text-txt3 text-center py-8">No tasks for this day</p>}
               {modalTasks.map((t) => {
                 const tagColor = getTagColor(t.text);
+                const taskColor = getTaskColor(t);
                 return (
                   <div key={t.id} className={cn("flex items-center gap-3 bg-surface border border-border rounded-lg px-3 py-2.5 group", t.done && "opacity-60")}>
                     <input type="checkbox" checked={t.done} onChange={() => toggleTaskDone(t)}
-                      className="w-4 h-4 shrink-0" style={{ accentColor: tagColor || modalColor }} />
+                      className="w-4 h-4 shrink-0" style={{ accentColor: taskColor || modalColor }} />
                     <div className="flex-1 min-w-0">
-                      <span className={cn("text-sm", t.done && "line-through text-txt3 opacity-60")}>
+                      <span className={cn("text-sm", t.done && "line-through text-txt3 opacity-60")}
+                        style={!tagColor && taskColor && !t.done ? { color: taskColor } : undefined}>
                         {tagColor && (
                           <span className="font-medium text-xs px-1.5 py-0.5 rounded mr-1.5 cursor-pointer hover:underline"
                             style={{ color: tagColor, backgroundColor: `${tagColor}15` }}
-                            onClick={() => { if (t.project_id) window.location.href = `/projects/${t.project_id}`; }}>
+                            onClick={() => { if (t.project_id) router.push(`/projects/${t.project_id}`); }}>
                             {t.text.match(/^\[(.+?)\]/)?.[1]}
                           </span>
                         )}
@@ -517,7 +691,7 @@ export default function WeekPage() {
                       </span>
                     </div>
                     {t.project_id && (
-                      <button onClick={() => window.location.href = `/projects/${t.project_id}`}
+                      <button onClick={() => router.push(`/projects/${t.project_id}`)}
                         className="text-txt3 hover:text-violet2 opacity-0 group-hover:opacity-100 transition-all text-xs shrink-0" title="Go to project">→</button>
                     )}
                     <button onClick={() => deleteTask(t.id)}

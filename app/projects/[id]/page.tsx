@@ -9,20 +9,27 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { InlineEdit } from "@/components/InlineEdit";
 import { CalendarPicker } from "@/components/CalendarPicker";
 import { Modal } from "@/components/Modal";
-import { syncProjectTaskToWeek, removeWeekTasksForProjectTask, syncTaskDeadlineToDeadlines } from "@/lib/sync";
+import { syncProjectTaskToWeek, removeWeekTasksForProjectTask, syncTaskDeadlineToDeadlines, syncTaskCompletion } from "@/lib/sync";
 import { FileAttachment } from "@/components/FileAttachment";
 import { GCalButton, GCalSyncModal } from "@/components/GCalButton";
 import { ColorPicker } from "@/components/ColorPicker";
 import { logActivity } from "@/lib/activity";
+import { useToast } from "@/components/Toast";
+import { reorderRows, reorderSubtasks, cleanupActivityLog } from "@/lib/db-helpers";
+import { Save, Upload, CalendarDays, Timer, RefreshCw, Calendar, Pencil, Trash2, AlertTriangle } from "lucide-react";
+import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
+import { fetchProjectById, fetchProjectTasksWithSubs } from "@/lib/queries";
 
 export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
+  const { toast } = useToast();
+  const { userId } = useCurrentUser();
 
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
-  const [userId, setUserId] = useState("");
 
   // Timer
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
@@ -31,6 +38,7 @@ export default function ProjectDetailPage() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
   const startElapsedRef = useRef<number>(0);
+  const elapsedRef = useRef<Record<string, number>>({});
 
   // UI
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
@@ -48,58 +56,104 @@ export default function ProjectDetailPage() {
   const [descDraft, setDescDraft] = useState("");
   const [gcalModalOpen, setGcalModalOpen] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragSubIdx, setDragSubIdx] = useState<number | null>(null);
+  const [dragSubParent, setDragSubParent] = useState<string | null>(null);
+  const [subMenuOpen, setSubMenuOpen] = useState<string | null>(null);
+  const [moveSubModal, setMoveSubModal] = useState<{ subId: string; subName: string; fromTaskId: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const loadIdRef = useRef(0);
 
   // Close menu on outside click
   useEffect(() => {
-    if (!menuOpen) return;
-    const handler = () => setMenuOpen(null);
+    if (!menuOpen && !subMenuOpen) return;
+    const handler = () => { setMenuOpen(null); setSubMenuOpen(null); };
     document.addEventListener("click", handler);
     return () => document.removeEventListener("click", handler);
-  }, [menuOpen]);
+  }, [menuOpen, subMenuOpen]);
 
   const loadProject = useCallback(async () => {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    setUserId(user.id);
+    if (!userId) return;
+    const thisLoad = ++loadIdRef.current;
+    try {
+      const supabase = createClient();
 
-    const { data: proj } = await supabase
-      .from("projects")
-      .select("*")
-      .eq("id", projectId)
-      .single();
+      const proj = await fetchProjectById(supabase, projectId);
+      if (!proj) { router.push("/projects"); return; }
+      if (loadIdRef.current !== thisLoad) return;
+      setProject(proj);
 
-    if (!proj) { router.push("/projects"); return; }
-    setProject(proj);
+      const tasksWithSubs = await fetchProjectTasksWithSubs(supabase, projectId);
+      if (loadIdRef.current !== thisLoad) return;
+      setTasks(tasksWithSubs);
 
-    const { data: taskData } = await supabase
-      .from("project_tasks")
-      .select("*")
-      .eq("project_id", projectId)
-      .order("sort_order");
+      const el: Record<string, number> = {};
+      for (const t of tasksWithSubs) {
+        el[t.id] = t.elapsed_seconds;
+        for (const s of t.subtasks || []) el[`sub:${s.id}`] = s.elapsed_seconds || 0;
+      }
+      setElapsed((prev) => {
+        const merged = { ...el };
+        for (const key of Object.keys(prev)) {
+          if (activeTaskId === key) merged[key] = prev[key];
+        }
+        return merged;
+      });
 
-    const tasksWithSubs: ProjectTask[] = [];
-    for (const t of taskData || []) {
-      const { data: subs } = await supabase
-        .from("subtasks")
-        .select("*")
-        .eq("task_id", t.id)
-        .order("sort_order");
-      tasksWithSubs.push({ ...t, subtasks: subs || [] });
+      cleanupActivityLog(supabase, userId);
+    } catch (err) {
+      console.error("Project load failed:", err);
+      toast("Failed to load project", "error");
     }
-
-    setTasks(tasksWithSubs);
-
-    // Init elapsed
-    const el: Record<string, number> = {};
-    for (const t of tasksWithSubs) {
-      el[t.id] = t.elapsed_seconds;
-      for (const s of t.subtasks || []) el[`sub:${s.id}`] = s.elapsed_seconds || 0;
-    }
-    setElapsed(el);
-  }, [projectId, router]);
+  }, [projectId, router, activeTaskId, userId, toast]);
 
   useEffect(() => { loadProject(); }, [loadProject]);
+
+  // ── Granular state helpers (avoid full reload after mutations) ──
+
+  const updateTaskLocal = (taskId: string, updates: Partial<ProjectTask>) => {
+    setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, ...updates } : t));
+  };
+
+  const updateSubtaskLocal = (taskId: string, subtaskId: string, updates: Partial<Subtask>) => {
+    setTasks((prev) => prev.map((t) => {
+      if (t.id !== taskId) return t;
+      return { ...t, subtasks: (t.subtasks || []).map((s) => s.id === subtaskId ? { ...s, ...updates } : s) };
+    }));
+  };
+
+  const addTaskLocal = (task: ProjectTask) => {
+    setTasks((prev) => [...prev, { ...task, subtasks: [] }]);
+    setElapsed((prev) => ({ ...prev, [task.id]: task.elapsed_seconds || 0 }));
+  };
+
+  const removeTaskLocal = (taskId: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    setElapsed((prev) => { const copy = { ...prev }; delete copy[taskId]; return copy; });
+  };
+
+  const addSubtaskLocal = (taskId: string, subtask: Subtask) => {
+    setTasks((prev) => prev.map((t) => {
+      if (t.id !== taskId) return t;
+      return { ...t, subtasks: [...(t.subtasks || []), subtask] };
+    }));
+    setElapsed((prev) => ({ ...prev, [`sub:${subtask.id}`]: subtask.elapsed_seconds || 0 }));
+  };
+
+  const removeSubtaskLocal = (taskId: string, subtaskId: string) => {
+    setTasks((prev) => prev.map((t) => {
+      if (t.id !== taskId) return t;
+      return { ...t, subtasks: (t.subtasks || []).filter((s) => s.id !== subtaskId) };
+    }));
+  };
+
+  const recalcParentProgress = (taskId: string) => {
+    setTasks((prev) => prev.map((t) => {
+      if (t.id !== taskId || !t.subtasks?.length) return t;
+      const avg = Math.round(t.subtasks.reduce((s, st) => s + st.progress, 0) / t.subtasks.length);
+      return { ...t, progress: avg };
+    }));
+  };
 
   // Timer logic — supports both task IDs and "sub:subtaskId"
   const startTimer = (timerId: string) => {
@@ -172,43 +226,83 @@ export default function ProjectDetailPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
 
+  // Keep ref in sync with state so auto-save always reads latest value
+  useEffect(() => { elapsedRef.current = elapsed; }, [elapsed]);
+
+  // Auto-save timer every 5 seconds to prevent data loss
+  useEffect(() => {
+    if (!activeTaskId) return;
+
+    const saveTimerToDB = async () => {
+      const supabase = createClient();
+      const current = elapsedRef.current[activeTaskId] || 0;
+      if (activeTaskId.startsWith("sub:")) {
+        const subId = activeTaskId.replace("sub:", "");
+        await supabase.from("subtasks").update({ elapsed_seconds: current }).eq("id", subId);
+      } else {
+        await supabase.from("project_tasks").update({ elapsed_seconds: current }).eq("id", activeTaskId);
+      }
+    };
+
+    const autoSave = setInterval(saveTimerToDB, 5000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        saveTimerToDB();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "Timer is running — are you sure you want to leave?";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      clearInterval(autoSave);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [activeTaskId]);
+
   // Task CRUD
   const saveTaskModal = async () => {
-    if (!formName.trim()) return;
+    if (!formName.trim() || saving) return;
+    setSaving(true);
+    try {
     const supabase = createClient();
     const name = formName.trim();
-    const calDate = formDate || null;       // → appears on calendar
-    const deadline = formDeadline || null;   // → appears in deadlines
+    const calDate = formDate || null;       // → calendar (when to work on it)
+    const deadline = formDeadline || null;  // → deadline dashboard (when it's due)
+    let savedTaskId: string | null = null;
 
     if (modalMode === "task") {
       if (editTarget && "project_id" in editTarget) {
-        // EDIT existing task
+        savedTaskId = editTarget.id;
         await supabase
           .from("project_tasks")
-          .update({ name, est_minutes: formEst, deadline })
+          .update({ name, est_minutes: formEst, deadline, date_key: calDate })
           .eq("id", editTarget.id);
 
-        // Sync calendar date
+        updateTaskLocal(editTarget.id, { name, est_minutes: formEst, deadline, date_key: calDate });
+
         if (project) {
-          await syncProjectTaskToWeek(supabase, userId, editTarget.id, name, projectId, project.title, calDate, editTarget.deadline);
-        }
-        // Sync deadline
-        if (project) {
+          await syncProjectTaskToWeek(supabase, userId, editTarget.id, name, projectId, project.title, calDate, (editTarget as ProjectTask).date_key);
           await syncTaskDeadlineToDeadlines(supabase, userId, editTarget.id, name, project.title, deadline);
         }
       } else {
-        // CREATE new task
         const { data: newTask } = await supabase.from("project_tasks").insert({
           project_id: projectId, user_id: userId, name,
-          est_minutes: formEst, deadline, sort_order: tasks.length,
+          est_minutes: formEst, deadline, date_key: calDate, sort_order: tasks.length,
         }).select().single();
 
         if (newTask && project) {
-          // Create calendar entry if date is set
+          savedTaskId = newTask.id;
+          addTaskLocal(newTask as ProjectTask);
           if (calDate) {
             await syncProjectTaskToWeek(supabase, userId, newTask.id, name, projectId, project.title, calDate, null);
           }
-          // Create deadline entry if deadline is set
           if (deadline) {
             await syncTaskDeadlineToDeadlines(supabase, userId, newTask.id, name, project.title, deadline);
           }
@@ -219,24 +313,66 @@ export default function ProjectDetailPage() {
       if (editTarget && "task_id" in editTarget) {
         await supabase
           .from("subtasks")
-          .update({ name, est_minutes: formEst, deadline })
+          .update({ name, est_minutes: formEst, deadline, date_key: calDate })
           .eq("id", editTarget.id);
+        updateSubtaskLocal(parentTaskId, editTarget.id, { name, est_minutes: formEst, deadline, date_key: calDate });
       } else {
-        await supabase.from("subtasks").insert({
+        const { data: newSub } = await supabase.from("subtasks").insert({
           task_id: parentTaskId, user_id: userId, name,
-          est_minutes: formEst, deadline,
+          est_minutes: formEst, deadline, date_key: calDate,
           sort_order: (parent?.subtasks?.length || 0),
-        });
+        }).select().single();
+        if (newSub) {
+          addSubtaskLocal(parentTaskId, newSub as Subtask);
+          // Recalc parent progress to account for the new 0% subtask
+          const allSubs = [...(parent?.subtasks || []), newSub as Subtask];
+          const avg = Math.round(allSubs.reduce((s, st) => s + st.progress, 0) / allSubs.length);
+          await supabase.from("project_tasks").update({ progress: avg }).eq("id", parentTaskId);
+          updateTaskLocal(parentTaskId, { progress: avg });
+        }
+      }
+      // Sync subtask to calendar
+      if (project && parent) {
+        const subText = `[${project.title}] ↳ ${name}`;
+        if (editTarget && "task_id" in editTarget) {
+          // Editing: find existing week_task and update or delete
+          const { data: existingWt } = await supabase
+            .from("week_tasks")
+            .select("id")
+            .eq("user_id", userId)
+            .eq("project_task_id", parentTaskId)
+            .ilike("text", `%↳ ${editTarget.name}`)
+            .maybeSingle();
+
+          if (!calDate && existingWt) {
+            await supabase.from("week_tasks").delete().eq("id", existingWt.id);
+          } else if (calDate && existingWt) {
+            await supabase.from("week_tasks").update({ text: subText, date_key: calDate }).eq("id", existingWt.id);
+          } else if (calDate) {
+            await supabase.from("week_tasks").insert({
+              user_id: userId, date_key: calDate, text: subText,
+              sort_order: 999, done: false,
+              project_id: projectId, project_task_id: parentTaskId,
+            });
+          }
+        } else if (calDate) {
+          // New subtask with date — create week_task
+          await supabase.from("week_tasks").insert({
+            user_id: userId, date_key: calDate, text: subText,
+            sort_order: 999, done: false,
+            project_id: projectId, project_task_id: parentTaskId,
+          });
+        }
       }
     }
 
-    // Create recurring deadline if recurrence is set
     if (formRecurrence && deadline) {
-      await supabase.from("deadlines").upsert({
+      await supabase.from("deadlines").insert({
         user_id: userId,
         label: `[${project?.title}] ${name}`,
         target_datetime: `${deadline}T23:59:00`,
         recurrence: formRecurrence,
+        source_task_id: savedTaskId,
       });
     }
 
@@ -244,7 +380,6 @@ export default function ProjectDetailPage() {
     setFormDate("");
     setFormDeadline("");
     setFormRecurrence(null);
-    // Auto-expand parent task when adding a subtask
     if (modalMode === "subtask" && parentTaskId) {
       setExpandedTasks((prev) => new Set(prev).add(parentTaskId));
     }
@@ -253,7 +388,9 @@ export default function ProjectDetailPage() {
       await logActivity(supabase2, userId, projectId,
         modalMode === "task" ? "Task added" : "Subtask added", formName.trim());
     }
-    loadProject();
+    } finally {
+      setSaving(false);
+    }
   };
 
   const removeTask = async (taskId: string) => {
@@ -264,68 +401,179 @@ export default function ProjectDetailPage() {
     if (activeTaskId === taskId) stopTimer();
     await logActivity(supabase, userId, projectId, "Task removed", task?.name || "");
     setMenuOpen(null);
-    loadProject();
+    removeTaskLocal(taskId);
   };
 
   const removeSubtask = async (subtaskId: string, parentId: string) => {
+    if (!confirm("Remove this subtask?")) return;
     const supabase = createClient();
     await supabase.from("subtasks").delete().eq("id", subtaskId);
-    // Recalc parent progress
+    removeSubtaskLocal(parentId, subtaskId);
+    // Recalc parent progress from remaining subtasks
     const parent = tasks.find((t) => t.id === parentId);
     const remaining = (parent?.subtasks || []).filter((s) => s.id !== subtaskId);
     if (remaining.length > 0) {
       const avg = Math.round(remaining.reduce((s, st) => s + st.progress, 0) / remaining.length);
       await supabase.from("project_tasks").update({ progress: avg }).eq("id", parentId);
+      updateTaskLocal(parentId, { progress: avg });
     }
-    loadProject();
+  };
+
+  // Subtask drag-drop reorder
+  const handleSubDragStart = (parentId: string, idx: number) => {
+    setDragSubParent(parentId);
+    setDragSubIdx(idx);
+  };
+  const handleSubDragOver = (e: React.DragEvent, parentId: string, idx: number) => {
+    e.preventDefault();
+    if (dragSubIdx === null || dragSubParent !== parentId || dragSubIdx === idx) return;
+    const task = tasks.find((t) => t.id === parentId);
+    if (!task?.subtasks) return;
+    const newSubs = [...task.subtasks];
+    const [moved] = newSubs.splice(dragSubIdx, 1);
+    newSubs.splice(idx, 0, moved);
+    setTasks((prev) => prev.map((t) => t.id === parentId ? { ...t, subtasks: newSubs } : t));
+    setDragSubIdx(idx);
+  };
+  const handleSubDragEnd = async (parentId: string) => {
+    setDragSubIdx(null);
+    setDragSubParent(null);
+    const task = tasks.find((t) => t.id === parentId);
+    if (!task?.subtasks || !userId) return;
+    const supabase = createClient();
+    const { error } = await reorderSubtasks(supabase, task.subtasks.map((s) => s.id), userId);
+    if (error) toast("Failed to reorder: " + error, "error");
+  };
+
+  // Move subtask to another task
+  const moveSubtask = async (subtaskId: string, fromTaskId: string, toTaskId: string) => {
+    const supabase = createClient();
+    const fromParent = tasks.find((t) => t.id === fromTaskId);
+    const movedSub = fromParent?.subtasks?.find((s) => s.id === subtaskId);
+    const toTask = tasks.find((t) => t.id === toTaskId);
+    const newOrder = (toTask?.subtasks?.length || 0);
+    await supabase.from("subtasks").update({ task_id: toTaskId, sort_order: newOrder }).eq("id", subtaskId);
+
+    // Granular: remove from source, add to target
+    removeSubtaskLocal(fromTaskId, subtaskId);
+    if (movedSub) {
+      addSubtaskLocal(toTaskId, { ...movedSub, task_id: toTaskId, sort_order: newOrder });
+    }
+
+    // Recalc source parent progress
+    const remaining = (fromParent?.subtasks || []).filter((s) => s.id !== subtaskId);
+    if (remaining.length > 0) {
+      const avg = Math.round(remaining.reduce((s, st) => s + st.progress, 0) / remaining.length);
+      await supabase.from("project_tasks").update({ progress: avg }).eq("id", fromTaskId);
+      updateTaskLocal(fromTaskId, { progress: avg });
+    }
+    setMoveSubModal(null);
+    toast("Subtask moved", "success");
   };
 
   const updateTaskField = async (taskId: string, field: string, value: string | number | null) => {
     const supabase = createClient();
-    await supabase.from("project_tasks").update({ [field]: value }).eq("id", taskId);
+    const { error } = await supabase.from("project_tasks").update({ [field]: value }).eq("id", taskId);
+    if (error) { toast("Failed to update task: " + error.message, "error"); return; }
+
+    // Granular local update
+    updateTaskLocal(taskId, { [field]: value } as Partial<ProjectTask>);
 
     const task = tasks.find((t) => t.id === taskId);
 
-    // Sync deadline to week + deadlines tab
-    if (field === "deadline") {
-      if (task && project) {
-        await syncProjectTaskToWeek(
-          supabase, userId, taskId, task.name, projectId, project.title,
-          value as string | null, task.deadline
-        );
-        await syncTaskDeadlineToDeadlines(
-          supabase, userId, taskId, task.name, project.title,
-          value as string | null
-        );
-      }
+    if (field === "deadline" && task && project) {
+      const res = await syncTaskDeadlineToDeadlines(supabase, userId, taskId, task.name, project.title, value as string | null);
+      if (res.error) toast("Sync error: " + res.error, "error");
     }
 
-    // When progress changes, sync to week_tasks and deadlines
+    if (field === "date_key" && task && project) {
+      const res = await syncProjectTaskToWeek(supabase, userId, taskId, task.name, projectId, project.title, value as string | null, task.date_key);
+      if (res.error) toast("Sync error: " + res.error, "error");
+    }
+
     if (field === "progress" && task) {
-      const progress = value as number;
-      // Mark linked week_task as done/undone
-      const { data: linkedWeek } = await supabase
-        .from("week_tasks")
-        .select("id")
-        .eq("project_task_id", taskId)
-        .eq("user_id", userId);
-      for (const wt of linkedWeek || []) {
-        await supabase.from("week_tasks").update({ done: progress >= 100 }).eq("id", wt.id);
-      }
-      // If 100%, remove the deadline entry
-      if (progress >= 100 && project) {
-        await syncTaskDeadlineToDeadlines(supabase, userId, taskId, task.name, project.title, null);
-      }
+      const res = await syncTaskCompletion(supabase, userId, taskId, value as number);
+      if (res.error) toast("Sync error: " + res.error, "error");
     }
-
-    loadProject();
   };
 
   const updateSubtaskField = async (subtaskId: string, parentId: string, field: string, value: string | number | null) => {
     const supabase = createClient();
-    await supabase.from("subtasks").update({ [field]: value }).eq("id", subtaskId);
+    const { error } = await supabase.from("subtasks").update({ [field]: value }).eq("id", subtaskId);
+    if (error) { toast("Failed to update subtask: " + error.message, "error"); return; }
 
-    // Recalc parent progress if progress changed
+    // Granular local update
+    updateSubtaskLocal(parentId, subtaskId, { [field]: value } as Partial<Subtask>);
+
+    if (field === "date_key" && project) {
+      const parent = tasks.find((t) => t.id === parentId);
+      const sub = parent?.subtasks?.find((s) => s.id === subtaskId);
+      const subName = sub?.name || "Subtask";
+      const subText = `[${project.title}] ↳ ${subName}`;
+
+      // Find existing week_task for this subtask (matched by text + project_task_id)
+      const { data: existing } = await supabase
+        .from("week_tasks")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("project_task_id", parentId)
+        .ilike("text", `%↳ ${subName}`)
+        .maybeSingle();
+
+      if (!value) {
+        // Date cleared — delete linked week_task
+        if (existing) {
+          await supabase.from("week_tasks").delete().eq("id", existing.id);
+        }
+      } else if (existing) {
+        // Date changed — update existing week_task
+        await supabase.from("week_tasks").update({
+          text: subText, date_key: value as string,
+        }).eq("id", existing.id);
+      } else {
+        // New date — create week_task
+        await supabase.from("week_tasks").insert({
+          user_id: userId, date_key: value as string, text: subText,
+          sort_order: 999, done: false,
+          project_id: projectId, project_task_id: parentId,
+        });
+      }
+    }
+
+    if (field === "deadline" && project) {
+      const parent = tasks.find((t) => t.id === parentId);
+      const sub = parent?.subtasks?.find((s) => s.id === subtaskId);
+      const subName = sub?.name || "Subtask";
+      const label = `[${project.title}] ↳ ${subName}`;
+
+      // Find existing deadline for this subtask (by label match)
+      const { data: existing } = await supabase
+        .from("deadlines")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("label", label)
+        .maybeSingle();
+
+      if (!value) {
+        // Deadline cleared — delete
+        if (existing) {
+          await supabase.from("deadlines").delete().eq("id", existing.id);
+        }
+      } else if (existing) {
+        // Deadline changed — update
+        await supabase.from("deadlines").update({
+          target_datetime: `${value}T23:59:00`,
+        }).eq("id", existing.id);
+      } else {
+        // New deadline — create
+        await supabase.from("deadlines").insert({
+          user_id: userId,
+          label,
+          target_datetime: `${value}T23:59:00`,
+        });
+      }
+    }
+
     if (field === "progress") {
       const parent = tasks.find((t) => t.id === parentId);
       if (parent?.subtasks) {
@@ -333,21 +581,14 @@ export default function ProjectDetailPage() {
           s.id === subtaskId ? { ...s, progress: value as number } : s
         );
         const avg = Math.round(subs.reduce((s, st) => s + st.progress, 0) / subs.length);
-        await supabase.from("project_tasks").update({ progress: avg }).eq("id", parentId);
+        const { error: upErr } = await supabase.from("project_tasks").update({ progress: avg }).eq("id", parentId);
+        if (upErr) { toast("Failed to update parent progress", "error"); }
+        updateTaskLocal(parentId, { progress: avg });
 
-        // Sync parent completion to calendar + deadlines
-        const { data: linkedWeek } = await supabase
-          .from("week_tasks").select("id").eq("project_task_id", parentId).eq("user_id", userId);
-        for (const wt of linkedWeek || []) {
-          await supabase.from("week_tasks").update({ done: avg >= 100 }).eq("id", wt.id);
-        }
-        if (avg >= 100 && project) {
-          await syncTaskDeadlineToDeadlines(supabase, userId, parentId, parent.name, project.title, null);
-        }
+        const res = await syncTaskCompletion(supabase, userId, parentId, avg);
+        if (res.error) toast("Sync error: " + res.error, "error");
       }
     }
-
-    loadProject();
   };
 
   const updateDescription = async () => {
@@ -371,15 +612,22 @@ export default function ProjectDetailPage() {
   };
   const handleDragEnd = async () => {
     setDragIdx(null);
+    if (!userId) return;
     const supabase = createClient();
-    await Promise.all(
-      tasks.map((t, i) => supabase.from("project_tasks").update({ sort_order: i }).eq("id", t.id))
-    );
+    const { error } = await reorderRows(supabase, "project_tasks", tasks.map((t) => t.id), userId);
+    if (error) toast("Failed to reorder: " + error, "error");
   };
 
   // Calculations
-  const totalEst = tasks.reduce((s, t) => s + t.est_minutes, 0);
-  const totalElapsed = tasks.reduce((s, t) => s + (elapsed[t.id] || t.elapsed_seconds), 0);
+  const totalEst = tasks.reduce((s, t) => {
+    const subEst = (t.subtasks || []).reduce((ss, sub) => ss + sub.est_minutes, 0);
+    return s + t.est_minutes + subEst;
+  }, 0);
+  const totalElapsed = tasks.reduce((s, t) => {
+    const taskTime = elapsed[t.id] || t.elapsed_seconds;
+    const subTime = (t.subtasks || []).reduce((ss, sub) => ss + (elapsed[`sub:${sub.id}`] || sub.elapsed_seconds), 0);
+    return s + taskTime + subTime;
+  }, 0);
   const overallProgress = tasks.length > 0
     ? Math.round(tasks.reduce((s, t) => s + t.progress, 0) / tasks.length)
     : 0;
@@ -458,6 +706,25 @@ export default function ProjectDetailPage() {
     URL.revokeObjectURL(url);
   };
 
+  const exportProjectCSV = () => {
+    if (!project) return;
+    const rows: string[][] = [["Type", "Name", "Est Minutes", "Deadline", "Date", "Progress", "Notes", "Parent Task"]];
+    for (const t of tasks) {
+      rows.push(["task", t.name, String(t.est_minutes), t.deadline || "", t.date_key || "", String(t.progress), t.notes || "", ""]);
+      for (const s of t.subtasks || []) {
+        rows.push(["subtask", s.name, String(s.est_minutes), s.deadline || "", s.date_key || "", String(s.progress), s.notes || "", t.name]);
+      }
+    }
+    const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${project.title.replace(/[^a-zA-Z0-9]/g, "_")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (!project) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -498,6 +765,7 @@ export default function ProjectDetailPage() {
             <div className="mt-1 flex items-center gap-3">
               <CalendarPicker
                 value={project.deadline || null}
+                variant="deadline"
                 onChange={async (d) => {
                   const supabase = createClient();
                   await supabase.from("projects").update({ deadline: d }).eq("id", projectId);
@@ -533,39 +801,40 @@ export default function ProjectDetailPage() {
               className="px-3 py-1.5 rounded-lg text-xs bg-surface border border-border text-txt2 hover:text-violet2 hover:border-violet/30 transition-colors"
               title="Save as template"
             >
-              💾 Template
+              <span className="flex items-center gap-1"><Save size={12} /> Template</span>
             </button>
             <button
               onClick={exportProject}
               className="px-3 py-1.5 rounded-lg text-xs bg-surface border border-border text-txt2 hover:text-green-acc hover:border-green-acc/30 transition-colors"
               title="Export as JSON"
             >
-              📤 Export
+              <span className="flex items-center gap-1"><Upload size={12} /> JSON</span>
+            </button>
+            <button
+              onClick={exportProjectCSV}
+              className="px-3 py-1.5 rounded-lg text-xs bg-surface border border-border text-txt2 hover:text-green-acc hover:border-green-acc/30 transition-colors"
+              title="Export as CSV"
+            >
+              <span className="flex items-center gap-1"><Upload size={12} /> CSV</span>
             </button>
             <button
               onClick={() => setGcalModalOpen(true)}
               className="px-3 py-1.5 rounded-lg text-xs bg-surface border border-border text-txt2 hover:text-amber hover:border-amber/30 transition-colors"
               title="Sync deadlines to Google Calendar"
             >
-              📆 GCal Sync
+              <span className="flex items-center gap-1"><Calendar size={12} /> GCal Sync</span>
             </button>
             <button
               onClick={() => { setDescDraft(project.description || ""); setDescModalOpen(true); }}
               className="px-3 py-1.5 rounded-lg text-xs bg-surface border border-border text-txt2 hover:text-txt hover:border-border2 transition-colors"
             >
-              ✎ Edit
+              <span className="flex items-center gap-1"><Pencil size={12} /> Edit</span>
             </button>
             <button
-              onClick={async () => {
-                if (!confirm(`Delete project "${project.title}"? This cannot be undone.`)) return;
-                const supabase = createClient();
-                await supabase.from("projects").delete().eq("id", projectId);
-                window.dispatchEvent(new Event("projects-changed"));
-                router.push("/routine");
-              }}
+              onClick={() => setConfirmDeleteOpen(true)}
               className="px-3 py-1.5 rounded-lg text-xs bg-surface border border-border text-txt3 hover:text-danger hover:border-danger/30 transition-colors"
             >
-              🗑 Delete
+              <span className="flex items-center gap-1"><Trash2 size={12} /> Delete</span>
             </button>
           </div>
         </div>
@@ -600,8 +869,8 @@ export default function ProjectDetailPage() {
               <>
                 <div className="w-px h-4 bg-border" />
                 <div>
-                  <span className="text-danger font-medium">
-                    ⚠ Overtime: +{formatSeconds(overtimeSec)}
+                  <span className="text-danger font-medium inline-flex items-center gap-1">
+                    <AlertTriangle size={13} /> Overtime: +{formatSeconds(overtimeSec)}
                   </span>
                 </div>
               </>
@@ -675,16 +944,29 @@ export default function ProjectDetailPage() {
                     {formatMinutes(task.est_minutes)}
                   </span>
 
-                  {/* Deadline — hidden when task is 100% */}
+                  {/* Calendar date — when to work on it */}
+                  {task.progress < 100 && (
+                    <CalendarPicker
+                      value={task.date_key}
+                      onChange={(d) => updateTaskField(task.id, "date_key", d)}
+                      variant="date"
+                    />
+                  )}
+                  {task.date_key && task.progress >= 100 && (
+                    <span className="text-[10px] text-green-acc font-mono">✓ scheduled</span>
+                  )}
+
+                  {/* Deadline — when it's due */}
                   {task.progress < 100 && (
                     <>
                       <CalendarPicker
                         value={task.deadline}
                         onChange={(d) => updateTaskField(task.id, "deadline", d)}
+                        variant="deadline"
                       />
                       <GCalButton
                         title={`[${project.title}] ${task.name}`}
-                        date={task.deadline}
+                        date={task.date_key || task.deadline}
                         description={task.notes}
                       />
                     </>
@@ -731,12 +1013,12 @@ export default function ProjectDetailPage() {
                     onUploaded={async (url, name) => {
                       const supabase = createClient();
                       await supabase.from("project_tasks").update({ file_url: url, file_name: name }).eq("id", task.id);
-                      loadProject();
+                      updateTaskLocal(task.id, { file_url: url, file_name: name });
                     }}
                     onRemoved={async () => {
                       const supabase = createClient();
                       await supabase.from("project_tasks").update({ file_url: null, file_name: null }).eq("id", task.id);
-                      loadProject();
+                      updateTaskLocal(task.id, { file_url: null, file_name: null });
                     }}
                   />
 
@@ -769,7 +1051,7 @@ export default function ProjectDetailPage() {
                             setEditTarget(task);
                             setFormName(task.name);
                             setFormEst(task.est_minutes);
-                            setFormDate("");
+                            setFormDate(task.date_key || "");
                             setFormDeadline(task.deadline || "");
                             setFormRecurrence(null);
                             setModalMode("task");
@@ -813,14 +1095,20 @@ export default function ProjectDetailPage() {
                 {/* Subtasks */}
                 {isExpanded && task.subtasks && task.subtasks.length > 0 && (
                   <div className="border-t border-border bg-surface2/50">
-                    {task.subtasks.map((sub) => (
+                    {task.subtasks.map((sub, subIdx) => (
                       <div
                         key={sub.id}
+                        draggable
+                        onDragStart={() => handleSubDragStart(task.id, subIdx)}
+                        onDragOver={(e) => handleSubDragOver(e, task.id, subIdx)}
+                        onDragEnd={() => handleSubDragEnd(task.id)}
                         className={cn(
                           "flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border/50 last:border-b-0 text-xs",
-                          activeTaskId === `sub:${sub.id}` && "bg-green-acc/5"
+                          activeTaskId === `sub:${sub.id}` && "bg-green-acc/5",
+                          dragSubIdx === subIdx && dragSubParent === task.id && "opacity-50"
                         )}
                       >
+                        <span className="cursor-grab text-txt3 opacity-30 hover:opacity-100 select-none text-[10px]">⠿</span>
                         <button
                           onClick={() => toggleTimer(`sub:${sub.id}`)}
                           className={cn(
@@ -837,74 +1125,45 @@ export default function ProjectDetailPage() {
                             {formatSeconds(elapsed[`sub:${sub.id}`] || 0)}
                           </span>
                         )}
-                        <div
-                          className="w-2 h-2 rounded-full"
-                          style={{ backgroundColor: progressColor(sub.progress) }}
-                        />
-                        <InlineEdit
-                          value={sub.name}
-                          onSave={(v) => updateSubtaskField(sub.id, task.id, "name", v)}
-                          className="font-medium text-xs min-w-[100px]"
-                        />
-                        {/* Est time */}
-                        <InlineEdit
-                          value={String(sub.est_minutes)}
-                          onSave={(v) => updateSubtaskField(sub.id, task.id, "est_minutes", parseInt(v) || 0)}
-                          type="number"
-                          min={0}
-                          className="w-10 text-xs text-txt3"
-                          placeholder="0"
-                        />
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: progressColor(sub.progress) }} />
+                        <InlineEdit value={sub.name} onSave={(v) => updateSubtaskField(sub.id, task.id, "name", v)} className="font-medium text-xs min-w-[100px]" />
+                        <InlineEdit value={String(sub.est_minutes)} onSave={(v) => updateSubtaskField(sub.id, task.id, "est_minutes", parseInt(v) || 0)} type="number" min={0} className="w-10 text-xs text-txt3" placeholder="0" />
                         <span className="text-txt3 text-[10px]">min</span>
                         <div className="flex items-center gap-1">
-                          <InlineEdit
-                            value={String(sub.progress)}
-                            onSave={(v) => updateSubtaskField(sub.id, task.id, "progress", parseInt(v) || 0)}
-                            type="number"
-                            min={0}
-                            max={100}
-                            className="w-10 text-xs"
-                          />
+                          <InlineEdit value={String(sub.progress)} onSave={(v) => updateSubtaskField(sub.id, task.id, "progress", parseInt(v) || 0)} type="number" min={0} max={100} className="w-10 text-xs" />
                           <span className="text-txt3">%</span>
                         </div>
                         {sub.progress < 100 ? (
-                          <CalendarPicker
-                            value={sub.deadline}
-                            onChange={(d) => updateSubtaskField(sub.id, task.id, "deadline", d)}
-                          />
-                        ) : sub.deadline ? (
+                          <>
+                            <CalendarPicker value={sub.date_key} onChange={(d) => updateSubtaskField(sub.id, task.id, "date_key", d)} variant="date" />
+                            <CalendarPicker value={sub.deadline} onChange={(d) => updateSubtaskField(sub.id, task.id, "deadline", d)} variant="deadline" />
+                          </>
+                        ) : (sub.deadline || sub.date_key) ? (
                           <span className="text-[10px] text-green-acc font-mono">✓</span>
                         ) : null}
                         <div className="flex-1 min-w-[80px]">
-                          <InlineEdit
-                            value={sub.notes}
-                            onSave={(v) => updateSubtaskField(sub.id, task.id, "notes", v)}
-                            placeholder="Notes..."
-                            className="text-xs text-txt3"
-                          />
+                          <InlineEdit value={sub.notes} onSave={(v) => updateSubtaskField(sub.id, task.id, "notes", v)} placeholder="Notes..." className="text-xs text-txt3" />
                         </div>
                         <FileAttachment
-                          fileUrl={sub.file_url}
-                          fileName={sub.file_name}
-                          userId={userId}
-                          entityId={sub.id}
-                          onUploaded={async (url, name) => {
-                            const supabase = createClient();
-                            await supabase.from("subtasks").update({ file_url: url, file_name: name }).eq("id", sub.id);
-                            loadProject();
-                          }}
-                          onRemoved={async () => {
-                            const supabase = createClient();
-                            await supabase.from("subtasks").update({ file_url: null, file_name: null }).eq("id", sub.id);
-                            loadProject();
-                          }}
+                          fileUrl={sub.file_url} fileName={sub.file_name} userId={userId} entityId={sub.id}
+                          onUploaded={async (url, name) => { const s = createClient(); await s.from("subtasks").update({ file_url: url, file_name: name }).eq("id", sub.id); updateSubtaskLocal(task.id, sub.id, { file_url: url, file_name: name }); }}
+                          onRemoved={async () => { const s = createClient(); await s.from("subtasks").update({ file_url: null, file_name: null }).eq("id", sub.id); updateSubtaskLocal(task.id, sub.id, { file_url: null, file_name: null }); }}
                         />
-                        <button
-                          onClick={() => removeSubtask(sub.id, task.id)}
-                          className="text-txt3 hover:text-danger transition-colors"
-                        >
-                          ✕
-                        </button>
+                        {/* Subtask 3-dot menu */}
+                        <div className="relative">
+                          <button onClick={(e) => { e.stopPropagation(); setSubMenuOpen(subMenuOpen === sub.id ? null : sub.id); }}
+                            className="w-6 h-6 flex items-center justify-center rounded hover:bg-surface3 text-txt3 text-[10px]">⋯</button>
+                          {subMenuOpen === sub.id && (
+                            <div className="absolute right-0 top-full mt-1 bg-surface2 border border-border rounded-lg shadow-xl py-1 w-40 z-20">
+                              <button onClick={() => { setEditTarget(sub); setParentTaskId(task.id); setFormName(sub.name); setFormEst(sub.est_minutes); setFormDate(sub.date_key || ""); setFormDeadline(sub.deadline || ""); setFormRecurrence(null); setModalMode("subtask"); setModalOpen(true); setSubMenuOpen(null); }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-txt2 hover:bg-surface3">Edit</button>
+                              <button onClick={() => { setMoveSubModal({ subId: sub.id, subName: sub.name, fromTaskId: task.id }); setSubMenuOpen(null); }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-txt2 hover:bg-surface3">Move to task...</button>
+                              <button onClick={() => { removeSubtask(sub.id, task.id); setSubMenuOpen(null); }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-danger hover:bg-surface3">Remove</button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -972,7 +1231,7 @@ export default function ProjectDetailPage() {
             />
           </div>
           <div>
-            <label className="block text-sm text-txt2 mb-1.5">📅 Schedule on calendar</label>
+            <label className="text-sm text-txt2 mb-1.5 flex items-center gap-1.5"><CalendarDays size={14} /> Schedule on calendar</label>
             <input
               type="date"
               value={formDate}
@@ -982,7 +1241,7 @@ export default function ProjectDetailPage() {
             {formDate && <p className="text-[10px] text-violet2 mt-1">Task will appear on the calendar for this date</p>}
           </div>
           <div>
-            <label className="block text-sm text-txt2 mb-1.5">⏳ Deadline (due date)</label>
+            <label className="text-sm text-txt2 mb-1.5 flex items-center gap-1.5"><Timer size={14} /> Deadline (due date)</label>
             <input
               type="date"
               value={formDeadline}
@@ -993,7 +1252,7 @@ export default function ProjectDetailPage() {
           </div>
           {formDeadline && (
             <div>
-              <label className="block text-sm text-txt2 mb-1.5">🔄 Recurring?</label>
+              <label className="text-sm text-txt2 mb-1.5 flex items-center gap-1.5"><RefreshCw size={14} /> Recurring?</label>
               <select value={formRecurrence || ""} onChange={(e) => setFormRecurrence(e.target.value || null)}
                 className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm">
                 <option value="">No — one-time deadline</option>
@@ -1013,10 +1272,10 @@ export default function ProjectDetailPage() {
             </button>
             <button
               onClick={saveTaskModal}
-              disabled={!formName.trim()}
+              disabled={!formName.trim() || saving}
               className="px-4 py-2 rounded-lg text-sm bg-red-acc hover:bg-red-dark text-white disabled:opacity-50"
             >
-              Save
+              {saving ? "Saving..." : "Save"}
             </button>
           </div>
         </div>
@@ -1058,6 +1317,48 @@ export default function ProjectDetailPage() {
         onClose={() => setGcalModalOpen(false)}
         projectTitle={project.title}
         tasks={tasks}
+      />
+
+      {/* Move Subtask Modal */}
+      {moveSubModal && (
+        <Modal open={true} onClose={() => setMoveSubModal(null)} title={`Move "${moveSubModal.subName}"`}>
+          <div className="space-y-2">
+            <p className="text-sm text-txt2 mb-3">Select the target task:</p>
+            {tasks.filter((t) => t.id !== moveSubModal.fromTaskId).map((t) => (
+              <button key={t.id} onClick={() => moveSubtask(moveSubModal.subId, moveSubModal.fromTaskId, t.id)}
+                className="w-full text-left px-3 py-2.5 rounded-lg bg-surface border border-border text-sm text-txt hover:border-violet/50 hover:text-violet2 transition-colors">
+                {t.name}
+                <span className="text-[10px] text-txt3 ml-2">{t.subtasks?.length || 0} subtasks</span>
+              </button>
+            ))}
+            {tasks.filter((t) => t.id !== moveSubModal.fromTaskId).length === 0 && (
+              <p className="text-sm text-txt3 text-center py-4">No other tasks to move to</p>
+            )}
+          </div>
+        </Modal>
+      )}
+      {/* Confirm Delete Project */}
+      <ConfirmDeleteModal
+        open={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        onConfirm={async () => {
+          setSaving(true);
+          const supabase = createClient();
+          const { error } = await supabase.from("projects")
+            .update({ archived_at: new Date().toISOString() })
+            .eq("id", projectId);
+          if (error) {
+            toast("Failed to delete project: " + error.message, "error");
+            setSaving(false);
+            return;
+          }
+          window.dispatchEvent(new Event("projects-changed"));
+          router.push("/projects");
+        }}
+        title={`Delete "${project.title}"?`}
+        confirmText={project.title}
+        description="This will remove the project from all views. The data is preserved and can be recovered if needed."
+        loading={saving}
       />
     </div>
   );

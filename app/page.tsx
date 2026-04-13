@@ -3,13 +3,28 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { RoutineTask, Project, WeekTask, Deadline, ActivityLog, ProjectTask } from "@/lib/types";
+import { RoutineTask, Project, WeekTask, Deadline, ActivityLog, ProjectTask, WeeklyRoutineTask, MonthlyRoutineTask, QuickTask } from "@/lib/types";
 import { ProgressBar } from "@/components/ProgressBar";
-import { formatSeconds, toLocalDateStr, cn, getMonday, addDays, formatDate, progressColor } from "@/lib/utils";
+import { formatSeconds, formatDate, cn, getMonday, addDays, progressColor, getWeekKey, getMonthKey } from "@/lib/utils";
+import { cleanupActivityLog } from "@/lib/db-helpers";
+import { useToast } from "@/components/Toast";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
+import {
+  fetchProjects, fetchRoutineWithChecks, fetchWeeklyRoutineWithChecks, fetchMonthlyRoutineWithChecks,
+  fetchWeekTasksGrouped, fetchWeekTasksForDate, fetchUpcomingDeadlines,
+  fetchRecentActivity, fetchOverdueTasks, fetchQuickTasks,
+} from "@/lib/queries";
 import Link from "next/link";
+import { ListChecks, CalendarDays, RefreshCw, CalendarRange, BarChart3, Timer, AlertTriangle, Folder, Activity, ClipboardList } from "lucide-react";
+
+const PRIORITY_COLORS: Record<number, string> = {
+  1: "#4ade80", 2: "#34d399", 3: "#eab308", 4: "#f97316", 5: "#ef4444",
+};
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { toast } = useToast();
+  const { user: currentUser, userId, loading: authLoading } = useCurrentUser();
   const [routine, setRoutine] = useState<RoutineTask[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [todayTasks, setTodayTasks] = useState<WeekTask[]>([]);
@@ -17,73 +32,198 @@ export default function DashboardPage() {
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [activity, setActivity] = useState<ActivityLog[]>([]);
   const [overdueTasks, setOverdueTasks] = useState<Array<ProjectTask & { projectTitle: string; projectColor: string }>>([]);
+  const [weeklyRoutine, setWeeklyRoutine] = useState<WeeklyRoutineTask[]>([]);
+  const [monthlyRoutine, setMonthlyRoutine] = useState<MonthlyRoutineTask[]>([]);
+  const [quickTasks, setQuickTasks] = useState<QuickTask[]>([]);
+  const [monthlyEnabled, setMonthlyEnabled] = useState(false);
   const [now, setNow] = useState(new Date());
   const [loading, setLoading] = useState(true);
 
-  const today = toLocalDateStr(new Date());
+  const today = formatDate(new Date());
 
   useEffect(() => {
+    if (authLoading || !userId) return;
+
     const load = async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
 
-      // Routine
-      const { data: tasks } = await supabase.from("routine_tasks").select("*").eq("user_id", user.id).order("sort_order");
-      const { data: checks } = await supabase.from("routine_checks").select("task_id").eq("user_id", user.id).eq("checked_date", today);
-      const checkedIds = new Set((checks || []).map((c: { task_id: string }) => c.task_id));
-      setRoutine((tasks || []).map((t: RoutineTask) => ({ ...t, checked: checkedIds.has(t.id) })));
-
-      // Projects
-      const { data: projs } = await supabase.from("projects").select("*").eq("user_id", user.id).order("sort_order");
-      setProjects(projs || []);
-
-      // Today's week tasks
-      const { data: wt } = await supabase.from("week_tasks").select("*").eq("user_id", user.id).eq("date_key", today).order("sort_order");
-      setTodayTasks(wt || []);
-
-      // Full week tasks
       const monday = getMonday(new Date());
       const weekDates: string[] = [];
       for (let i = 0; i < 7; i++) weekDates.push(formatDate(addDays(monday, i)));
-      const { data: allWt } = await supabase.from("week_tasks").select("*").eq("user_id", user.id).in("date_key", weekDates);
-      setWeekTasks(allWt || []);
+      const wKey = getWeekKey(new Date());
+      const mKey = getMonthKey(new Date());
+      const hasMonthly = localStorage.getItem("comfy-monthly-routine") === "true";
+      setMonthlyEnabled(hasMonthly);
 
-      // Upcoming deadlines (next 7 days)
-      const { data: dl } = await supabase.from("deadlines").select("*").eq("user_id", user.id)
-        .gte("target_datetime", new Date().toISOString())
-        .order("target_datetime").limit(6);
-      setDeadlines(dl || []);
+      try {
+        const [
+          routineData, projs, todayData, weekData,
+          dl, act, overdue, wrData, qt,
+        ] = await Promise.all([
+          fetchRoutineWithChecks(supabase, userId, today),
+          fetchProjects(supabase, userId),
+          fetchWeekTasksForDate(supabase, userId, today),
+          fetchWeekTasksGrouped(supabase, userId, weekDates),
+          fetchUpcomingDeadlines(supabase, userId, 6),
+          fetchRecentActivity(supabase, userId, 10),
+          fetchOverdueTasks(supabase, userId, today),
+          fetchWeeklyRoutineWithChecks(supabase, userId, wKey),
+          fetchQuickTasks(supabase, userId),
+        ]);
 
-      // Recent activity
-      const { data: act } = await supabase.from("activity_log").select("*").eq("user_id", user.id)
-        .order("created_at", { ascending: false }).limit(10);
-      setActivity(act || []);
+        setRoutine(routineData);
+        setProjects(projs);
+        setTodayTasks(todayData);
+        setWeekTasks(Object.values(weekData).flat());
+        setDeadlines(dl);
+        setActivity(act);
+        setOverdueTasks(overdue);
+        setWeeklyRoutine(wrData);
+        setQuickTasks(qt);
 
-      // Overdue tasks (past deadline, progress < 100)
-      const { data: allProjTasks } = await supabase
-        .from("project_tasks").select("*").eq("user_id", user.id)
-        .lt("deadline", today).lt("progress", 100).not("deadline", "is", null)
-        .order("deadline");
+        // Fetch monthly if enabled (separate to avoid breaking if table doesn't exist)
+        if (hasMonthly) {
+          try {
+            const mrData = await fetchMonthlyRoutineWithChecks(supabase, userId, mKey);
+            setMonthlyRoutine(mrData);
+          } catch { /* table may not exist yet */ }
+        }
 
-      const projMap: Record<string, { title: string; color: string }> = {};
-      for (const p of projs || []) projMap[p.id] = { title: p.title, color: p.color || "#e05555" };
-
-      setOverdueTasks((allProjTasks || []).map((t: ProjectTask) => ({
-        ...t,
-        projectTitle: projMap[t.project_id]?.title || "Unknown",
-        projectColor: projMap[t.project_id]?.color || "#e05555",
-      })));
+        // Cleanup old activity log entries
+        cleanupActivityLog(supabase, userId);
+      } catch (err) {
+        console.error("Dashboard load failed:", err);
+        toast("Failed to load dashboard data", "error");
+      }
 
       setLoading(false);
     };
     load();
-  }, [today]);
+  }, [today, userId, authLoading]);
 
   useEffect(() => {
     const iv = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(iv);
   }, []);
+
+  // Toggle routine check from dashboard
+  const toggleRoutine = async (task: RoutineTask) => {
+    const supabase = createClient();
+    const newChecked = !task.checked;
+    setRoutine((prev) => prev.map((t) => t.id === task.id ? { ...t, checked: newChecked } : t));
+    let error;
+    if (newChecked) {
+      ({ error } = await supabase.from("routine_checks").insert({ user_id: userId, task_id: task.id, checked_date: today }));
+    } else {
+      ({ error } = await supabase.from("routine_checks").delete().eq("task_id", task.id).eq("checked_date", today));
+    }
+    if (error) {
+      toast("Failed to save: " + error.message, "error");
+      setRoutine((prev) => prev.map((t) => t.id === task.id ? { ...t, checked: !newChecked } : t));
+    }
+  };
+
+  // Toggle today's week task from dashboard
+  const toggleTodayTask = async (task: WeekTask) => {
+    const supabase = createClient();
+    const newDone = !task.done;
+    setTodayTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, done: newDone } : t));
+    const { error } = await supabase.from("week_tasks").update({ done: newDone }).eq("id", task.id);
+    if (error) {
+      toast("Failed to save: " + error.message, "error");
+      setTodayTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, done: !newDone } : t));
+      return;
+    }
+    if (task.project_task_id) {
+      const isSubtaskEntry = task.text.includes("↳");
+      const newProgress = newDone ? 100 : 0;
+
+      if (isSubtaskEntry) {
+        // This week_task represents a specific subtask — update only that one
+        const subName = task.text.split("↳").pop()?.trim() || "";
+        const { data: matchedSub } = await supabase
+          .from("subtasks").select("id").eq("task_id", task.project_task_id)
+          .ilike("name", subName).limit(1).maybeSingle();
+        if (matchedSub) {
+          await supabase.from("subtasks").update({ progress: newProgress }).eq("id", matchedSub.id);
+        }
+        // Recalc parent from all subtasks
+        const { data: allSubs } = await supabase
+          .from("subtasks").select("progress").eq("task_id", task.project_task_id);
+        if (allSubs && allSubs.length > 0) {
+          const avg = Math.round(allSubs.reduce((s, st) => s + st.progress, 0) / allSubs.length);
+          await supabase.from("project_tasks").update({ progress: avg }).eq("id", task.project_task_id);
+        }
+      } else {
+        // Main task entry
+        const { data: subs } = await supabase.from("subtasks").select("id").eq("task_id", task.project_task_id).limit(1);
+        if (!subs || subs.length === 0) {
+          await supabase.from("project_tasks").update({ progress: newProgress }).eq("id", task.project_task_id);
+        } else {
+          await supabase.from("subtasks").update({ progress: newProgress }).eq("task_id", task.project_task_id);
+          await supabase.from("project_tasks").update({ progress: newProgress }).eq("id", task.project_task_id);
+        }
+      }
+    }
+    // If marking done and this came from a quick task, remove it
+    if (newDone && !task.project_task_id) {
+      await supabase.from("quick_tasks").delete()
+        .eq("user_id", userId).eq("name", task.text).eq("date_key", task.date_key);
+      setQuickTasks((prev) => prev.filter((t) => !(t.name === task.text && t.date_key === task.date_key)));
+    }
+  };
+
+  // Toggle weekly routine from dashboard
+  const toggleWeeklyRoutine = async (task: WeeklyRoutineTask) => {
+    const supabase = createClient();
+    const newChecked = !task.checked;
+    setWeeklyRoutine((prev) => prev.map((t) => t.id === task.id ? { ...t, checked: newChecked } : t));
+    const wKey = getWeekKey(new Date());
+    let error;
+    if (newChecked) {
+      ({ error } = await supabase.from("weekly_routine_checks").insert({ user_id: userId, task_id: task.id, week_key: wKey }));
+    } else {
+      ({ error } = await supabase.from("weekly_routine_checks").delete().eq("task_id", task.id).eq("week_key", wKey));
+    }
+    if (error) {
+      toast("Failed to save: " + error.message, "error");
+      setWeeklyRoutine((prev) => prev.map((t) => t.id === task.id ? { ...t, checked: !newChecked } : t));
+    }
+  };
+
+  const toggleMonthlyRoutine = async (task: MonthlyRoutineTask) => {
+    const supabase = createClient();
+    const newChecked = !task.checked;
+    setMonthlyRoutine((prev) => prev.map((t) => t.id === task.id ? { ...t, checked: newChecked } : t));
+    const mKey = getMonthKey(new Date());
+    let error;
+    if (newChecked) {
+      ({ error } = await supabase.from("monthly_routine_checks").insert({ user_id: userId, task_id: task.id, month_key: mKey }));
+    } else {
+      ({ error } = await supabase.from("monthly_routine_checks").delete().eq("task_id", task.id).eq("month_key", mKey));
+    }
+    if (error) {
+      toast("Failed to save: " + error.message, "error");
+      setMonthlyRoutine((prev) => prev.map((t) => t.id === task.id ? { ...t, checked: !newChecked } : t));
+    }
+  };
+
+  const completeQuickTask = async (id: string) => {
+    const supabase = createClient();
+    const task = quickTasks.find((t) => t.id === id);
+    await supabase.from("quick_tasks").delete().eq("id", id);
+    setQuickTasks((prev) => prev.filter((t) => t.id !== id));
+    // Clean up linked week_task
+    if (task?.date_key) {
+      await supabase.from("week_tasks").delete()
+        .eq("user_id", userId).eq("text", task.name).eq("date_key", task.date_key);
+      setTodayTasks((prev) => prev.filter((t) => !(t.text === task.name && t.date_key === task.date_key)));
+    }
+    // Clean up linked deadline
+    if (task?.deadline) {
+      await supabase.from("deadlines").delete().eq("user_id", userId).eq("label", task.name);
+    }
+  };
 
   if (loading) {
     return (
@@ -145,96 +285,172 @@ export default function DashboardPage() {
       {/* Top row: Routine + Today */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         {/* Routine card */}
-        <Link href="/routine" className="bg-surface border border-border rounded-xl p-4 hover:border-border2 transition-colors group">
+        <div className="bg-surface border border-border rounded-xl p-4 hover:border-border2 transition-colors">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium text-txt2 group-hover:text-red-acc transition-colors">☰ Daily Routine</h2>
+            <Link href="/routine" className="text-sm font-medium text-txt2 hover:text-red-acc transition-colors flex items-center gap-1.5"><ListChecks size={15} /> Daily Routine</Link>
             <span className="text-xs font-mono text-red-acc">{routineChecked}/{routineTotal}</span>
           </div>
           <ProgressBar value={routinePct} height={8} />
-          <div className="mt-3 space-y-1">
-            {routine.slice(0, 4).map((t) => (
+          <div className="mt-3 space-y-1.5">
+            {routine.slice(0, 6).map((t) => (
               <div key={t.id} className="flex items-center gap-2 text-xs">
-                <span className={t.checked ? "text-green-acc" : "text-txt3"}>{t.checked ? "✓" : "○"}</span>
-                <span className={cn("truncate", t.checked && "task-done")}>{t.text}</span>
+                <input type="checkbox" checked={t.checked || false} onChange={() => toggleRoutine(t)}
+                  className="w-3.5 h-3.5 shrink-0" />
+                <span className={cn("truncate", t.checked && "line-through text-txt3 opacity-60")}>{t.text}</span>
               </div>
             ))}
-            {routineTotal > 4 && <p className="text-[10px] text-txt3">+{routineTotal - 4} more</p>}
+            {routineTotal > 6 && <Link href="/routine" className="text-[10px] text-txt3 hover:text-red-acc">+{routineTotal - 6} more →</Link>}
           </div>
-        </Link>
+        </div>
 
         {/* Today's tasks card */}
-        <Link href={`/week/${today}`} className="bg-surface border border-border rounded-xl p-4 hover:border-border2 transition-colors group">
+        <div className="bg-surface border border-border rounded-xl p-4 hover:border-border2 transition-colors">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium text-txt2 group-hover:text-violet2 transition-colors">📅 Today&apos;s Tasks</h2>
+            <Link href={`/week/${today}`} className="text-sm font-medium text-txt2 hover:text-violet2 transition-colors flex items-center gap-1.5"><CalendarDays size={15} /> Today&apos;s Tasks</Link>
             <span className="text-xs font-mono text-violet2">{todayDone}/{todayTotal}</span>
           </div>
           {todayTotal > 0 ? (
             <>
               <ProgressBar value={todayTotal > 0 ? (todayDone / todayTotal) * 100 : 0} height={8} />
-              <div className="mt-3 space-y-1">
-                {todayTasks.slice(0, 4).map((t) => (
+              <div className="mt-3 space-y-1.5">
+                {todayTasks.slice(0, 6).map((t) => (
                   <div key={t.id} className="flex items-center gap-2 text-xs">
-                    <span className={t.done ? "text-green-acc" : "text-txt3"}>{t.done ? "✓" : "○"}</span>
-                    <span className={cn("truncate", t.done && "task-done")}>
+                    <input type="checkbox" checked={t.done || false} onChange={() => toggleTodayTask(t)}
+                      className="w-3.5 h-3.5 shrink-0" />
+                    <span className={cn("truncate", t.done && "line-through text-txt3 opacity-60")}>
                       {t.project_id && <span className="text-violet2 font-medium">{t.text.match(/^\[.*?\]/)?.[0]} </span>}
                       {t.text.replace(/^\[.*?\]\s*/, "")}
                     </span>
                   </div>
                 ))}
-                {todayTotal > 4 && <p className="text-[10px] text-txt3">+{todayTotal - 4} more</p>}
+                {todayTotal > 6 && <Link href={`/week/${today}`} className="text-[10px] text-txt3 hover:text-violet2">+{todayTotal - 6} more →</Link>}
               </div>
             </>
           ) : (
             <p className="text-xs text-txt3 mt-2">No tasks scheduled for today</p>
           )}
-        </Link>
+        </div>
       </div>
 
-      {/* Weekly overview */}
-      {weekTasks.length > 0 && (() => {
-        const weekDone = weekTasks.filter((t) => t.done).length;
-        const weekTotal = weekTasks.length;
-        const weekPct = weekTotal > 0 ? Math.round((weekDone / weekTotal) * 100) : 0;
-
-        // Per-project breakdown
-        const tagStats: Record<string, { done: number; total: number; color: string }> = {};
-        const projColorMap: Record<string, string> = {};
-        for (const p of projects) projColorMap[p.title] = p.color || "#e05555";
-
-        for (const t of weekTasks) {
-          const match = t.text.match(/^\[(.+?)\]/);
-          const tag = match ? match[1] : "Untagged";
-          const color = match ? (projColorMap[match[1]] || "#7c6fff") : "#5c5a7a";
-          if (!tagStats[tag]) tagStats[tag] = { done: 0, total: 0, color };
-          tagStats[tag].total++;
-          if (t.done) tagStats[tag].done++;
-        }
-
-        return (
-          <Link href="/week" className="bg-surface border border-border rounded-xl p-4 mb-4 block hover:border-border2 transition-colors group">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-medium text-txt2 group-hover:text-violet2 transition-colors">📊 This Week</h2>
-              <span className="text-xs font-mono text-violet2">{weekDone}/{weekTotal} · {weekPct}%</span>
+      {/* Row 2: Weekly Routine + This Week */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        {/* Weekly routine */}
+        {weeklyRoutine.length > 0 && (() => {
+          const wrChecked = weeklyRoutine.filter((t) => t.checked).length;
+          const wrTotal = weeklyRoutine.length;
+          const wrPct = wrTotal > 0 ? Math.round((wrChecked / wrTotal) * 100) : 0;
+          return (
+            <div className="bg-surface border border-border rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <Link href="/weekly-routine" className="text-sm font-medium text-txt2 hover:text-violet2 transition-colors flex items-center gap-1.5"><RefreshCw size={15} /> Weekly Routine</Link>
+                <span className="text-xs font-mono text-violet2">{wrChecked}/{wrTotal}</span>
+              </div>
+              <ProgressBar value={wrPct} height={6} />
+              <div className="mt-3 space-y-1.5">
+                {weeklyRoutine.slice(0, 6).map((t) => (
+                  <div key={t.id} className="flex items-center gap-2 text-xs">
+                    <input type="checkbox" checked={t.checked || false} onChange={() => toggleWeeklyRoutine(t)}
+                      className="w-3.5 h-3.5 shrink-0 accent-violet" />
+                    <span className={cn("truncate", t.checked && "line-through text-txt3 opacity-60")}>{t.text}</span>
+                  </div>
+                ))}
+                {weeklyRoutine.length > 6 && <Link href="/weekly-routine" className="text-[10px] text-txt3 hover:text-violet2">+{weeklyRoutine.length - 6} more →</Link>}
+              </div>
             </div>
-            <ProgressBar value={weekPct} height={8} />
-            <div className="flex flex-wrap gap-2 mt-3">
-              {Object.entries(tagStats).sort((a, b) => b[1].total - a[1].total).map(([tag, stats]) => (
-                <div key={tag} className="flex items-center gap-1.5 text-xs">
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: stats.color }} />
-                  <span style={{ color: stats.color }}>{tag}</span>
-                  <span className="text-txt3 font-mono">{stats.done}/{stats.total}</span>
-                </div>
-              ))}
+          );
+        })()}
+
+        {/* This Week */}
+        {(() => {
+          const weekDone = weekTasks.filter((t) => t.done).length;
+          const weekTotal = weekTasks.length;
+          const weekPct = weekTotal > 0 ? Math.round((weekDone / weekTotal) * 100) : 0;
+          const tagStats: Record<string, { done: number; total: number; color: string }> = {};
+          const projColorMap: Record<string, string> = {};
+          for (const p of projects) projColorMap[p.title] = p.color || "#e05555";
+          for (const t of weekTasks) {
+            const match = t.text.match(/^\[(.+?)\]/);
+            const tag = match ? match[1] : "Untagged";
+            const color = match ? (projColorMap[match[1]] || "#7c6fff") : "#5c5a7a";
+            if (!tagStats[tag]) tagStats[tag] = { done: 0, total: 0, color };
+            tagStats[tag].total++;
+            if (t.done) tagStats[tag].done++;
+          }
+          return (
+            <Link href="/week" className="bg-surface border border-border rounded-xl p-4 block hover:border-border2 transition-colors group">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-medium text-txt2 group-hover:text-violet2 transition-colors flex items-center gap-1.5"><BarChart3 size={15} /> This Week</h2>
+                <span className="text-xs font-mono text-violet2">{weekDone}/{weekTotal} · {weekPct}%</span>
+              </div>
+              <ProgressBar value={weekPct} height={8} />
+              <div className="flex flex-wrap gap-2 mt-3">
+                {Object.entries(tagStats).sort((a, b) => b[1].total - a[1].total).map(([tag, stats]) => (
+                  <div key={tag} className="flex items-center gap-1.5 text-xs">
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: stats.color }} />
+                    <span style={{ color: stats.color }}>{tag}</span>
+                    <span className="text-txt3 font-mono">{stats.done}/{stats.total}</span>
+                  </div>
+                ))}
+              </div>
+            </Link>
+          );
+        })()}
+      </div>
+
+      {/* Row 3: Monthly Routine + Task List */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        {/* Monthly routine (if enabled) */}
+        {monthlyEnabled && monthlyRoutine.length > 0 && (() => {
+          const mrChecked = monthlyRoutine.filter((t) => t.checked).length;
+          const mrTotal = monthlyRoutine.length;
+          const mrPct = mrTotal > 0 ? Math.round((mrChecked / mrTotal) * 100) : 0;
+          return (
+            <div className="bg-surface border border-border rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <Link href="/monthly-routine" className="text-sm font-medium text-txt2 hover:text-violet2 transition-colors flex items-center gap-1.5"><CalendarRange size={15} /> Monthly Routine</Link>
+                <span className="text-xs font-mono text-violet2">{mrChecked}/{mrTotal}</span>
+              </div>
+              <ProgressBar value={mrPct} height={6} />
+              <div className="mt-3 space-y-1.5">
+                {monthlyRoutine.slice(0, 6).map((t) => (
+                  <div key={t.id} className="flex items-center gap-2 text-xs">
+                    <input type="checkbox" checked={t.checked || false} onChange={() => toggleMonthlyRoutine(t)}
+                      className="w-3.5 h-3.5 shrink-0 accent-violet" />
+                    <span className={cn("truncate", t.checked && "line-through text-txt3 opacity-60")}>{t.text}</span>
+                  </div>
+                ))}
+                {monthlyRoutine.length > 6 && <Link href="/monthly-routine" className="text-[10px] text-txt3 hover:text-violet2">+{monthlyRoutine.length - 6} more →</Link>}
+              </div>
             </div>
-          </Link>
-        );
-      })()}
+          );
+        })()}
+
+        {/* Task List */}
+        <div className="bg-surface border border-border rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <Link href="/tasks" className="text-sm font-medium text-txt2 hover:text-violet2 transition-colors flex items-center gap-1.5"><ClipboardList size={15} /> Task List</Link>
+            <span className="text-xs font-mono text-txt3">{quickTasks.length} tasks</span>
+          </div>
+          <div className="space-y-1.5">
+            {quickTasks.slice(0, 6).map((t) => (
+              <div key={t.id} className="flex items-center gap-2 text-xs group">
+                <button onClick={() => completeQuickTask(t.id)}
+                  className="w-3.5 h-3.5 rounded border border-border hover:border-green-acc transition-colors shrink-0" />
+                <span className="truncate flex-1" style={{ color: PRIORITY_COLORS[t.priority] || "#eab308" }}>{t.name}</span>
+                {t.deadline && <span className="text-[10px] font-mono text-txt3 shrink-0">{t.deadline}</span>}
+              </div>
+            ))}
+            {quickTasks.length > 6 && <Link href="/tasks" className="text-[10px] text-txt3 hover:text-violet2">+{quickTasks.length - 6} more →</Link>}
+            {quickTasks.length === 0 && <p className="text-xs text-txt3">No quick tasks</p>}
+          </div>
+        </div>
+      </div>
 
       {/* Overdue tasks */}
       {overdueTasks.length > 0 && (
         <div className="bg-surface border border-danger/30 rounded-xl p-4 mb-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium text-danger">⚠ Overdue Tasks</h2>
+            <h2 className="text-sm font-medium text-danger flex items-center gap-1.5"><AlertTriangle size={15} /> Overdue Tasks</h2>
             <span className="text-xs text-danger font-mono">{overdueTasks.length} late</span>
           </div>
           <div className="space-y-2">
@@ -271,12 +487,31 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Middle row: Projects + Deadlines */}
+      {/* Row 4: Deadlines + Projects */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        {/* Deadlines */}
+        <div className="bg-surface border border-border rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5"><Timer size={15} /> Upcoming Deadlines</h2>
+            <Link href="/deadlines" className="text-[10px] text-txt3 hover:text-violet2 transition-colors">View all →</Link>
+          </div>
+          <div className="space-y-2">
+            {deadlines.map((d) => (
+              <div key={d.id} className="flex items-center justify-between py-1">
+                <span className="text-sm text-txt2 truncate flex-1">{d.label}</span>
+                <span className="text-xs font-mono ml-2 shrink-0" style={{ color: getDeadlineColor(d.target_datetime) }}>
+                  {getDeadlineText(d.target_datetime)}
+                </span>
+              </div>
+            ))}
+            {deadlines.length === 0 && <p className="text-xs text-txt3">No upcoming deadlines</p>}
+          </div>
+        </div>
+
         {/* Projects */}
         <div className="bg-surface border border-border rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium text-txt2">📁 Projects</h2>
+            <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5"><Folder size={15} /> Projects</h2>
             <Link href="/projects" className="text-[10px] text-txt3 hover:text-red-acc transition-colors">View all →</Link>
           </div>
           <div className="space-y-2">
@@ -293,31 +528,12 @@ export default function DashboardPage() {
             {projects.length === 0 && <p className="text-xs text-txt3">No projects yet</p>}
           </div>
         </div>
-
-        {/* Deadlines */}
-        <div className="bg-surface border border-border rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-medium text-txt2">⏳ Upcoming Deadlines</h2>
-            <Link href="/deadlines" className="text-[10px] text-txt3 hover:text-violet2 transition-colors">View all →</Link>
-          </div>
-          <div className="space-y-2">
-            {deadlines.map((d) => (
-              <div key={d.id} className="flex items-center justify-between py-1">
-                <span className="text-sm text-txt2 truncate flex-1">{d.label}</span>
-                <span className="text-xs font-mono ml-2 shrink-0" style={{ color: getDeadlineColor(d.target_datetime) }}>
-                  {getDeadlineText(d.target_datetime)}
-                </span>
-              </div>
-            ))}
-            {deadlines.length === 0 && <p className="text-xs text-txt3">No upcoming deadlines</p>}
-          </div>
-        </div>
       </div>
 
       {/* Activity log */}
       {activity.length > 0 && (
         <div className="bg-surface border border-border rounded-xl p-4">
-          <h2 className="text-sm font-medium text-txt2 mb-3">🕐 Recent Activity</h2>
+          <h2 className="text-sm font-medium text-txt2 mb-3 flex items-center gap-1.5"><Activity size={15} /> Recent Activity</h2>
           <div className="space-y-1.5">
             {activity.map((a) => (
               <div key={a.id} className="flex items-center gap-2 text-xs">

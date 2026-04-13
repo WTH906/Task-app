@@ -3,14 +3,17 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { DAY_NAMES } from "@/lib/utils";
+import { CalendarDays, Timer } from "lucide-react";
 
 interface CalendarPickerProps {
   value: string | null;
   onChange: (date: string | null) => void;
   className?: string;
+  label?: string;
+  variant?: "date" | "deadline";
 }
 
-export function CalendarPicker({ value, onChange, className = "" }: CalendarPickerProps) {
+export function CalendarPicker({ value, onChange, className = "", label, variant = "date" }: CalendarPickerProps) {
   const [open, setOpen] = useState(false);
   const [viewDate, setViewDate] = useState(() => {
     if (value) return new Date(value + "T00:00:00");
@@ -124,8 +127,8 @@ export function CalendarPicker({ value, onChange, className = "" }: CalendarPick
     <div className={`inline-block ${className}`}>
       <button ref={btnRef} type="button" onClick={() => setOpen(!open)}
         className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-surface3 hover:bg-border text-txt2 hover:text-txt transition-colors">
-        <span>📅</span>
-        <span>{value || "No date"}</span>
+        {variant === "deadline" ? <Timer size={12} /> : <CalendarDays size={12} />}
+        <span>{value || (label ? `No ${label}` : variant === "deadline" ? "No deadline" : "No date")}</span>
       </button>
       {popup}
     </div>

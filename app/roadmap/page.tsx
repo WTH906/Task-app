@@ -4,6 +4,9 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 import { Project, ProjectTask, Subtask } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
+import { fetchProjects, fetchProjectTasksWithSubs, fetchRoadmapData } from "@/lib/queries";
+import { useToast } from "@/components/Toast";
 
 interface RoadmapCheck {
   text: string;
@@ -45,49 +48,50 @@ export default function RoadmapPage() {
   };
   const [phases, setPhases] = useState<Phase[]>([]);
   const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([]);
-  const [userId, setUserId] = useState("");
+  const { userId } = useCurrentUser();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const saveTimer = useRef<NodeJS.Timeout | null>(null);
   const [dragMilestone, setDragMilestone] = useState<{ pi: number; mi: number } | null>(null);
 
   useEffect(() => {
+    if (!userId) return;
     const load = async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      setUserId(user.id);
-      const { data } = await supabase.from("projects").select("*").eq("user_id", user.id).order("sort_order");
-      setProjects(data || []);
-      // Restore last selected project
-      const saved = localStorage.getItem("roadmap_project");
-      if (saved && (data || []).some((p: Project) => p.id === saved)) {
-        setSelectedProject(saved);
+      try {
+        const supabase = createClient();
+        const data = await fetchProjects(supabase, userId);
+        setProjects(data);
+        const saved = localStorage.getItem("roadmap_project");
+        if (saved && data.some((p) => p.id === saved)) {
+          setSelectedProject(saved);
+        }
+      } catch (err) {
+        console.error("Roadmap projects load failed:", err);
       }
     };
     load();
-  }, []);
+  }, [userId]);
 
   const loadRoadmap = useCallback(async (projectId: string) => {
+    if (!userId) return;
     setLoading(true);
-    const supabase = createClient();
+    try {
+      const supabase = createClient();
 
-    // Load roadmap data
-    const { data: rd } = await supabase.from("roadmap_data")
-      .select("*").eq("user_id", userId).eq("project_id", projectId).maybeSingle();
-    setPhases(rd?.phases || []);
+      const [rd, tasksWithSubs] = await Promise.all([
+        fetchRoadmapData(supabase, userId, projectId),
+        fetchProjectTasksWithSubs(supabase, projectId),
+      ]);
 
-    // Load project tasks + subtasks for the picker
-    const { data: tasks } = await supabase.from("project_tasks")
-      .select("*").eq("project_id", projectId).order("sort_order");
-    const tasksWithSubs: ProjectTask[] = [];
-    for (const t of tasks || []) {
-      const { data: subs } = await supabase.from("subtasks").select("*").eq("task_id", t.id).order("sort_order");
-      tasksWithSubs.push({ ...t, subtasks: subs || [] });
+      setPhases(rd || []);
+      setProjectTasks(tasksWithSubs);
+    } catch (err) {
+      console.error("Roadmap load failed:", err);
+      toast("Failed to load roadmap", "error");
     }
-    setProjectTasks(tasksWithSubs);
     setLoading(false);
-  }, [userId]);
+  }, [userId, toast]);
 
   useEffect(() => {
     if (selectedProject && userId) loadRoadmap(selectedProject);

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { Folder, Pin, CornerDownRight, ListChecks, Timer, Search } from "lucide-react";
 
 interface SearchResult {
   type: "project" | "task" | "subtask" | "routine" | "deadline";
@@ -12,6 +14,7 @@ interface SearchResult {
 }
 
 export function SearchModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [selected, setSelected] = useState(0);
@@ -38,12 +41,12 @@ export function SearchModal({ open, onClose }: { open: boolean; onClose: () => v
       const items: SearchResult[] = [];
 
       const { data: projects } = await supabase
-        .from("projects").select("id, title, color").eq("user_id", user.id).ilike("title", term).limit(5);
+        .from("projects").select("id, title, color").eq("user_id", user.id).is("archived_at", null).ilike("title", term).limit(5);
       for (const p of projects || [])
         items.push({ type: "project", id: p.id, title: p.title, subtitle: "Project", href: `/projects/${p.id}`, color: p.color });
 
       const { data: tasks } = await supabase
-        .from("project_tasks").select("id, name, project_id, notes").eq("user_id", user.id)
+        .from("project_tasks").select("id, name, project_id, notes").eq("user_id", user.id).is("archived_at", null)
         .or(`name.ilike.${term},notes.ilike.${term}`).limit(8);
       for (const t of tasks || [])
         items.push({ type: "task", id: t.id, title: t.name, subtitle: t.notes?.slice(0, 60) || "Task", href: `/projects/${t.project_id}` });
@@ -72,8 +75,7 @@ export function SearchModal({ open, onClose }: { open: boolean; onClose: () => v
   const handleNavigate = (href: string) => {
     onClose();
     if (href && href !== "#") {
-      // Use window.location for reliable navigation
-      window.location.href = href;
+      router.push(href);
     }
   };
 
@@ -84,7 +86,10 @@ export function SearchModal({ open, onClose }: { open: boolean; onClose: () => v
     if (e.key === "Escape") onClose();
   };
 
-  const typeIcon: Record<string, string> = { project: "📁", task: "📌", subtask: "↳", routine: "☰", deadline: "⏳" };
+  const typeIcon: Record<string, React.ReactNode> = {
+    project: <Folder size={13} />, task: <Pin size={13} />, subtask: <CornerDownRight size={13} />,
+    routine: <ListChecks size={13} />, deadline: <Timer size={13} />,
+  };
 
   if (!open) return null;
 
@@ -93,7 +98,7 @@ export function SearchModal({ open, onClose }: { open: boolean; onClose: () => v
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="bg-surface2 border border-border rounded-xl max-w-lg w-full shadow-2xl overflow-hidden">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-          <span className="text-txt3">🔍</span>
+          <span className="text-txt3"><Search size={16} /></span>
           <input ref={inputRef} type="text" value={query} onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKey} placeholder="Search projects, tasks, deadlines..."
             className="flex-1 bg-transparent text-txt text-sm placeholder-txt3 outline-none" />

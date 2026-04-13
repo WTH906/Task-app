@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js";
 import { Sidebar } from "./Sidebar";
+import { ToastProvider } from "./Toast";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -37,15 +38,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   if (isLogin || !user) {
-    return <>{children}</>;
+    return <ToastProvider>{children}</ToastProvider>;
   }
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar user={user} />
-      <main className="flex-1 ml-0 md:ml-60 min-h-screen animate-fade-in">
-        {children}
-      </main>
-    </div>
+    <ToastProvider>
+      <div className="flex min-h-screen">
+        <Sidebar user={user} />
+        <main className="flex-1 ml-0 md:ml-60 min-h-screen animate-fade-in">
+          {children}
+        </main>
+      </div>
+    </ToastProvider>
   );
 }

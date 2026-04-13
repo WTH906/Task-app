@@ -56,13 +56,6 @@ export function addDays(d: Date, n: number): Date {
   return r;
 }
 
-export function toLocalDateStr(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
 export function playAlarm() {
   try {
     const ctx = new AudioContext();
@@ -98,4 +91,8 @@ export function getWeekKey(d: Date = new Date()): string {
   const week1 = new Date(date.getFullYear(), 0, 4);
   const weekNum = 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
   return `${date.getFullYear()}-W${String(weekNum).padStart(2, "0")}`;
+}
+
+export function getMonthKey(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }

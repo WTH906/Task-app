@@ -9,6 +9,12 @@ import { Project, Template } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ImportModal } from "./ImportModal";
 import { SearchModal } from "./SearchModal";
+import { fetchProjects as fetchProjectsQuery, fetchTemplates as fetchTemplatesQuery } from "@/lib/queries";
+import {
+  LayoutDashboard, ListChecks, RefreshCw, CalendarDays, ClipboardList,
+  Map, BarChart3, Timer, Search, Download, ClipboardCopy, FolderPlus,
+  ChevronDown, LogOut, Menu, X, CalendarRange, User as UserIcon, PieChart,
+} from "lucide-react";
 
 export function Sidebar({ user }: { user: User }) {
   const pathname = usePathname();
@@ -19,17 +25,33 @@ export function Sidebar({ user }: { user: User }) {
   const [importOpen, setImportOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [monthlyEnabled, setMonthlyEnabled] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  // Load monthly routine toggle from localStorage
+  useEffect(() => {
+    setMonthlyEnabled(localStorage.getItem("comfy-monthly-routine") === "true");
+    const handler = () => setMonthlyEnabled(localStorage.getItem("comfy-monthly-routine") === "true");
+    window.addEventListener("monthly-routine-changed", handler);
+    return () => window.removeEventListener("monthly-routine-changed", handler);
+  }, []);
+
+  // Close user menu on outside click
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const handler = () => setUserMenuOpen(false);
+    setTimeout(() => document.addEventListener("click", handler), 0);
+    return () => document.removeEventListener("click", handler);
+  }, [userMenuOpen]);
 
   const fetchProjects = useCallback(async () => {
     const supabase = createClient();
-    const { data } = await supabase.from("projects").select("*").eq("user_id", user.id).order("sort_order");
-    setProjects(data || []);
+    setProjects(await fetchProjectsQuery(supabase, user.id));
   }, [user.id]);
 
   const fetchTemplates = useCallback(async () => {
     const supabase = createClient();
-    const { data } = await supabase.from("templates").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
-    setTemplates(data || []);
+    setTemplates(await fetchTemplatesQuery(supabase, user.id));
   }, [user.id]);
 
   useEffect(() => {
@@ -60,29 +82,30 @@ export function Sidebar({ user }: { user: User }) {
       if (isInput) return;
 
       // Quick nav shortcuts
-      if (e.key === "d") { e.preventDefault(); window.location.href = "/"; }
-      if (e.key === "r") { e.preventDefault(); window.location.href = "/routine"; }
-      if (e.key === "e") { e.preventDefault(); window.location.href = "/weekly-routine"; }
-      if (e.key === "w") { e.preventDefault(); window.location.href = "/week"; }
-      if (e.key === "q") { e.preventDefault(); window.location.href = "/tasks"; }
-      if (e.key === "m") { e.preventDefault(); window.location.href = "/roadmap"; }
-      if (e.key === "t") { e.preventDefault(); window.location.href = "/retro"; }
-      if (e.key === "l") { e.preventDefault(); window.location.href = "/deadlines"; }
+      if (e.key === "d") { e.preventDefault(); router.push("/"); }
+      if (e.key === "r") { e.preventDefault(); router.push("/routine"); }
+      if (e.key === "e") { e.preventDefault(); router.push("/weekly-routine"); }
+      if (e.key === "w") { e.preventDefault(); router.push("/week"); }
+      if (e.key === "q") { e.preventDefault(); router.push("/tasks"); }
+      if (e.key === "m") { e.preventDefault(); router.push("/roadmap"); }
+      if (e.key === "t") { e.preventDefault(); router.push("/retro"); }
+      if (e.key === "l") { e.preventDefault(); router.push("/deadlines"); }
       if (e.key === "n") { e.preventDefault(); handleNewProject(); }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, []);
+  }, [router]);
 
-  const navItems = [
-    { href: "/", icon: "🏠", label: "Dashboard", accent: "violet", key: "D" },
-    { href: "/routine", icon: "☰", label: "Daily Routine", accent: "red-acc", key: "R" },
-    { href: "/weekly-routine", icon: "🔄", label: "Weekly Routine", accent: "violet", key: "E" },
-    { href: "/week", icon: "📅", label: "Calendar", accent: "violet", key: "W" },
-    { href: "/tasks", icon: "📝", label: "Task List", accent: "violet", key: "Q" },
-    { href: "/roadmap", icon: "🛤", label: "Roadmap", accent: "violet", key: "M" },
-    { href: "/retro", icon: "📊", label: "Retro Planning", accent: "violet", key: "T" },
-    { href: "/deadlines", icon: "⏳", label: "Deadlines", accent: "violet", key: "L" },
+  const navItems: Array<{ href: string; icon: React.ReactNode; label: string; accent: string; key: string }> = [
+    { href: "/", icon: <LayoutDashboard size={18} />, label: "Dashboard", accent: "violet", key: "D" },
+    { href: "/routine", icon: <ListChecks size={18} />, label: "Daily Routine", accent: "red-acc", key: "R" },
+    { href: "/weekly-routine", icon: <RefreshCw size={18} />, label: "Weekly Routine", accent: "violet", key: "E" },
+    ...(monthlyEnabled ? [{ href: "/monthly-routine", icon: <CalendarRange size={18} />, label: "Monthly Routine", accent: "violet", key: "Y" }] : []),
+    { href: "/week", icon: <CalendarDays size={18} />, label: "Calendar", accent: "violet", key: "W" },
+    { href: "/tasks", icon: <ClipboardList size={18} />, label: "Task List", accent: "violet", key: "Q" },
+    { href: "/roadmap", icon: <Map size={18} />, label: "Roadmap", accent: "violet", key: "M" },
+    { href: "/retro", icon: <BarChart3 size={18} />, label: "Retro Planning", accent: "violet", key: "T" },
+    { href: "/deadlines", icon: <Timer size={18} />, label: "Deadlines", accent: "violet", key: "L" },
   ];
 
   const handleSignOut = async () => {
@@ -138,6 +161,7 @@ export function Sidebar({ user }: { user: User }) {
   };
 
   const deleteTemplate = async (id: string) => {
+    if (!confirm("Delete this template?")) return;
     const supabase = createClient();
     await supabase.from("templates").delete().eq("id", id);
     setTemplates((prev) => prev.filter((t) => t.id !== id));
@@ -147,7 +171,7 @@ export function Sidebar({ user }: { user: User }) {
     <>
       <button onClick={() => setOpen(!open)}
         className="fixed top-3 left-3 z-50 md:hidden w-10 h-10 flex items-center justify-center bg-surface2 rounded-lg border border-border">
-        <span className="text-lg">{open ? "✕" : "☰"}</span>
+        <span className="text-lg">{open ? <X size={20} /> : <Menu size={20} />}</span>
       </button>
       {open && <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setOpen(false)} />}
 
@@ -157,12 +181,32 @@ export function Sidebar({ user }: { user: User }) {
       )}>
         <div className="p-4 border-b border-border">
           <h1 className="font-title text-lg text-bright tracking-wide">Comfy Board</h1>
-          <p className="text-xs text-txt3 mt-0.5 truncate">{user.email}</p>
+          <div className="relative mt-1">
+            <button onClick={() => setUserMenuOpen(!userMenuOpen)}
+              className="flex items-center gap-2 text-xs text-txt3 hover:text-txt transition-colors w-full">
+              <UserIcon size={13} />
+              <span className="truncate flex-1 text-left">{user.email}</span>
+              <ChevronDown size={12} className={cn("transition-transform", userMenuOpen && "rotate-180")} />
+            </button>
+            {userMenuOpen && (
+              <div className="absolute left-0 top-full mt-1 bg-surface2 border border-border rounded-lg shadow-xl py-1 w-full z-50">
+                <Link href="/stats" onClick={() => { setUserMenuOpen(false); setOpen(false); }}
+                  className="flex items-center gap-2 px-3 py-2 text-xs text-txt2 hover:bg-surface3 transition-colors w-full">
+                  <PieChart size={13} /> Stats & Activity
+                </Link>
+                <div className="border-t border-border my-1" />
+                <button onClick={handleSignOut}
+                  className="flex items-center gap-2 px-3 py-2 text-xs text-txt3 hover:text-danger hover:bg-surface3 transition-colors w-full">
+                  <LogOut size={13} /> Sign out
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <button onClick={() => setSearchOpen(true)}
           className="mx-2 mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-surface2 border border-border text-sm text-txt3 hover:text-txt hover:border-border2 transition-colors">
-          <span>🔍</span><span className="flex-1 text-left">Search...</span>
+          <span><Search size={14} /></span><span className="flex-1 text-left">Search...</span>
           <kbd className="text-[9px] bg-surface3 px-1 py-0.5 rounded">⌘K</kbd>
         </button>
 
@@ -177,7 +221,7 @@ export function Sidebar({ user }: { user: User }) {
                   backgroundColor: item.accent === "violet" ? "rgba(124,111,255,0.15)" : "rgba(224,85,85,0.15)",
                   color: item.accent === "violet" ? "#a594ff" : "#e05555",
                 } : undefined}>
-                <span className="text-base">{item.icon}</span>
+                <span className="w-5 h-5 flex items-center justify-center shrink-0">{item.icon}</span>
                 <span className="flex-1">{item.label}</span>
                 {item.key && <kbd className="text-[9px] text-txt3 bg-surface3 px-1 py-0.5 rounded">{item.key}</kbd>}
               </Link>
@@ -190,8 +234,8 @@ export function Sidebar({ user }: { user: User }) {
             <Link href="/projects" onClick={() => setOpen(false)}
               className="text-[11px] uppercase tracking-wider text-txt3 hover:text-red-acc transition-colors">Projects</Link>
             <div className="flex items-center gap-1">
-              <button onClick={() => setImportOpen(true)} title="Import" className="text-xs text-txt3 hover:text-green-acc transition-colors p-0.5">📥</button>
-              <button onClick={() => { fetchTemplates(); setTemplateOpen(!templateOpen); }} title="Templates" className="text-xs text-txt3 hover:text-violet2 transition-colors p-0.5">📋</button>
+              <button onClick={() => setImportOpen(true)} title="Import" className="text-txt3 hover:text-green-acc transition-colors p-0.5"><Download size={14} /></button>
+              <button onClick={() => { fetchTemplates(); setTemplateOpen(!templateOpen); }} title="Templates" className="text-txt3 hover:text-violet2 transition-colors p-0.5"><ClipboardCopy size={14} /></button>
             </div>
           </div>
 
@@ -203,7 +247,7 @@ export function Sidebar({ user }: { user: User }) {
                 <div key={t.id} className="flex items-center border-b border-border/50 last:border-b-0 group">
                   <button onClick={() => createFromTemplate(t)}
                     className="flex-1 text-left px-3 py-2 text-xs text-txt2 hover:bg-surface3 hover:text-violet2 truncate">
-                    📋 {t.name}
+                    <ClipboardCopy size={12} className="shrink-0" /> {t.name}
                   </button>
                   <button onClick={() => deleteTemplate(t.id)}
                     className="px-2 py-2 text-xs text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 transition-all">✕</button>
@@ -227,17 +271,13 @@ export function Sidebar({ user }: { user: User }) {
 
           <button onClick={handleNewProject}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-txt3 hover:bg-surface2 hover:text-txt w-full transition-colors">
-            <span className="text-lg leading-none">＋</span><span>New Project</span>
+            <FolderPlus size={16} className="shrink-0" /><span>New Project</span>
             <kbd className="text-[9px] text-txt3 bg-surface3 px-1 py-0.5 rounded ml-auto">N</kbd>
           </button>
         </nav>
 
         <div className="p-3 border-t border-border text-[10px] text-txt3 px-5 space-y-0.5">
           <p><kbd className="bg-surface3 px-1 py-0.5 rounded">⌘K</kbd> Search · <kbd className="bg-surface3 px-1 py-0.5 rounded">D</kbd> Home · <kbd className="bg-surface3 px-1 py-0.5 rounded">R</kbd> Routine · <kbd className="bg-surface3 px-1 py-0.5 rounded">W</kbd> Calendar · <kbd className="bg-surface3 px-1 py-0.5 rounded">M</kbd> Map · <kbd className="bg-surface3 px-1 py-0.5 rounded">N</kbd> New</p>
-        </div>
-        <div className="p-3 border-t border-border">
-          <button onClick={handleSignOut}
-            className="w-full text-left px-3 py-2 rounded-lg text-sm text-txt3 hover:bg-surface2 hover:text-danger transition-colors">Sign out</button>
         </div>
       </aside>
 

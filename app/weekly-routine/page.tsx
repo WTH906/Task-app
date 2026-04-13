@@ -3,13 +3,18 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { WeeklyRoutineTask } from "@/lib/types";
-import { formatMinutes, cn, getWeekKey, getMonday, toLocalDateStr, addDays } from "@/lib/utils";
+import { formatMinutes, cn, getWeekKey, getMonday, formatDate, addDays } from "@/lib/utils";
 import { ProgressBar } from "@/components/ProgressBar";
 import { Modal } from "@/components/Modal";
+import { reorderRows } from "@/lib/db-helpers";
+import { useToast } from "@/components/Toast";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
+import { fetchWeeklyRoutineWithChecks } from "@/lib/queries";
 
 export default function WeeklyRoutinePage() {
+  const { toast } = useToast();
+  const { userId, loading: authLoading } = useCurrentUser();
   const [tasks, setTasks] = useState<WeeklyRoutineTask[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<WeeklyRoutineTask | null>(null);
   const [formText, setFormText] = useState("");
@@ -35,32 +40,15 @@ export default function WeeklyRoutinePage() {
   const daysLeft = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
 
   const loadTasks = useCallback(async () => {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    setUserId(user.id);
-
-    const { data: taskData } = await supabase
-      .from("weekly_routine_tasks")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("sort_order");
-
-    const { data: checks } = await supabase
-      .from("weekly_routine_checks")
-      .select("task_id")
-      .eq("user_id", user.id)
-      .eq("week_key", weekKey);
-
-    const checkedIds = new Set((checks || []).map((c: { task_id: string }) => c.task_id));
-
-    setTasks(
-      (taskData || []).map((t: WeeklyRoutineTask) => ({
-        ...t,
-        checked: checkedIds.has(t.id),
-      }))
-    );
-  }, [weekKey]);
+    if (!userId) return;
+    try {
+      const supabase = createClient();
+      setTasks(await fetchWeeklyRoutineWithChecks(supabase, userId, weekKey));
+    } catch (err) {
+      console.error("Weekly routine load failed:", err);
+      toast("Failed to load weekly routine", "error");
+    }
+  }, [weekKey, userId, toast]);
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
@@ -72,18 +60,23 @@ export default function WeeklyRoutinePage() {
       prev.map((t) => (t.id === task.id ? { ...t, checked: newChecked } : t))
     );
 
+    let error;
     if (newChecked) {
-      await supabase.from("weekly_routine_checks").insert({
+      ({ error } = await supabase.from("weekly_routine_checks").insert({
         user_id: userId,
         task_id: task.id,
         week_key: weekKey,
-      });
+      }));
     } else {
-      await supabase
+      ({ error } = await supabase
         .from("weekly_routine_checks")
         .delete()
         .eq("task_id", task.id)
-        .eq("week_key", weekKey);
+        .eq("week_key", weekKey));
+    }
+    if (error) {
+      toast("Failed to save: " + error.message, "error");
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, checked: !newChecked } : t)));
     }
   };
 
@@ -92,30 +85,34 @@ export default function WeeklyRoutinePage() {
     const supabase = createClient();
 
     if (editingTask) {
-      await supabase
+      const { error } = await supabase
         .from("weekly_routine_tasks")
         .update({ text: formText.trim(), est_minutes: formEst })
         .eq("id", editingTask.id);
+      if (error) { toast("Failed to save: " + error.message, "error"); return; }
+      setTasks((prev) => prev.map((t) => t.id === editingTask.id
+        ? { ...t, text: formText.trim(), est_minutes: formEst } : t));
     } else {
-      await supabase.from("weekly_routine_tasks").insert({
+      const { data: newTask, error } = await supabase.from("weekly_routine_tasks").insert({
         user_id: userId,
         text: formText.trim(),
         est_minutes: formEst,
         sort_order: tasks.length,
-      });
+      }).select().single();
+      if (error) { toast("Failed to save: " + error.message, "error"); return; }
+      if (newTask) setTasks((prev) => [...prev, { ...newTask as WeeklyRoutineTask, checked: false }]);
     }
 
     setModalOpen(false);
     setEditingTask(null);
     setFormText("");
     setFormEst(0);
-    loadTasks();
   };
 
   const removeTask = async (id: string) => {
     const supabase = createClient();
     await supabase.from("weekly_routine_tasks").delete().eq("id", id);
-    loadTasks();
+    setTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
   const openEdit = (task: WeeklyRoutineTask) => {
@@ -145,11 +142,10 @@ export default function WeeklyRoutinePage() {
   };
   const handleDragEnd = async () => {
     setDragIdx(null);
+    if (!userId) return;
     const supabase = createClient();
-    const updates = tasks.map((t, i) =>
-      supabase.from("weekly_routine_tasks").update({ sort_order: i }).eq("id", t.id)
-    );
-    await Promise.all(updates);
+    const { error } = await reorderRows(supabase, "weekly_routine_tasks", tasks.map((t) => t.id), userId);
+    if (error) toast("Failed to reorder: " + error, "error");
   };
 
   const checked = tasks.filter((t) => t.checked).length;
@@ -158,15 +154,45 @@ export default function WeeklyRoutinePage() {
   const totalEst = tasks.reduce((s, t) => s + t.est_minutes, 0);
   const remainEst = tasks.filter((t) => !t.checked).reduce((s, t) => s + t.est_minutes, 0);
 
+  const [monthlyEnabled, setMonthlyEnabled] = useState(false);
+  useEffect(() => { setMonthlyEnabled(localStorage.getItem("comfy-monthly-routine") === "true"); }, []);
+
+  const enableMonthly = () => {
+    localStorage.setItem("comfy-monthly-routine", "true");
+    setMonthlyEnabled(true);
+    window.dispatchEvent(new Event("monthly-routine-changed"));
+    toast("Monthly routine added to sidebar!", "success");
+  };
+
+  const disableMonthly = () => {
+    localStorage.setItem("comfy-monthly-routine", "false");
+    setMonthlyEnabled(false);
+    window.dispatchEvent(new Event("monthly-routine-changed"));
+    toast("Monthly routine removed from sidebar", "info");
+  };
+
   return (
     <div className="p-4 md:p-8 max-w-3xl mx-auto">
-      <div className="mb-6">
-        <p className="text-xs text-txt3 uppercase tracking-wider mb-1">{rangeLabel} · {weekKey}</p>
-        <h1 className="font-title text-2xl text-bright mb-1">Weekly Routine</h1>
-        <p className="text-sm text-txt2">
-          Tasks to complete this week
-          {daysLeft > 0 ? ` · ${daysLeft} day${daysLeft > 1 ? "s" : ""} left` : " · Last day!"}
-        </p>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <p className="text-xs text-txt3 uppercase tracking-wider mb-1">{rangeLabel} · {weekKey}</p>
+          <h1 className="font-title text-2xl text-bright mb-1">Weekly Routine</h1>
+          <p className="text-sm text-txt2">
+            Tasks to complete this week
+            {daysLeft > 0 ? ` · ${daysLeft} day${daysLeft > 1 ? "s" : ""} left` : " · Last day!"}
+          </p>
+        </div>
+        {!monthlyEnabled ? (
+          <button onClick={enableMonthly}
+            className="px-3 py-1.5 rounded-lg text-xs border border-dashed border-violet/30 text-violet2 hover:bg-violet/10 transition-colors shrink-0">
+            Need a monthly planner?
+          </button>
+        ) : (
+          <button onClick={disableMonthly}
+            className="px-3 py-1.5 rounded-lg text-xs border border-border text-txt3 hover:text-danger hover:border-danger/30 transition-colors shrink-0">
+            Hide monthly routine
+          </button>
+        )}
       </div>
 
       <div className="flex items-center gap-4 mb-4 text-sm">

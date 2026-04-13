@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ProjectTask } from "@/lib/types";
 import { progressColor } from "@/lib/utils";
+import { Calendar, FileText } from "lucide-react";
 
 export function googleCalendarUrl(params: {
   title: string;
@@ -34,7 +35,7 @@ export function GCalButton({
     <a href={url} target="_blank" rel="noopener noreferrer"
       className={`flex items-center gap-1 text-xs px-2 py-1 rounded bg-surface3 hover:bg-border text-txt3 hover:text-txt transition-colors ${className}`}
       title="Add to Google Calendar" onClick={(e) => e.stopPropagation()}>
-      <span>📆</span><span>GCal</span>
+      <Calendar size={12} /><span>GCal</span>
     </a>
   );
 }
@@ -101,7 +102,7 @@ export function GCalSyncModal({
       <div className="bg-surface2 border border-border rounded-xl max-w-lg w-full max-h-[85vh] overflow-hidden shadow-2xl flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
           <div>
-            <h2 className="font-title text-bright text-lg">📆 Sync to Google Calendar</h2>
+            <h2 className="font-title text-bright text-lg flex items-center gap-2"><Calendar size={18} /> Sync to Google Calendar</h2>
             <p className="text-xs text-txt3 mt-0.5">Click any item to create a calendar event</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface3 text-txt3 hover:text-txt">✕</button>
@@ -126,7 +127,7 @@ export function GCalSyncModal({
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: progressColor(item.progress) }} />
                   {isSynced
                     ? <span className="text-xs text-green-acc shrink-0">✓ Sent</span>
-                    : <span className="text-xs text-amber shrink-0">📆 Add</span>}
+                    : <span className="text-xs text-amber shrink-0 inline-flex items-center gap-0.5"><Calendar size={10} /> Add</span>}
                 </div>
                 <div className="flex items-center gap-2 mt-1 text-xs text-txt3">
                   <span className="font-mono">{item.deadline}</span>
@@ -134,7 +135,7 @@ export function GCalSyncModal({
                     <><span className="text-border2">·</span><span className="truncate">in: {item.parentName}</span></>
                   )}
                   {item.notes && (
-                    <><span className="text-border2">·</span><span className="truncate italic">📝 {item.notes}</span></>
+                    <><span className="text-border2">·</span><span className="truncate italic inline-flex items-center gap-1"><FileText size={10} /> {item.notes}</span></>
                   )}
                 </div>
               </button>

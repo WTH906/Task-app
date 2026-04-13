@@ -3,13 +3,18 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { RoutineTask } from "@/lib/types";
-import { formatMinutes, cn, toLocalDateStr } from "@/lib/utils";
+import { formatMinutes, cn, formatDate } from "@/lib/utils";
 import { ProgressBar } from "@/components/ProgressBar";
 import { Modal } from "@/components/Modal";
+import { reorderRows } from "@/lib/db-helpers";
+import { useToast } from "@/components/Toast";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
+import { fetchRoutineWithChecks } from "@/lib/queries";
 
 export default function RoutinePage() {
+  const { toast } = useToast();
+  const { userId, loading: authLoading } = useCurrentUser();
   const [tasks, setTasks] = useState<RoutineTask[]>([]);
-  const [userId, setUserId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<RoutineTask | null>(null);
   const [formText, setFormText] = useState("");
@@ -25,35 +30,18 @@ export default function RoutinePage() {
     return () => document.removeEventListener("click", handler);
   }, [menuOpen]);
 
-  const today = toLocalDateStr(new Date());
+  const today = formatDate(new Date());
 
   const loadTasks = useCallback(async () => {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    setUserId(user.id);
-
-    const { data: taskData } = await supabase
-      .from("routine_tasks")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("sort_order");
-
-    const { data: checks } = await supabase
-      .from("routine_checks")
-      .select("task_id")
-      .eq("user_id", user.id)
-      .eq("checked_date", today);
-
-    const checkedIds = new Set((checks || []).map((c: { task_id: string }) => c.task_id));
-
-    setTasks(
-      (taskData || []).map((t: RoutineTask) => ({
-        ...t,
-        checked: checkedIds.has(t.id),
-      }))
-    );
-  }, [today]);
+    if (!userId) return;
+    try {
+      const supabase = createClient();
+      setTasks(await fetchRoutineWithChecks(supabase, userId, today));
+    } catch (err) {
+      console.error("Routine load failed:", err);
+      toast("Failed to load routine", "error");
+    }
+  }, [today, userId, toast]);
 
   useEffect(() => {
     loadTasks();
@@ -68,18 +56,23 @@ export default function RoutinePage() {
       prev.map((t) => (t.id === task.id ? { ...t, checked: newChecked } : t))
     );
 
+    let error;
     if (newChecked) {
-      await supabase.from("routine_checks").insert({
+      ({ error } = await supabase.from("routine_checks").insert({
         user_id: userId,
         task_id: task.id,
         checked_date: today,
-      });
+      }));
     } else {
-      await supabase
+      ({ error } = await supabase
         .from("routine_checks")
         .delete()
         .eq("task_id", task.id)
-        .eq("checked_date", today);
+        .eq("checked_date", today));
+    }
+    if (error) {
+      toast("Failed to save: " + error.message, "error");
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, checked: !newChecked } : t)));
     }
   };
 
@@ -88,30 +81,34 @@ export default function RoutinePage() {
     const supabase = createClient();
 
     if (editingTask) {
-      await supabase
+      const { error } = await supabase
         .from("routine_tasks")
         .update({ text: formText.trim(), est_minutes: formEst })
         .eq("id", editingTask.id);
+      if (error) { toast("Failed to save: " + error.message, "error"); return; }
+      setTasks((prev) => prev.map((t) => t.id === editingTask.id
+        ? { ...t, text: formText.trim(), est_minutes: formEst } : t));
     } else {
-      await supabase.from("routine_tasks").insert({
+      const { data: newTask, error } = await supabase.from("routine_tasks").insert({
         user_id: userId,
         text: formText.trim(),
         est_minutes: formEst,
         sort_order: tasks.length,
-      });
+      }).select().single();
+      if (error) { toast("Failed to save: " + error.message, "error"); return; }
+      if (newTask) setTasks((prev) => [...prev, { ...newTask as RoutineTask, checked: false }]);
     }
 
     setModalOpen(false);
     setEditingTask(null);
     setFormText("");
     setFormEst(0);
-    loadTasks();
   };
 
   const removeTask = async (id: string) => {
     const supabase = createClient();
     await supabase.from("routine_tasks").delete().eq("id", id);
-    loadTasks();
+    setTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
   const openEdit = (task: RoutineTask) => {
@@ -142,11 +139,10 @@ export default function RoutinePage() {
   };
   const handleDragEnd = async () => {
     setDragIdx(null);
+    if (!userId) return;
     const supabase = createClient();
-    const updates = tasks.map((t, i) =>
-      supabase.from("routine_tasks").update({ sort_order: i }).eq("id", t.id)
-    );
-    await Promise.all(updates);
+    const { error } = await reorderRows(supabase, "routine_tasks", tasks.map((t) => t.id), userId);
+    if (error) toast("Failed to reorder: " + error, "error");
   };
 
   const checked = tasks.filter((t) => t.checked).length;

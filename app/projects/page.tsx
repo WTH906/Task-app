@@ -8,11 +8,15 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { Modal } from "@/components/Modal";
 import { cn } from "@/lib/utils";
 import { cleanDeadline, detectFileType } from "@/lib/import-helpers";
+import { reorderRows } from "@/lib/db-helpers";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
+import { fetchProjects, fetchTemplates } from "@/lib/queries";
+import { ClipboardCopy, Download } from "lucide-react";
 
 export default function ProjectsPage() {
+  const { userId } = useCurrentUser();
   const [projects, setProjects] = useState<Project[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [userId, setUserId] = useState("");
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [importLog, setImportLog] = useState<string[]>([]);
@@ -21,45 +25,30 @@ export default function ProjectsPage() {
   const router = useRouter();
 
   useEffect(() => {
+    if (!userId) return;
     const load = async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      setUserId(user.id);
-
-      const { data } = await supabase
-        .from("projects")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("sort_order");
-      setProjects(data || []);
-
-      const { data: tmpl } = await supabase
-        .from("templates")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-      setTemplates(tmpl || []);
+      const [projs, tmpls] = await Promise.all([
+        fetchProjects(supabase, userId),
+        fetchTemplates(supabase, userId),
+      ]);
+      setProjects(projs);
+      setTemplates(tmpls);
     };
     load();
-  }, []);
+  }, [userId]);
 
   const notifySidebar = () => window.dispatchEvent(new Event("projects-changed"));
 
   const reload = async () => {
+    if (!userId) return;
     const supabase = createClient();
-    const { data } = await supabase
-      .from("projects")
-      .select("*")
-      .eq("user_id", userId)
-      .order("sort_order");
-    setProjects(data || []);
-    const { data: tmpl } = await supabase
-      .from("templates")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false });
-    setTemplates(tmpl || []);
+    const [projs, tmpls] = await Promise.all([
+      fetchProjects(supabase, userId),
+      fetchTemplates(supabase, userId),
+    ]);
+    setProjects(projs);
+    setTemplates(tmpls);
     notifySidebar();
   };
 
@@ -201,6 +190,7 @@ export default function ProjectsPage() {
         .select("id")
         .eq("user_id", userId)
         .eq("title", p.title)
+        .is("archived_at", null)
         .maybeSingle();
 
       if (existing) {
@@ -254,6 +244,100 @@ export default function ProjectsPage() {
     for (const file of Array.from(files)) {
       try {
         const text = await file.text();
+
+        // CSV import
+        if (file.name.endsWith(".csv")) {
+          log.push(`\n📄 ${file.name} → CSV import`);
+          const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+          if (lines.length < 2) { log.push("  ✗ Empty CSV"); continue; }
+
+          // Parse CSV rows (handle quoted fields)
+          const parseCSVRow = (line: string): string[] => {
+            const result: string[] = [];
+            let current = "";
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+              const ch = line[i];
+              if (ch === '"') {
+                if (inQuotes && line[i + 1] === '"') { current += '"'; i++; }
+                else inQuotes = !inQuotes;
+              } else if (ch === "," && !inQuotes) { result.push(current); current = ""; }
+              else current += ch;
+            }
+            result.push(current);
+            return result;
+          };
+
+          const header = parseCSVRow(lines[0]).map((h) => h.toLowerCase().trim());
+          const nameIdx = header.indexOf("name");
+          const typeIdx = header.indexOf("type");
+          const estIdx = header.indexOf("est minutes");
+          const deadlineIdx = header.indexOf("deadline");
+          const dateIdx = header.indexOf("date");
+          const progressIdx = header.indexOf("progress");
+          const notesIdx = header.indexOf("notes");
+          const parentIdx = header.indexOf("parent task");
+
+          if (nameIdx === -1) { log.push("  ✗ CSV must have a 'Name' column"); continue; }
+
+          // Determine project name from filename
+          const projTitle = file.name.replace(/\.csv$/i, "").replace(/_/g, " ");
+          const { data: proj } = await supabase.from("projects").insert({
+            user_id: userId, title: projTitle, sort_order: projects.length,
+          }).select().single();
+          if (!proj) { log.push("  ✗ Failed to create project"); continue; }
+
+          // First pass: create tasks
+          const taskMap: Record<string, string> = {}; // name → id
+          let taskOrder = 0;
+          let subtaskCounts: Record<string, number> = {};
+
+          for (let i = 1; i < lines.length; i++) {
+            const row = parseCSVRow(lines[i]);
+            const type = typeIdx >= 0 ? row[typeIdx]?.trim().toLowerCase() : "task";
+            const name = row[nameIdx]?.trim();
+            if (!name) continue;
+
+            if (type !== "subtask") {
+              const { data: task } = await supabase.from("project_tasks").insert({
+                project_id: proj.id, user_id: userId, name,
+                est_minutes: estIdx >= 0 ? parseInt(row[estIdx]) || 0 : 0,
+                deadline: deadlineIdx >= 0 ? row[deadlineIdx]?.trim() || null : null,
+                date_key: dateIdx >= 0 ? row[dateIdx]?.trim() || null : null,
+                progress: progressIdx >= 0 ? parseInt(row[progressIdx]) || 0 : 0,
+                notes: notesIdx >= 0 ? row[notesIdx]?.trim() || "" : "",
+                sort_order: taskOrder++,
+              }).select().single();
+              if (task) taskMap[name] = task.id;
+            }
+          }
+
+          // Second pass: create subtasks
+          for (let i = 1; i < lines.length; i++) {
+            const row = parseCSVRow(lines[i]);
+            const type = typeIdx >= 0 ? row[typeIdx]?.trim().toLowerCase() : "";
+            if (type !== "subtask") continue;
+            const name = row[nameIdx]?.trim();
+            const parent = parentIdx >= 0 ? row[parentIdx]?.trim() : "";
+            if (!name || !parent || !taskMap[parent]) continue;
+            const parentId = taskMap[parent];
+            subtaskCounts[parentId] = (subtaskCounts[parentId] || 0);
+            await supabase.from("subtasks").insert({
+              task_id: parentId, user_id: userId, name,
+              est_minutes: estIdx >= 0 ? parseInt(row[estIdx]) || 0 : 0,
+              deadline: deadlineIdx >= 0 ? row[deadlineIdx]?.trim() || null : null,
+              date_key: dateIdx >= 0 ? row[dateIdx]?.trim() || null : null,
+              progress: progressIdx >= 0 ? parseInt(row[progressIdx]) || 0 : 0,
+              notes: notesIdx >= 0 ? row[notesIdx]?.trim() || "" : "",
+              sort_order: subtaskCounts[parentId]++,
+            });
+          }
+
+          log.push(`  ✓ Created "${projTitle}" with ${taskOrder} tasks`);
+          continue;
+        }
+
+        // JSON import (existing logic)
         const data = JSON.parse(text);
         const type = detectFileType(data);
 
@@ -356,10 +440,9 @@ export default function ProjectsPage() {
   };
   const handleDragEnd = async () => {
     setDragIdx(null);
+    if (!userId) return;
     const supabase = createClient();
-    await Promise.all(projects.map((p, i) =>
-      supabase.from("projects").update({ sort_order: i }).eq("id", p.id)
-    ));
+    await reorderRows(supabase, "projects", projects.map((p) => p.id), userId);
     notifySidebar();
   };
 
@@ -367,7 +450,7 @@ export default function ProjectsPage() {
     e.stopPropagation();
     if (!confirm(`Delete project "${title}"?`)) return;
     const supabase = createClient();
-    await supabase.from("projects").delete().eq("id", id);
+    await supabase.from("projects").update({ archived_at: new Date().toISOString() }).eq("id", id);
     setProjects((prev) => prev.filter((p) => p.id !== id));
     notifySidebar();
   };
@@ -381,12 +464,12 @@ export default function ProjectsPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={() => setTemplateModalOpen(true)}
-            className="px-3 py-2 rounded-lg text-sm bg-surface border border-border text-txt2 hover:text-violet2 hover:border-violet/30 transition-colors">
-            📋 Templates
+            className="px-3 py-2 rounded-lg text-sm bg-surface border border-border text-txt2 hover:text-violet2 hover:border-violet/30 transition-colors flex items-center gap-1.5">
+            <ClipboardCopy size={14} /> Templates
           </button>
-          <label className="px-3 py-2 rounded-lg text-sm bg-surface border border-border text-txt2 hover:text-green-acc hover:border-green-acc/30 transition-colors cursor-pointer">
-            📥 Import
-            <input ref={importRef} type="file" accept=".json" multiple onChange={handleImport} className="hidden" />
+          <label className="px-3 py-2 rounded-lg text-sm bg-surface border border-border text-txt2 hover:text-green-acc hover:border-green-acc/30 transition-colors cursor-pointer inline-flex items-center gap-1.5">
+            <Download size={14} /> Import
+            <input ref={importRef} type="file" accept=".json,.csv" multiple onChange={handleImport} className="hidden" />
           </label>
           <button onClick={createProject}
             className="px-4 py-2 rounded-lg text-sm bg-red-acc hover:bg-red-dark text-white transition-colors">
@@ -426,9 +509,9 @@ export default function ProjectsPage() {
           <p className="text-sm mb-4">Create a project, import from JSON, or load a template</p>
           <div className="flex flex-wrap justify-center gap-2">
             <button onClick={createProject} className="px-4 py-2 rounded-lg text-sm bg-red-acc hover:bg-red-dark text-white">Create Project</button>
-            <label className="px-4 py-2 rounded-lg text-sm bg-surface border border-border text-txt2 hover:text-green-acc cursor-pointer">
-              📥 Import JSON
-              <input type="file" accept=".json" multiple onChange={handleImport} className="hidden" />
+            <label className="px-4 py-2 rounded-lg text-sm bg-surface border border-border text-txt2 hover:text-green-acc cursor-pointer inline-flex items-center gap-1.5">
+              <Download size={14} /> Import JSON
+              <input type="file" accept=".json,.csv" multiple onChange={handleImport} className="hidden" />
             </label>
           </div>
         </div>
@@ -457,7 +540,7 @@ export default function ProjectsPage() {
         <div className="space-y-2">
           {templates.length === 0 && (
             <p className="text-sm text-txt3 text-center py-6">
-              No templates yet. Open a project and click "💾 Template" to save one,<br/>or import a template JSON file.
+              No templates yet. Open a project and click &quot;Template&quot; to save one,<br/>or import a template JSON file.
             </p>
           )}
           {templates.map((t) => {

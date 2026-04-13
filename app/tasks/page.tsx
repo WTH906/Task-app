@@ -3,8 +3,13 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { QuickTask } from "@/lib/types";
-import { cn, toLocalDateStr } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import { GCalButton } from "@/components/GCalButton";
+import { reorderRows } from "@/lib/db-helpers";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
+import { fetchQuickTasks } from "@/lib/queries";
+import { useToast } from "@/components/Toast";
+import { CalendarDays, Timer, RefreshCw } from "lucide-react";
 
 const PRIORITY_COLORS: Record<number, { border: string; bg: string; text: string; label: string }> = {
   1: { border: "#4ade80", bg: "rgba(74,222,128,0.06)", text: "#4ade80", label: "Low" },
@@ -15,44 +20,49 @@ const PRIORITY_COLORS: Record<number, { border: string; bg: string; text: string
 };
 
 export default function TaskListPage() {
+  const { userId, loading: authLoading } = useCurrentUser();
+  const { toast } = useToast();
   const [tasks, setTasks] = useState<QuickTask[]>([]);
-  const [userId, setUserId] = useState("");
   const [newName, setNewName] = useState("");
   const [newPriority, setNewPriority] = useState(3);
   const [newNotes, setNewNotes] = useState("");
   const [newDate, setNewDate] = useState("");
   const [newDeadline, setNewDeadline] = useState("");
   const [newRecurrence, setNewRecurrence] = useState("");
-  const [sortDir, setSortDir] = useState<"asc" | "desc" | "manual">("manual");
+  const [sortDir, setSortDir] = useState<"manual" | "priority-asc" | "priority-desc" | "date-asc" | "date-desc">("manual");
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [now] = useState(new Date());
 
-  const today = toLocalDateStr(now);
+  const today = formatDate(now);
 
   const loadTasks = useCallback(async () => {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    setUserId(user.id);
-    const { data } = await supabase.from("quick_tasks").select("*").eq("user_id", user.id).order("sort_order");
-    setTasks(data || []);
-  }, []);
+    if (!userId) return;
+    try {
+      const supabase = createClient();
+      setTasks(await fetchQuickTasks(supabase, userId));
+    } catch (err) {
+      console.error("Tasks load failed:", err);
+      toast("Failed to load tasks", "error");
+    }
+  }, [userId, toast]);
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
   const addTask = async () => {
     if (!newName.trim()) return;
     const supabase = createClient();
-    await supabase.from("quick_tasks").insert({
+    const { data: newTask, error } = await supabase.from("quick_tasks").insert({
       user_id: userId, name: newName.trim(), priority: newPriority,
       notes: newNotes.trim(), date_key: newDate || null,
       deadline: newDeadline || null, recurrence: newRecurrence || null,
       sort_order: tasks.length,
-    });
+    }).select().single();
 
-    // Also create a week_task if date is set
+    if (error || !newTask) return;
+    setTasks((prev) => [...prev, newTask as QuickTask]);
+
     if (newDate) {
       await supabase.from("week_tasks").insert({
         user_id: userId, date_key: newDate, text: newName.trim(),
@@ -60,7 +70,6 @@ export default function TaskListPage() {
       });
     }
 
-    // Create deadline entry if deadline is set
     if (newDeadline) {
       await supabase.from("deadlines").insert({
         user_id: userId,
@@ -72,26 +81,45 @@ export default function TaskListPage() {
 
     setNewName(""); setNewPriority(3); setNewNotes("");
     setNewDate(""); setNewDeadline(""); setNewRecurrence("");
-    loadTasks();
   };
 
   const deleteTask = async (id: string) => {
     const supabase = createClient();
+    const task = tasks.find((t) => t.id === id);
     await supabase.from("quick_tasks").delete().eq("id", id);
     setConfirmId(null);
     setTasks((prev) => prev.filter((t) => t.id !== id));
+
+    // Clean up linked week_task
+    if (task?.date_key) {
+      await supabase.from("week_tasks").delete()
+        .eq("user_id", userId).eq("text", task.name).eq("date_key", task.date_key);
+    }
+    // Clean up linked deadline
+    if (task?.deadline) {
+      await supabase.from("deadlines").delete()
+        .eq("user_id", userId).eq("label", task.name);
+    }
   };
 
-  const updateTask = async (id: string, field: string, value: string | number) => {
+  const updateTask = async (id: string, field: string, value: string | number | null) => {
     const supabase = createClient();
-    await supabase.from("quick_tasks").update({ [field]: value }).eq("id", id);
-    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, [field]: value } : t));
+    const dbValue = value === "" ? null : value;
+    await supabase.from("quick_tasks").update({ [field]: dbValue }).eq("id", id);
+    setTasks((prev) => prev.map((t) => t.id === id ? { ...t, [field]: dbValue } : t));
   };
 
   // Sort
-  const sortedTasks = sortDir === "manual"
-    ? tasks
-    : [...tasks].sort((a, b) => sortDir === "asc" ? a.priority - b.priority : b.priority - a.priority);
+  const sortedTasks = (() => {
+    if (sortDir === "manual") return tasks;
+    if (sortDir === "priority-asc") return [...tasks].sort((a, b) => a.priority - b.priority);
+    if (sortDir === "priority-desc") return [...tasks].sort((a, b) => b.priority - a.priority);
+    // Date sorting — tasks without dates go to the end
+    const noDate = "9999-99-99";
+    if (sortDir === "date-asc") return [...tasks].sort((a, b) => (a.date_key || a.deadline || noDate).localeCompare(b.date_key || b.deadline || noDate));
+    if (sortDir === "date-desc") return [...tasks].sort((a, b) => (b.date_key || b.deadline || "").localeCompare(a.date_key || a.deadline || ""));
+    return tasks;
+  })();
 
   // Drag
   const handleDragStart = (idx: number) => setDragIdx(idx);
@@ -106,9 +134,9 @@ export default function TaskListPage() {
   };
   const handleDragEnd = async () => {
     setDragIdx(null);
-    if (sortDir !== "manual") return;
+    if (sortDir !== "manual" || !userId) return;
     const supabase = createClient();
-    await Promise.all(tasks.map((t, i) => supabase.from("quick_tasks").update({ sort_order: i }).eq("id", t.id)));
+    await reorderRows(supabase, "quick_tasks", tasks.map((t) => t.id), userId);
   };
 
   // Stats
@@ -124,10 +152,15 @@ export default function TaskListPage() {
           <p className="text-sm text-txt2 mt-0.5">Quick tasks, appointments & reminders — no project needed</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setSortDir(sortDir === "asc" ? "desc" : sortDir === "desc" ? "manual" : "asc")}
+          <button onClick={() => setSortDir(sortDir === "priority-asc" ? "priority-desc" : sortDir === "priority-desc" ? "manual" : "priority-asc")}
             className={cn("px-3 py-1.5 rounded-lg border text-xs font-mono transition-colors",
-              sortDir === "manual" ? "border-border text-txt3" : "border-violet/30 text-violet2 bg-violet/10")}>
-            {sortDir === "asc" ? "Priority ↑" : sortDir === "desc" ? "Priority ↓" : "Manual"}
+              sortDir.startsWith("priority") ? "border-violet/30 text-violet2 bg-violet/10" : "border-border text-txt3")}>
+            {sortDir === "priority-asc" ? "Priority ↑" : sortDir === "priority-desc" ? "Priority ↓" : "Priority"}
+          </button>
+          <button onClick={() => setSortDir(sortDir === "date-asc" ? "date-desc" : sortDir === "date-desc" ? "manual" : "date-asc")}
+            className={cn("px-3 py-1.5 rounded-lg border text-xs font-mono transition-colors",
+              sortDir.startsWith("date") ? "border-violet/30 text-violet2 bg-violet/10" : "border-border text-txt3")}>
+            {sortDir === "date-asc" ? "Date ↑" : sortDir === "date-desc" ? "Date ↓" : "Date"}
           </button>
         </div>
       </div>
@@ -161,18 +194,18 @@ export default function TaskListPage() {
           className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-xs text-txt placeholder-txt3" />
         <div className="flex flex-wrap gap-2">
           <div className="flex-1 min-w-[140px]">
-            <label className="block text-[10px] text-txt3 uppercase tracking-wider mb-1">📅 Calendar date</label>
+            <label className="text-[10px] text-txt3 uppercase tracking-wider mb-1 flex items-center gap-1"><CalendarDays size={10} /> Calendar date</label>
             <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)}
               className="w-full bg-surface2 border border-border rounded-lg px-3 py-1.5 text-xs text-txt" />
           </div>
           <div className="flex-1 min-w-[140px]">
-            <label className="block text-[10px] text-txt3 uppercase tracking-wider mb-1">⏳ Deadline</label>
+            <label className="text-[10px] text-txt3 uppercase tracking-wider mb-1 flex items-center gap-1"><Timer size={10} /> Deadline</label>
             <input type="date" value={newDeadline} onChange={(e) => setNewDeadline(e.target.value)}
               className="w-full bg-surface2 border border-border rounded-lg px-3 py-1.5 text-xs text-txt" />
           </div>
           {newDeadline && (
             <div className="flex-1 min-w-[140px]">
-              <label className="block text-[10px] text-txt3 uppercase tracking-wider mb-1">🔄 Recurring</label>
+              <label className="text-[10px] text-txt3 uppercase tracking-wider mb-1 flex items-center gap-1"><RefreshCw size={10} /> Recurring</label>
               <select value={newRecurrence} onChange={(e) => setNewRecurrence(e.target.value)}
                 className="w-full bg-surface2 border border-border rounded-lg px-3 py-1.5 text-xs text-txt">
                 <option value="">No</option>
@@ -234,26 +267,43 @@ export default function TaskListPage() {
                   )}
                   {task.notes && <p className="text-xs text-txt3 mt-0.5">{task.notes}</p>}
 
-                  {/* Date/deadline info */}
+                  {/* Date/deadline info — editable */}
                   <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                    {task.date_key && (
-                      <span className="text-[10px] text-violet2 bg-violet/10 px-1.5 py-0.5 rounded">
-                        📅 {task.date_key}
-                      </span>
-                    )}
-                    {task.deadline && (
-                      <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-mono",
-                        isOverdue ? "text-red-400 bg-red-400/10" : "text-txt3 bg-surface3")}>
-                        ⏳ {task.deadline}
-                        {daysUntilDeadline !== null && (
-                          <span className="ml-1">
-                            {isOverdue ? `${Math.abs(daysUntilDeadline)}d late` : daysUntilDeadline === 0 ? "today" : `${daysUntilDeadline}d`}
-                          </span>
-                        )}
-                      </span>
-                    )}
+                    <label className="text-[10px] text-violet2 bg-violet/10 px-1.5 py-0.5 rounded inline-flex items-center gap-1 cursor-pointer">
+                      <CalendarDays size={10} />
+                      <input type="date" value={task.date_key || ""}
+                        onChange={(e) => {
+                          const val = e.target.value || null;
+                          setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, date_key: val } : t));
+                          updateTask(task.id, "date_key", val || "");
+                        }}
+                        className="bg-transparent border-none text-[10px] text-violet2 w-[105px] outline-none cursor-pointer"
+                        title="Calendar date" />
+                      {task.date_key && (
+                        <button onClick={(e) => { e.stopPropagation(); updateTask(task.id, "date_key", ""); setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, date_key: null } : t)); }}
+                          className="text-violet2/50 hover:text-violet2 text-[10px]">✕</button>
+                      )}
+                    </label>
+                    <label className={cn("text-[10px] px-1.5 py-0.5 rounded inline-flex items-center gap-1 cursor-pointer",
+                      isOverdue ? "text-red-400 bg-red-400/10" : "text-txt3 bg-surface3")}>
+                      <Timer size={10} />
+                      <input type="date" value={task.deadline || ""}
+                        onChange={(e) => {
+                          const val = e.target.value || null;
+                          setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, deadline: val } : t));
+                          updateTask(task.id, "deadline", val || "");
+                        }}
+                        className="bg-transparent border-none text-[10px] w-[105px] outline-none cursor-pointer"
+                        style={{ color: "inherit" }}
+                        title="Deadline" />
+                      {task.deadline && daysUntilDeadline !== null && (
+                        <span className="text-[10px]">
+                          {isOverdue ? `${Math.abs(daysUntilDeadline)}d late` : daysUntilDeadline === 0 ? "today" : `${daysUntilDeadline}d`}
+                        </span>
+                      )}
+                    </label>
                     {task.recurrence && (
-                      <span className="text-[10px] text-txt3">🔄 {task.recurrence}</span>
+                      <span className="text-[10px] text-txt3 inline-flex items-center gap-1"><RefreshCw size={10} /> {task.recurrence}</span>
                     )}
                   </div>
                 </div>

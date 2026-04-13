@@ -4,11 +4,18 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { WeekTask, WeekDay } from "@/lib/types";
-import { DAY_COLORS, DAY_NAMES_FULL, cn, addDays, toLocalDateStr } from "@/lib/utils";
+import { DAY_COLORS, DAY_NAMES_FULL, cn, addDays, formatDate } from "@/lib/utils";
+import { syncTaskCompletion } from "@/lib/sync";
+import { reorderRows } from "@/lib/db-helpers";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
+import { fetchWeekTasksForDate, fetchWeekDayMetaSingle, fetchWeekTemplateSingle, fetchProjectsSlim, fetchProjectTasksSlim } from "@/lib/queries";
+import { useToast } from "@/components/Toast";
 
 export default function DayDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { userId } = useCurrentUser();
+  const { toast } = useToast();
   const dateKey = params.date as string;
   const dateObj = new Date(dateKey + "T00:00:00");
   const dayNum = dateObj.getDay();
@@ -19,7 +26,6 @@ export default function DayDetailPage() {
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [newTask, setNewTask] = useState("");
-  const [userId, setUserId] = useState("");
   const [now, setNow] = useState(new Date());
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [projects, setProjects] = useState<Array<{ id: string; title: string; color: string }>>([]);
@@ -28,49 +34,36 @@ export default function DayDetailPage() {
   const [linkParentTask, setLinkParentTask] = useState<string | null>(null);
   const [projectTasks, setProjectTasks] = useState<Array<{ id: string; name: string }>>([]);
 
-  const today = toLocalDateStr(new Date());
+  const today = formatDate(new Date());
   const isToday = dateKey === today;
 
   const load = useCallback(async () => {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    setUserId(user.id);
+    if (!userId) return;
+    try {
+      const supabase = createClient();
 
-    const { data: taskData } = await supabase
-      .from("week_tasks")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("date_key", dateKey)
-      .order("sort_order");
+      const [taskData, meta, projs] = await Promise.all([
+        fetchWeekTasksForDate(supabase, userId, dateKey),
+        fetchWeekDayMetaSingle(supabase, userId, dateKey),
+        fetchProjectsSlim(supabase, userId),
+      ]);
 
-    setTasks(taskData || []);
+      setTasks(taskData);
+      setProjects(projs);
 
-    const { data: meta } = await supabase
-      .from("week_days")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("date_key", dateKey)
-      .maybeSingle();
-
-    if (meta) {
-      setDayMeta(meta);
-      setTitle(meta.title);
-      setNotes(meta.notes);
-    } else {
-      // Check template
-      const { data: tmpl } = await supabase
-        .from("week_templates")
-        .select("title")
-        .eq("user_id", user.id)
-        .eq("weekday", dayNum)
-        .maybeSingle();
-      if (tmpl) setTitle(tmpl.title);
+      if (meta) {
+        setDayMeta(meta);
+        setTitle(meta.title);
+        setNotes(meta.notes);
+      } else {
+        const tmplTitle = await fetchWeekTemplateSingle(supabase, userId, dayNum);
+        if (tmplTitle) setTitle(tmplTitle);
+      }
+    } catch (err) {
+      console.error("Day load failed:", err);
+      toast("Failed to load day", "error");
     }
-
-    const { data: projs } = await supabase.from("projects").select("id, title, color").eq("user_id", user.id);
-    setProjects((projs || []) as Array<{ id: string; title: string; color: string }>);
-  }, [dateKey, dayNum]);
+  }, [dateKey, dayNum, userId, toast]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -112,11 +105,39 @@ export default function DayDetailPage() {
     setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, done: newDone } : t));
     await supabase.from("week_tasks").update({ done: newDone }).eq("id", task.id);
     if (task.project_task_id) {
-      // Check subtasks
-      const { data: subs } = await supabase.from("subtasks").select("id").eq("task_id", task.project_task_id).limit(1);
-      if (!subs || subs.length === 0) {
-        await supabase.from("project_tasks").update({ progress: newDone ? 100 : 0 }).eq("id", task.project_task_id);
+      const isSubtaskEntry = task.text.includes("↳");
+      const newProgress = newDone ? 100 : 0;
+
+      if (isSubtaskEntry) {
+        const subName = task.text.split("↳").pop()?.trim() || "";
+        const { data: matchedSub } = await supabase
+          .from("subtasks").select("id").eq("task_id", task.project_task_id)
+          .ilike("name", subName).limit(1).maybeSingle();
+        if (matchedSub) {
+          await supabase.from("subtasks").update({ progress: newProgress }).eq("id", matchedSub.id);
+        }
+        const { data: allSubs } = await supabase
+          .from("subtasks").select("progress").eq("task_id", task.project_task_id);
+        if (allSubs && allSubs.length > 0) {
+          const avg = Math.round(allSubs.reduce((s, st) => s + st.progress, 0) / allSubs.length);
+          await supabase.from("project_tasks").update({ progress: avg }).eq("id", task.project_task_id);
+          await syncTaskCompletion(supabase, userId, task.project_task_id, avg);
+        }
+      } else {
+        const { data: subs } = await supabase.from("subtasks").select("id").eq("task_id", task.project_task_id).limit(1);
+        if (!subs || subs.length === 0) {
+          await supabase.from("project_tasks").update({ progress: newProgress }).eq("id", task.project_task_id);
+        } else {
+          await supabase.from("subtasks").update({ progress: newProgress }).eq("task_id", task.project_task_id);
+          await supabase.from("project_tasks").update({ progress: newProgress }).eq("id", task.project_task_id);
+        }
+        await syncTaskCompletion(supabase, userId, task.project_task_id, newProgress);
       }
+    }
+    // If marking done and this came from a quick task, remove it from quick_tasks
+    if (newDone && !task.project_task_id) {
+      await supabase.from("quick_tasks").delete()
+        .eq("user_id", userId).eq("name", task.text).eq("date_key", task.date_key);
     }
   };
 
@@ -125,7 +146,9 @@ export default function DayDetailPage() {
     const supabase = createClient();
     const text = newTask.trim();
     const proj = linkProject ? projects.find((p) => p.id === linkProject) : null;
-    const taggedText = proj ? `[${proj.title}] ${text}` : text;
+    const taggedText = proj
+      ? (linkType === "subtask" ? `[${proj.title}] ↳ ${text}` : `[${proj.title}] ${text}`)
+      : text;
 
     let projectTaskId: string | null = null;
 
@@ -143,39 +166,47 @@ export default function DayDetailPage() {
         notes: "", sort_order: 999,
       });
       projectTaskId = linkParentTask;
+      // Recalc parent progress to include the new 0% subtask
+      const { data: allSubs } = await supabase
+        .from("subtasks").select("progress").eq("task_id", linkParentTask);
+      if (allSubs && allSubs.length > 0) {
+        const avg = Math.round(allSubs.reduce((s: number, st: { progress: number }) => s + st.progress, 0) / allSubs.length);
+        await supabase.from("project_tasks").update({ progress: avg }).eq("id", linkParentTask);
+      }
     }
 
-    await supabase.from("week_tasks").insert({
+    const { data: newWeekTask } = await supabase.from("week_tasks").insert({
       user_id: userId, date_key: dateKey, text: taggedText,
       sort_order: tasks.length,
       project_id: proj?.id || null,
       project_task_id: projectTaskId,
-    });
+    }).select().single();
+
+    if (newWeekTask) {
+      setTasks((prev) => [...prev, newWeekTask as WeekTask]);
+    }
 
     setNewTask("");
     setLinkProject(null);
     setLinkType("none");
     setLinkParentTask(null);
     setProjectTasks([]);
-    load();
   };
 
   const loadProjectTasksForLink = async (projectId: string) => {
     const supabase = createClient();
-    const { data } = await supabase.from("project_tasks")
-      .select("id, name").eq("project_id", projectId).order("sort_order");
-    setProjectTasks(data || []);
+    setProjectTasks(await fetchProjectTasksSlim(supabase, projectId));
   };
 
   const deleteTask = async (id: string) => {
     const supabase = createClient();
     await supabase.from("week_tasks").delete().eq("id", id);
-    load();
+    setTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
   const carryOver = async () => {
     const supabase = createClient();
-    const yesterday = toLocalDateStr(addDays(dateObj, -1));
+    const yesterday = formatDate(addDays(dateObj, -1));
     const { data: yestTasks } = await supabase
       .from("week_tasks")
       .select("*")
@@ -185,17 +216,19 @@ export default function DayDetailPage() {
 
     if (!yestTasks?.length) { alert("No unfinished tasks from yesterday"); return; }
 
+    const newTasks: WeekTask[] = [];
     for (const t of yestTasks) {
-      await supabase.from("week_tasks").insert({
+      const { data: copied } = await supabase.from("week_tasks").insert({
         user_id: userId,
         date_key: dateKey,
         text: t.text,
         project_id: t.project_id,
         project_task_id: t.project_task_id,
-        sort_order: tasks.length,
-      });
+        sort_order: tasks.length + newTasks.length,
+      }).select().single();
+      if (copied) newTasks.push(copied as WeekTask);
     }
-    load();
+    setTasks((prev) => [...prev, ...newTasks]);
   };
 
   // Drag
@@ -211,14 +244,13 @@ export default function DayDetailPage() {
   };
   const handleDragEnd = async () => {
     setDragIdx(null);
+    if (!userId) return;
     const supabase = createClient();
-    await Promise.all(tasks.map((t, i) =>
-      supabase.from("week_tasks").update({ sort_order: i }).eq("id", t.id)
-    ));
+    await reorderRows(supabase, "week_tasks", tasks.map((t) => t.id), userId);
   };
 
-  const prevDay = toLocalDateStr(addDays(dateObj, -1));
-  const nextDay = toLocalDateStr(addDays(dateObj, 1));
+  const prevDay = formatDate(addDays(dateObj, -1));
+  const nextDay = formatDate(addDays(dateObj, 1));
 
   const dateLabel = dateObj.toLocaleDateString("en-US", {
     weekday: "long",

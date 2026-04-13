@@ -25,12 +25,17 @@ export function InlineEdit({
   const [draft, setDraft] = useState(value);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const debounceRef = useRef<NodeJS.Timeout>();
+  const editingRef = useRef(false);
 
+  // Only sync value → draft when NOT editing (prevents mid-type resets)
   useEffect(() => {
-    setDraft(value);
+    if (!editingRef.current) {
+      setDraft(value);
+    }
   }, [value]);
 
   useEffect(() => {
+    editingRef.current = editing;
     if (editing && inputRef.current) {
       inputRef.current.focus();
       if (type !== "number") {
@@ -39,8 +44,14 @@ export function InlineEdit({
     }
   }, [editing, type]);
 
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, []);
+
   const save = useCallback(
     (val: string) => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
       const trimmed = val.trim();
       if (type === "number") {
         const num = parseInt(trimmed) || 0;
@@ -57,9 +68,25 @@ export function InlineEdit({
     setDraft(val);
     if (type === "textarea") {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => onSave(val), 300);
+      debounceRef.current = setTimeout(() => {
+        onSave(val);
+      }, 800);
     }
   };
+
+  // Track whether save already fired to prevent blur double-save
+  const savedRef = useRef(false);
+
+  const wrappedSave = useCallback(
+    (val: string) => {
+      if (savedRef.current) return;
+      savedRef.current = true;
+      save(val);
+      // Reset after a tick so next edit cycle works
+      setTimeout(() => { savedRef.current = false; }, 50);
+    },
+    [save]
+  );
 
   if (!editing) {
     return (
@@ -81,7 +108,7 @@ export function InlineEdit({
         ref={inputRef as React.RefObject<HTMLTextAreaElement>}
         value={draft}
         onChange={(e) => handleChange(e.target.value)}
-        onBlur={() => { save(draft); }}
+        onBlur={() => wrappedSave(draft)}
         onKeyDown={(e) => {
           if (e.key === "Escape") { setDraft(value); setEditing(false); }
         }}
