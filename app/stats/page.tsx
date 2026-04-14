@@ -57,6 +57,8 @@ export default function StatsPage() {
   const [loading, setLoading] = useState(true);
   const [monthlyEnabled, setMonthlyEnabled] = useState(false);
 
+  useEffect(() => { document.title = "Comfy Board — Stats"; }, []);
+
   useEffect(() => {
     setMonthlyEnabled(localStorage.getItem("comfy-monthly-routine") === "true");
   }, []);

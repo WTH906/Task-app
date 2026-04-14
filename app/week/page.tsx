@@ -77,6 +77,8 @@ export default function WeekPage() {
     }
   }, [weekStart, monthDate, viewMode, userId, toast]);
 
+  useEffect(() => { document.title = "Comfy Board — Week Planner"; }, []);
+
   useEffect(() => { loadData(); }, [loadData]);
   useEffect(() => { const iv = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(iv); }, []);
 

@@ -65,6 +65,8 @@ export default function DayDetailPage() {
     }
   }, [dateKey, dayNum, userId, toast]);
 
+  useEffect(() => { document.title = `Comfy Board — ${DAY_NAMES_FULL[dayNum]} ${dateKey}`; }, [dayNum, dateKey]);
+
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {

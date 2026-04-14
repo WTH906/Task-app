@@ -65,6 +65,8 @@ export default function ProjectDetailPage() {
   const loadIdRef = useRef(0);
 
   // Close menu on outside click
+  useEffect(() => { document.title = project ? `Comfy Board — ${project.title}` : "Comfy Board — Project"; }, [project]);
+
   useEffect(() => {
     if (!menuOpen && !subMenuOpen) return;
     const handler = () => { setMenuOpen(null); setSubMenuOpen(null); };
@@ -1056,7 +1058,7 @@ export default function ProjectDetailPage() {
                   {/* Menu */}
                   <div className="relative">
                     <button
-                      onClick={() => setMenuOpen(menuOpen === task.id ? null : task.id)}
+                      onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === task.id ? null : task.id); setSubMenuOpen(null); }}
                       className="w-6 h-6 flex items-center justify-center rounded hover:bg-surface2 text-txt3"
                     >
                       ⋯
@@ -1168,7 +1170,7 @@ export default function ProjectDetailPage() {
                         />
                         {/* Subtask 3-dot menu */}
                         <div className="relative">
-                          <button onClick={(e) => { e.stopPropagation(); setSubMenuOpen(subMenuOpen === sub.id ? null : sub.id); }}
+                          <button onClick={(e) => { e.stopPropagation(); setSubMenuOpen(subMenuOpen === sub.id ? null : sub.id); setMenuOpen(null); }}
                             className="w-6 h-6 flex items-center justify-center rounded hover:bg-surface3 text-txt3 text-[10px]">⋯</button>
                           {subMenuOpen === sub.id && (
                             <div className="absolute right-0 top-full mt-1 bg-surface2 border border-border rounded-lg shadow-xl py-1 w-40 z-20">
@@ -1238,14 +1240,40 @@ export default function ProjectDetailPage() {
             />
           </div>
           <div>
-            <label className="block text-sm text-txt2 mb-1.5">Est. minutes</label>
-            <input
-              type="number"
-              value={formEst}
-              onChange={(e) => setFormEst(parseInt(e.target.value) || 0)}
-              min={0}
-              className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm"
-            />
+            <label className="block text-sm text-txt2 mb-1.5">Estimated time</label>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  value={Math.floor(formEst / 60) || ""}
+                  onChange={(e) => {
+                    const h = parseInt(e.target.value) || 0;
+                    setFormEst(Math.max(0, h * 60 + (formEst % 60)));
+                  }}
+                  onFocus={(e) => { if (e.target.value === "0") e.target.value = ""; e.target.select(); }}
+                  min={0}
+                  placeholder="0"
+                  className="w-16 bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm"
+                />
+                <span className="text-xs text-txt3">h</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  value={formEst % 60 || ""}
+                  onChange={(e) => {
+                    const m = Math.min(59, Math.max(0, parseInt(e.target.value) || 0));
+                    setFormEst(Math.floor(formEst / 60) * 60 + m);
+                  }}
+                  onFocus={(e) => { if (e.target.value === "0") e.target.value = ""; e.target.select(); }}
+                  min={0}
+                  max={59}
+                  placeholder="0"
+                  className="w-16 bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm"
+                />
+                <span className="text-xs text-txt3">min</span>
+              </div>
+            </div>
           </div>
           <div>
             <label className="text-sm text-txt2 mb-1.5 flex items-center gap-1.5"><CalendarDays size={14} /> Schedule on calendar</label>

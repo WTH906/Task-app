@@ -55,6 +55,8 @@ export default function RoadmapPage() {
   const saveTimer = useRef<NodeJS.Timeout | null>(null);
   const [dragMilestone, setDragMilestone] = useState<{ pi: number; mi: number } | null>(null);
 
+  useEffect(() => { document.title = "Comfy Board — Roadmap"; }, []);
+
   useEffect(() => {
     if (!userId) return;
     const load = async () => {

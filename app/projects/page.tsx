@@ -24,6 +24,8 @@ export default function ProjectsPage() {
   const importRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
+  useEffect(() => { document.title = "Comfy Board — Projects"; }, []);
+
   useEffect(() => {
     if (!userId) return;
     const load = async () => {

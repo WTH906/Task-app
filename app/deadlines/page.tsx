@@ -62,6 +62,8 @@ export default function DeadlinesPage() {
     }
   }, [userId, toast]);
 
+  useEffect(() => { document.title = "Comfy Board — Deadlines"; }, []);
+
   useEffect(() => { load(); }, [load]);
   useEffect(() => { const iv = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(iv); }, []);
 

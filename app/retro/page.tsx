@@ -24,6 +24,8 @@ export default function RetroPlanningPage() {
 
   const today = formatDate(new Date());
 
+  useEffect(() => { document.title = "Comfy Board — Retro Planning"; }, []);
+
   useEffect(() => {
     if (!userId) return;
     const load = async () => {

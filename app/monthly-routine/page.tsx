@@ -38,6 +38,8 @@ export default function MonthlyRoutinePage() {
     }
   }, [userId, monthKey, toast]);
 
+  useEffect(() => { document.title = "Comfy Board — Monthly Routine"; }, []);
+
   useEffect(() => { if (!authLoading && userId) loadTasks(); }, [authLoading, userId, loadTasks]);
 
   const toggleCheck = async (task: MonthlyRoutineTask) => {
@@ -164,9 +166,21 @@ export default function MonthlyRoutinePage() {
               className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm" autoFocus />
           </div>
           <div>
-            <label className="block text-sm text-txt2 mb-1.5">Est. minutes</label>
-            <input type="number" value={formEst} onChange={(e) => setFormEst(parseInt(e.target.value) || 0)} min={0}
-              className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm" />
+            <label className="block text-sm text-txt2 mb-1.5">Estimated time</label>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <input type="number" value={Math.floor(formEst / 60) || ""} onChange={(e) => { const h = parseInt(e.target.value) || 0; setFormEst(Math.max(0, h * 60 + (formEst % 60))); }}
+                  onFocus={(e) => { if (e.target.value === "0") e.target.value = ""; e.target.select(); }} min={0} placeholder="0"
+                  className="w-16 bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm" />
+                <span className="text-xs text-txt3">h</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <input type="number" value={formEst % 60 || ""} onChange={(e) => { const m = Math.min(59, Math.max(0, parseInt(e.target.value) || 0)); setFormEst(Math.floor(formEst / 60) * 60 + m); }}
+                  onFocus={(e) => { if (e.target.value === "0") e.target.value = ""; e.target.select(); }} min={0} max={59} placeholder="0"
+                  className="w-16 bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm" />
+                <span className="text-xs text-txt3">min</span>
+              </div>
+            </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button onClick={() => setModalOpen(false)} className="px-4 py-2 rounded-lg text-sm text-txt2 hover:bg-surface3">Cancel</button>

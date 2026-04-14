@@ -48,6 +48,8 @@ export default function TaskListPage() {
     }
   }, [userId, toast]);
 
+  useEffect(() => { document.title = "Comfy Board — Task List"; }, []);
+
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
   const addTask = async () => {
