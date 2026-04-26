@@ -19,6 +19,20 @@ export function ImportModal({ open, onClose, userId, onComplete }: ImportModalPr
   const [done, setDone] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const MAX_FILE_SIZE = 2_000_000; // 2MB
+  const MAX_TASKS = 500;
+  const MAX_STRING = 200;
+
+  // Validation helpers
+  const clampStr = (v: unknown, max = MAX_STRING): string => {
+    const s = typeof v === "string" ? v.trim() : "";
+    return s.slice(0, max);
+  };
+  const clampInt = (v: unknown, min = 0, max = 100_000): number => {
+    const n = typeof v === "number" ? Math.round(v) : parseInt(String(v)) || 0;
+    return Math.max(min, Math.min(max, n));
+  };
+
   const processFiles = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
     setImporting(true);
@@ -30,6 +44,13 @@ export function ImportModal({ open, onClose, userId, onComplete }: ImportModalPr
 
     for (const file of files) {
       try {
+        // File size check
+        if (file.size > MAX_FILE_SIZE) {
+          lines.push(`✗ ${file.name}: file too large (${(file.size / 1_000_000).toFixed(1)}MB, max 2MB)`);
+          setLog([...lines]);
+          continue;
+        }
+
         const text = await file.text();
         const data = JSON.parse(text);
         const type = detectFileType(data);
@@ -71,55 +92,69 @@ export function ImportModal({ open, onClose, userId, onComplete }: ImportModalPr
     data: Record<string, unknown>,
     log: string[]
   ) {
-    const title = (data.title || data.name || "Imported") as string;
-    const tasks = (data.tasks || []) as Array<Record<string, unknown>>;
+    const title = clampStr(data.title || data.name || "Imported");
+    const rawTasks = (data.tasks || []) as Array<Record<string, unknown>>;
+
+    if (!title) { log.push("  ✗ Missing project title"); return; }
+    if (rawTasks.length > MAX_TASKS) {
+      log.push(`  ✗ Too many tasks (${rawTasks.length}, max ${MAX_TASKS})`);
+      return;
+    }
 
     const { data: proj } = await supabase
       .from("projects")
       .insert({
         user_id: userId, title,
-        description: (data.description as string) || "",
-        elapsed_seconds: (data.elapsed_seconds as number) || 0,
-        alarm_fired: (data.alarm_fired as boolean) || false,
+        description: clampStr(data.description, 2000),
+        elapsed_seconds: clampInt(data.elapsed_seconds),
         sort_order: 999,
       })
       .select().single();
 
     if (!proj) { log.push(`  ✗ Failed to create "${title}"`); return; }
 
-    let tc = 0, sc = 0;
-    for (let i = 0; i < tasks.length; i++) {
-      const t = tasks[i];
-      const { data: task } = await supabase
-        .from("project_tasks")
-        .insert({
-          project_id: proj.id, user_id: userId,
-          name: t.name as string, est_minutes: (t.est_minutes as number) || 0,
-          deadline: cleanDeadline(t.deadline), progress: (t.progress as number) || 0,
-          notes: (t.notes as string) || "", elapsed_seconds: (t.elapsed_seconds as number) || 0,
-          sort_order: i,
-        })
-        .select().single();
-      if (!task) continue;
-      tc++;
+    // Bulk insert tasks
+    const taskInserts = rawTasks.slice(0, MAX_TASKS).map((t, i) => ({
+      project_id: proj.id, user_id: userId,
+      name: clampStr(t.name) || `Task ${i + 1}`,
+      est_minutes: clampInt(t.est_minutes),
+      deadline: cleanDeadline(t.deadline),
+      progress: clampInt(t.progress, 0, 100),
+      notes: clampStr(t.notes, 2000),
+      elapsed_seconds: clampInt(t.elapsed_seconds),
+      sort_order: i,
+    }));
 
-      const subs = (t.subtasks || []) as Array<Record<string, unknown>>;
-      for (let j = 0; j < subs.length; j++) {
-        const s = subs[j];
-        await supabase.from("subtasks").insert({
-          task_id: task.id, user_id: userId,
-          name: s.name as string, est_minutes: (s.est_minutes as number) || 0,
-          deadline: cleanDeadline(s.deadline), progress: (s.progress as number) || 0,
-          notes: (s.notes as string) || "", sort_order: j,
-        });
-        sc++;
-      }
-      if (subs.length > 0) {
-        const avg = Math.round(subs.reduce((sum, s) => sum + ((s.progress as number) || 0), 0) / subs.length);
-        await supabase.from("project_tasks").update({ progress: avg }).eq("id", task.id);
-      }
+    const { data: insertedTasks } = await supabase
+      .from("project_tasks")
+      .insert(taskInserts)
+      .select("id");
+
+    if (!insertedTasks) { log.push(`  ✗ Failed to insert tasks`); return; }
+
+    let sc = 0;
+    for (let i = 0; i < rawTasks.length && i < insertedTasks.length; i++) {
+      const subs = (rawTasks[i].subtasks || []) as Array<Record<string, unknown>>;
+      if (subs.length === 0) continue;
+
+      const subInserts = subs.slice(0, MAX_TASKS).map((s, j) => ({
+        task_id: insertedTasks[i].id, user_id: userId,
+        name: clampStr(s.name) || `Subtask ${j + 1}`,
+        est_minutes: clampInt(s.est_minutes),
+        deadline: cleanDeadline(s.deadline),
+        progress: clampInt(s.progress, 0, 100),
+        notes: clampStr(s.notes, 2000),
+        sort_order: j,
+      }));
+
+      await supabase.from("subtasks").insert(subInserts);
+      sc += subInserts.length;
+
+      // Recalc parent progress
+      const avg = Math.round(subInserts.reduce((sum, s) => sum + s.progress, 0) / subInserts.length);
+      await supabase.from("project_tasks").update({ progress: avg }).eq("id", insertedTasks[i].id);
     }
-    log.push(`  ✓ "${title}" — ${tc} tasks, ${sc} subtasks`);
+    log.push(`  ✓ "${title}" — ${insertedTasks.length} tasks, ${sc} subtasks`);
   }
 
   async function importTemplate(
@@ -127,14 +162,15 @@ export function ImportModal({ open, onClose, userId, onComplete }: ImportModalPr
     data: Record<string, unknown>,
     log: string[]
   ) {
-    const name = (data.name as string) || "Imported Template";
+    const name = clampStr(data.name) || "Imported Template";
     const tasks = (data.tasks || []) as Array<Record<string, unknown>>;
-    const taskData = tasks.map((t) => ({
-      name: t.name as string, est_minutes: (t.est_minutes as number) || 0,
-      deadline: cleanDeadline(t.deadline), progress: 0, notes: (t.notes as string) || "",
-      subtasks: ((t.subtasks || []) as Array<Record<string, unknown>>).map((s) => ({
-        name: s.name as string, est_minutes: (s.est_minutes as number) || 0,
-        deadline: cleanDeadline(s.deadline), progress: 0, notes: (s.notes as string) || "",
+    if (tasks.length > MAX_TASKS) { log.push(`  ✗ Too many tasks (${tasks.length}, max ${MAX_TASKS})`); return; }
+    const taskData = tasks.slice(0, MAX_TASKS).map((t) => ({
+      name: clampStr(t.name), est_minutes: clampInt(t.est_minutes),
+      deadline: cleanDeadline(t.deadline), progress: 0, notes: clampStr(t.notes, 2000),
+      subtasks: ((t.subtasks || []) as Array<Record<string, unknown>>).slice(0, MAX_TASKS).map((s) => ({
+        name: clampStr(s.name), est_minutes: clampInt(s.est_minutes),
+        deadline: cleanDeadline(s.deadline), progress: 0, notes: clampStr(s.notes, 2000),
       })),
       elapsed_seconds: 0,
     }));
@@ -166,15 +202,13 @@ export function ImportModal({ open, onClose, userId, onComplete }: ImportModalPr
   ) {
     const tasks = (data.tasks || []) as Array<{ text?: string; name?: string; est_minutes?: number }>;
     if (tasks.length === 0) { log.push("  ⏭ No routine tasks"); return; }
-    let c = 0;
-    for (let i = 0; i < tasks.length; i++) {
-      const t = tasks[i];
-      const text = t.text || t.name;
-      if (!text) continue;
-      await supabase.from("routine_tasks").insert({ user_id: userId, text, est_minutes: t.est_minutes || 0, sort_order: i });
-      c++;
-    }
-    log.push(`  ✓ ${c} routine tasks imported`);
+    const inserts = tasks
+      .map((t, i) => ({ user_id: userId, text: clampStr(t.text || t.name), est_minutes: clampInt(t.est_minutes), sort_order: i }))
+      .filter((t) => t.text.length > 0)
+      .slice(0, MAX_TASKS);
+    if (inserts.length === 0) { log.push("  ⏭ No valid routine tasks"); return; }
+    await supabase.from("routine_tasks").insert(inserts);
+    log.push(`  ✓ ${inserts.length} routine tasks imported`);
   }
 
   const handleDrop = (e: React.DragEvent) => {

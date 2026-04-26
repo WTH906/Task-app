@@ -174,19 +174,11 @@ export default function DashboardPage() {
       return;
     }
     if (task.project_task_id) {
-      const isSubtaskEntry = task.text.includes("↳");
       const newProgress = newDone ? 100 : 0;
 
-      if (isSubtaskEntry) {
-        // This week_task represents a specific subtask — update only that one
-        const subName = task.text.split("↳").pop()?.trim() || "";
-        const { data: matchedSub } = await supabase
-          .from("subtasks").select("id").eq("task_id", task.project_task_id)
-          .ilike("name", subName).limit(1).maybeSingle();
-        if (matchedSub) {
-          await supabase.from("subtasks").update({ progress: newProgress }).eq("id", matchedSub.id);
-        }
-        // Recalc parent from all subtasks
+      if (task.subtask_id) {
+        // Subtask entry — update via FK
+        await supabase.from("subtasks").update({ progress: newProgress }).eq("id", task.subtask_id);
         const { data: allSubs } = await supabase
           .from("subtasks").select("progress").eq("task_id", task.project_task_id);
         if (allSubs && allSubs.length > 0) {
@@ -647,13 +639,13 @@ export default function DashboardPage() {
         <div className="flex items-end gap-3 mt-1">
           <h1 className="font-title text-3xl text-bright">Comfy Board</h1>
           <span className="text-lg font-mono text-violet2 mb-0.5">{timeStr}</span>
-          <div className="relative mb-1 ml-auto">
+          <div className="relative mb-1">
             <button onClick={() => setShowOptions(!showOptions)}
               className="flex items-center gap-1.5 text-xs text-txt3 hover:text-txt2 bg-surface border border-border hover:border-border2 rounded-lg px-2.5 py-1.5 transition-colors">
               <Settings size={14} /> Options
             </button>
             {showOptions && (
-              <div className="absolute top-full right-0 mt-1 bg-surface border border-border rounded-lg shadow-lg p-1 z-50 whitespace-nowrap">
+              <div className="absolute top-full left-0 mt-1 bg-surface border border-border rounded-lg shadow-lg p-1 z-50 whitespace-nowrap">
                 <button onClick={() => { cleanupOrphanedTasks(); setShowOptions(false); }}
                   className="flex items-center gap-2 px-3 py-2 text-xs text-txt2 hover:bg-surface3 rounded w-full text-left">
                   <Trash2 size={13} /> Clean up orphaned calendar tasks

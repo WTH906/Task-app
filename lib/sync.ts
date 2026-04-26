@@ -74,6 +74,80 @@ export async function syncProjectTaskToWeek(
 }
 
 /**
+ * Sync a subtask to the weekly planner.
+ * Creates/updates/removes a week_task linked by subtask_id (the FK, not text matching).
+ * Also stores project_task_id (parent) and project_id for cross-joins.
+ */
+export async function syncSubtaskToWeek(
+  supabase: SupabaseClient,
+  userId: string,
+  subtaskId: string,
+  parentTaskId: string,
+  subtaskName: string,
+  projectId: string,
+  projectTitle: string,
+  calendarDate: string | null,
+): Promise<{ error?: string }> {
+  try {
+    // If date was removed, delete linked week_task
+    if (!calendarDate) {
+      const { error } = await supabase
+        .from("week_tasks")
+        .delete()
+        .eq("subtask_id", subtaskId)
+        .eq("user_id", userId);
+      if (error) return { error: error.message };
+      return {};
+    }
+
+    // ↳ in display text is purely cosmetic now — not used for matching
+    const text = `[${projectTitle}] ↳ ${subtaskName}`;
+
+    // Match by subtask_id (FK)
+    const { data: existing, error: findErr } = await supabase
+      .from("week_tasks")
+      .select("id")
+      .eq("subtask_id", subtaskId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (findErr) return { error: findErr.message };
+
+    if (existing) {
+      const { error } = await supabase
+        .from("week_tasks")
+        .update({ text, date_key: calendarDate })
+        .eq("id", existing.id);
+      if (error) return { error: error.message };
+    } else {
+      const { data: maxOrder } = await supabase
+        .from("week_tasks")
+        .select("sort_order")
+        .eq("user_id", userId)
+        .eq("date_key", calendarDate)
+        .order("sort_order", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const { error } = await supabase.from("week_tasks").insert({
+        user_id: userId,
+        date_key: calendarDate,
+        text,
+        done: false,
+        project_id: projectId,
+        project_task_id: parentTaskId,
+        subtask_id: subtaskId,
+        sort_order: (maxOrder?.sort_order ?? -1) + 1,
+      });
+      if (error) return { error: error.message };
+    }
+    return {};
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
+/**
  * Sync a project task's deadline to the Deadlines tab.
  * Uses source_task_id foreign key (not label matching).
  */
@@ -165,12 +239,14 @@ export async function syncTaskCompletion(
   try {
     const isDone = progress >= 100;
 
-    // Mark linked week_tasks
+    // Mark linked week_tasks — only main task entries (not subtask entries)
+    // Subtask week_tasks have their own independent done state
     const { data: linkedWeek, error: weekErr } = await supabase
       .from("week_tasks")
       .select("id")
       .eq("project_task_id", taskId)
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .is("subtask_id", null);
 
     if (weekErr) return { error: weekErr.message };
 

@@ -9,6 +9,7 @@ import { Modal } from "@/components/Modal";
 import { reorderRows } from "@/lib/db-helpers";
 import { useToast } from "@/components/Toast";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
+import { useUserSettings } from "@/lib/hooks/useUserSettings";
 import { fetchWeeklyRoutineWithChecks } from "@/lib/queries";
 
 export default function WeeklyRoutinePage() {
@@ -156,20 +157,16 @@ export default function WeeklyRoutinePage() {
   const totalEst = tasks.reduce((s, t) => s + t.est_minutes, 0);
   const remainEst = tasks.filter((t) => !t.checked).reduce((s, t) => s + t.est_minutes, 0);
 
-  const [monthlyEnabled, setMonthlyEnabled] = useState(false);
-  useEffect(() => { setMonthlyEnabled(localStorage.getItem("comfy-monthly-routine") === "true"); }, []);
+  const { settings, updateSetting } = useUserSettings(userId);
+  const monthlyEnabled = settings.monthly_routine_enabled;
 
   const enableMonthly = () => {
-    localStorage.setItem("comfy-monthly-routine", "true");
-    setMonthlyEnabled(true);
-    window.dispatchEvent(new Event("monthly-routine-changed"));
+    updateSetting("monthly_routine_enabled", true);
     toast("Monthly routine added to sidebar!", "success");
   };
 
   const disableMonthly = () => {
-    localStorage.setItem("comfy-monthly-routine", "false");
-    setMonthlyEnabled(false);
-    window.dispatchEvent(new Event("monthly-routine-changed"));
+    updateSetting("monthly_routine_enabled", false);
     toast("Monthly routine removed from sidebar", "info");
   };
 

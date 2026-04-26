@@ -107,17 +107,11 @@ export default function DayDetailPage() {
     setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, done: newDone } : t));
     await supabase.from("week_tasks").update({ done: newDone }).eq("id", task.id);
     if (task.project_task_id) {
-      const isSubtaskEntry = task.text.includes("↳");
       const newProgress = newDone ? 100 : 0;
 
-      if (isSubtaskEntry) {
-        const subName = task.text.split("↳").pop()?.trim() || "";
-        const { data: matchedSub } = await supabase
-          .from("subtasks").select("id").eq("task_id", task.project_task_id)
-          .ilike("name", subName).limit(1).maybeSingle();
-        if (matchedSub) {
-          await supabase.from("subtasks").update({ progress: newProgress }).eq("id", matchedSub.id);
-        }
+      if (task.subtask_id) {
+        // Subtask entry — update via FK
+        await supabase.from("subtasks").update({ progress: newProgress }).eq("id", task.subtask_id);
         const { data: allSubs } = await supabase
           .from("subtasks").select("progress").eq("task_id", task.project_task_id);
         if (allSubs && allSubs.length > 0) {
@@ -153,6 +147,7 @@ export default function DayDetailPage() {
       : text;
 
     let projectTaskId: string | null = null;
+    let subtaskId: string | null = null;
 
     if (proj && linkType === "main") {
       const { data: pt } = await supabase.from("project_tasks").insert({
@@ -162,12 +157,15 @@ export default function DayDetailPage() {
       }).select().single();
       if (pt) projectTaskId = pt.id;
     } else if (proj && linkType === "subtask" && linkParentTask) {
-      await supabase.from("subtasks").insert({
+      const { data: sub } = await supabase.from("subtasks").insert({
         task_id: linkParentTask, user_id: userId, name: text,
         est_minutes: 0, deadline: dateKey, progress: 0,
         notes: "", sort_order: 999,
-      });
-      projectTaskId = linkParentTask;
+      }).select().single();
+      if (sub) {
+        projectTaskId = linkParentTask;
+        subtaskId = (sub as { id: string }).id;
+      }
       // Recalc parent progress to include the new 0% subtask
       const { data: allSubs } = await supabase
         .from("subtasks").select("progress").eq("task_id", linkParentTask);
@@ -182,6 +180,7 @@ export default function DayDetailPage() {
       sort_order: tasks.length,
       project_id: proj?.id || null,
       project_task_id: projectTaskId,
+      subtask_id: subtaskId,
     }).select().single();
 
     if (newWeekTask) {
@@ -226,6 +225,7 @@ export default function DayDetailPage() {
         text: t.text,
         project_id: t.project_id,
         project_task_id: t.project_task_id,
+        subtask_id: t.subtask_id,
         sort_order: tasks.length + newTasks.length,
       }).select().single();
       if (copied) newTasks.push(copied as WeekTask);

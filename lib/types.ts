@@ -7,7 +7,7 @@ export interface RoutineTask {
 export interface Project {
   id: string; user_id: string; title: string;
   description: string; elapsed_seconds: number;
-  active_task_id: string | null; alarm_fired: boolean;
+  active_task_id: string | null; alarm_fired?: boolean;
   sort_order: number; created_at: string;
   color: string;
   deadline: string | null;
@@ -22,6 +22,8 @@ export interface ProjectTask {
   sort_order: number; created_at: string; subtasks?: Subtask[];
   file_url: string | null; file_name: string | null;
   archived_at: string | null;
+  alarm_fired_at: string | null;
+  timer_started_at: string | null;
 }
 
 export interface Subtask {
@@ -31,6 +33,7 @@ export interface Subtask {
   progress: number; notes: string; sort_order: number;
   created_at: string; elapsed_seconds: number;
   file_url: string | null; file_name: string | null;
+  timer_started_at: string | null;
 }
 
 export interface Template {
@@ -41,7 +44,8 @@ export interface Template {
 export interface WeekTask {
   id: string; user_id: string; date_key: string;
   text: string; done: boolean; project_id: string | null;
-  project_task_id: string | null; sort_order: number;
+  project_task_id: string | null; subtask_id: string | null;
+  sort_order: number;
   created_at: string;
 }
 

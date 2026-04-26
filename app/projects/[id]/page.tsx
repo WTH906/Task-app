@@ -4,20 +4,22 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { Project, ProjectTask, Subtask } from "@/lib/types";
-import { formatSeconds, formatMinutes, progressColor, cn, playAlarm } from "@/lib/utils";
+import { formatSeconds, formatMinutes } from "@/lib/utils";
+import { useTimer } from "@/lib/hooks/useTimer";
 import { ProgressBar } from "@/components/ProgressBar";
 import { InlineEdit } from "@/components/InlineEdit";
 import { CalendarPicker } from "@/components/CalendarPicker";
 import { Modal } from "@/components/Modal";
-import { syncProjectTaskToWeek, removeWeekTasksForProjectTask, syncTaskDeadlineToDeadlines, syncTaskCompletion } from "@/lib/sync";
-import { FileAttachment } from "@/components/FileAttachment";
-import { GCalButton, GCalSyncModal } from "@/components/GCalButton";
+import { syncProjectTaskToWeek, syncSubtaskToWeek, removeWeekTasksForProjectTask, syncTaskDeadlineToDeadlines, syncTaskCompletion } from "@/lib/sync";
+import { GCalSyncModal } from "@/components/GCalButton";
 import { ColorPicker } from "@/components/ColorPicker";
 import { logActivity } from "@/lib/activity";
 import { useToast } from "@/components/Toast";
 import { reorderRows, reorderSubtasks, cleanupActivityLog } from "@/lib/db-helpers";
-import { Save, Upload, CalendarDays, Timer, RefreshCw, Calendar, Pencil, Trash2, AlertTriangle } from "lucide-react";
+import { Save, Upload, Calendar, Pencil, Trash2, AlertTriangle } from "lucide-react";
 import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
+import { TaskFormModal } from "@/components/project/TaskFormModal";
+import { TaskItem, TaskActions } from "@/components/project/TaskItem";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 import { fetchProjectById, fetchProjectTasksWithSubs } from "@/lib/queries";
 
@@ -32,13 +34,7 @@ export default function ProjectDetailPage() {
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
 
   // Timer
-  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
-  const [activeSubtaskId, setActiveSubtaskId] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState<Record<string, number>>({});
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const startTimeRef = useRef<number>(0);
-  const startElapsedRef = useRef<number>(0);
-  const elapsedRef = useRef<Record<string, number>>({});
 
   // UI
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
@@ -63,6 +59,17 @@ export default function ProjectDetailPage() {
   const [saving, setSaving] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const loadIdRef = useRef(0);
+
+  // Timer hook — DB-backed started_at, drift-proof
+  const onElapsedChange = useCallback((timerId: string, value: number) => {
+    setElapsed((prev) => ({ ...prev, [timerId]: value }));
+  }, []);
+  const onTaskAlarmUpdate = useCallback((taskId: string, updates: Partial<ProjectTask>) => {
+    updateTaskLocal(taskId, updates);
+  }, []);
+  const { activeTaskId, stopTimer, toggleTimer } = useTimer({
+    userId, projectId, tasks, onElapsedChange, onTaskUpdate: onTaskAlarmUpdate,
+  });
 
   // Close menu on outside click
   useEffect(() => { document.title = project ? `Comfy Board — ${project.title}` : "Comfy Board — Project"; }, [project]);
@@ -157,117 +164,6 @@ export default function ProjectDetailPage() {
     }));
   };
 
-  // Timer logic — supports both task IDs and "sub:subtaskId"
-  const startTimer = (timerId: string) => {
-    if (activeTaskId) stopTimer();
-    setActiveTaskId(timerId);
-    startTimeRef.current = Date.now();
-    startElapsedRef.current = elapsed[timerId] || 0;
-
-    timerRef.current = setInterval(() => {
-      const now = Date.now();
-      const newElapsed = startElapsedRef.current + (now - startTimeRef.current) / 1000;
-      setElapsed((prev) => ({ ...prev, [timerId]: newElapsed }));
-
-      // 80% alarm check (only for main tasks)
-      if (!timerId.startsWith("sub:")) {
-        const task = tasks.find((t) => t.id === timerId);
-        if (task && task.est_minutes > 0 && !project?.alarm_fired) {
-          const threshold = task.est_minutes * 60 * 0.8;
-          if (newElapsed >= threshold) {
-            playAlarm();
-            const supabase = createClient();
-            supabase.from("projects").update({ alarm_fired: true }).eq("id", projectId);
-            setProject((p) => p ? { ...p, alarm_fired: true } : p);
-          }
-        }
-      }
-    }, 1000);
-  };
-
-  const stopTimer = async () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    if (activeTaskId) {
-      const supabase = createClient();
-      const finalElapsed = elapsed[activeTaskId] || 0;
-      const sessionTime = finalElapsed - startElapsedRef.current;
-
-      if (activeTaskId.startsWith("sub:")) {
-        const subId = activeTaskId.replace("sub:", "");
-        await supabase.from("subtasks").update({ elapsed_seconds: finalElapsed }).eq("id", subId);
-        // Find subtask name for logging
-        let subName = "Subtask";
-        for (const t of tasks) {
-          const found = t.subtasks?.find((s) => s.id === subId);
-          if (found) { subName = found.name; break; }
-        }
-        if (sessionTime > 5) {
-          await logActivity(supabase, userId, projectId, "Timer stopped",
-            `↳ ${subName} — ${formatSeconds(sessionTime)} tracked`);
-        }
-      } else {
-        await supabase.from("project_tasks").update({ elapsed_seconds: finalElapsed }).eq("id", activeTaskId);
-        const task = tasks.find((t) => t.id === activeTaskId);
-        if (sessionTime > 5) {
-          await logActivity(supabase, userId, projectId, "Timer stopped",
-            `${task?.name || "Task"} — ${formatSeconds(sessionTime)} tracked`);
-        }
-      }
-    }
-    timerRef.current = null;
-    setActiveTaskId(null);
-  };
-
-  const toggleTimer = (timerId: string) => {
-    if (activeTaskId === timerId) stopTimer();
-    else startTimer(timerId);
-  };
-
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, []);
-
-  // Keep ref in sync with state so auto-save always reads latest value
-  useEffect(() => { elapsedRef.current = elapsed; }, [elapsed]);
-
-  // Auto-save timer every 5 seconds to prevent data loss
-  useEffect(() => {
-    if (!activeTaskId) return;
-
-    const saveTimerToDB = async () => {
-      const supabase = createClient();
-      const current = elapsedRef.current[activeTaskId] || 0;
-      if (activeTaskId.startsWith("sub:")) {
-        const subId = activeTaskId.replace("sub:", "");
-        await supabase.from("subtasks").update({ elapsed_seconds: current }).eq("id", subId);
-      } else {
-        await supabase.from("project_tasks").update({ elapsed_seconds: current }).eq("id", activeTaskId);
-      }
-    };
-
-    const autoSave = setInterval(saveTimerToDB, 5000);
-
-    const handleVisibility = () => {
-      if (document.visibilityState === "hidden") {
-        saveTimerToDB();
-      }
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
-
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "Timer is running — are you sure you want to leave?";
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
-    return () => {
-      clearInterval(autoSave);
-      document.removeEventListener("visibilitychange", handleVisibility);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [activeTaskId]);
-
   // Task CRUD
   const saveTaskModal = async () => {
     if (!formName.trim() || saving) return;
@@ -309,12 +205,15 @@ export default function ProjectDetailPage() {
       }
     } else if (modalMode === "subtask" && parentTaskId) {
       const parent = tasks.find((t) => t.id === parentTaskId);
+      let subtaskId: string | null = null;
+
       if (editTarget && "task_id" in editTarget) {
         await supabase
           .from("subtasks")
           .update({ name, est_minutes: formEst, deadline, date_key: calDate })
           .eq("id", editTarget.id);
         updateSubtaskLocal(parentTaskId, editTarget.id, { name, est_minutes: formEst, deadline, date_key: calDate });
+        subtaskId = editTarget.id;
         // Recalc parent est_minutes
         if (parent?.subtasks) {
           const subs = parent.subtasks.map((s) => s.id === editTarget.id ? { ...s, est_minutes: formEst } : s);
@@ -330,6 +229,7 @@ export default function ProjectDetailPage() {
         }).select().single();
         if (newSub) {
           addSubtaskLocal(parentTaskId, newSub as Subtask);
+          subtaskId = (newSub as Subtask).id;
           // Recalc parent progress and est_minutes to account for new subtask
           const allSubs = [...(parent?.subtasks || []), newSub as Subtask];
           const avg = Math.round(allSubs.reduce((s, st) => s + st.progress, 0) / allSubs.length);
@@ -338,38 +238,10 @@ export default function ProjectDetailPage() {
           updateTaskLocal(parentTaskId, { progress: avg, est_minutes: totalEst });
         }
       }
-      // Sync subtask to calendar
-      if (project && parent) {
-        const subText = `[${project.title}] ↳ ${name}`;
-        if (editTarget && "task_id" in editTarget) {
-          // Editing: find existing week_task and update or delete
-          const { data: existingWt } = await supabase
-            .from("week_tasks")
-            .select("id")
-            .eq("user_id", userId)
-            .eq("project_task_id", parentTaskId)
-            .ilike("text", `%↳ ${editTarget.name}`)
-            .maybeSingle();
 
-          if (!calDate && existingWt) {
-            await supabase.from("week_tasks").delete().eq("id", existingWt.id);
-          } else if (calDate && existingWt) {
-            await supabase.from("week_tasks").update({ text: subText, date_key: calDate }).eq("id", existingWt.id);
-          } else if (calDate) {
-            await supabase.from("week_tasks").insert({
-              user_id: userId, date_key: calDate, text: subText,
-              sort_order: 999, done: false,
-              project_id: projectId, project_task_id: parentTaskId,
-            });
-          }
-        } else if (calDate) {
-          // New subtask with date — create week_task
-          await supabase.from("week_tasks").insert({
-            user_id: userId, date_key: calDate, text: subText,
-            sort_order: 999, done: false,
-            project_id: projectId, project_task_id: parentTaskId,
-          });
-        }
+      // Sync subtask to calendar via subtask_id (proper FK — not text matching)
+      if (project && parent && subtaskId) {
+        await syncSubtaskToWeek(supabase, userId, subtaskId, parentTaskId, name, projectId, project.title, calDate);
       }
     }
 
@@ -511,35 +383,8 @@ export default function ProjectDetailPage() {
       const parent = tasks.find((t) => t.id === parentId);
       const sub = parent?.subtasks?.find((s) => s.id === subtaskId);
       const subName = sub?.name || "Subtask";
-      const subText = `[${project.title}] ↳ ${subName}`;
-
-      // Find existing week_task for this subtask (matched by text + project_task_id)
-      const { data: existing } = await supabase
-        .from("week_tasks")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("project_task_id", parentId)
-        .ilike("text", `%↳ ${subName}`)
-        .maybeSingle();
-
-      if (!value) {
-        // Date cleared — delete linked week_task
-        if (existing) {
-          await supabase.from("week_tasks").delete().eq("id", existing.id);
-        }
-      } else if (existing) {
-        // Date changed — update existing week_task
-        await supabase.from("week_tasks").update({
-          text: subText, date_key: value as string,
-        }).eq("id", existing.id);
-      } else {
-        // New date — create week_task
-        await supabase.from("week_tasks").insert({
-          user_id: userId, date_key: value as string, text: subText,
-          sort_order: 999, done: false,
-          project_id: projectId, project_task_id: parentId,
-        });
-      }
+      // Sync via subtask_id FK — not text matching
+      await syncSubtaskToWeek(supabase, userId, subtaskId, parentId, subName, projectId, project.title, value as string | null);
     }
 
     if (field === "deadline" && project) {
@@ -692,7 +537,6 @@ export default function ProjectDetailPage() {
       est_minutes: totalEst,
       elapsed_seconds: project.elapsed_seconds,
       active_task: project.active_task_id,
-      alarm_fired: project.alarm_fired,
       tasks: tasks.map((t) => ({
         id: t.id,
         name: t.name,
@@ -742,6 +586,27 @@ export default function ProjectDetailPage() {
     a.download = `${project.title.replace(/[^a-zA-Z0-9]/g, "_")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // Helper to open the edit modal for tasks or subtasks
+  const openEditModal = (target: ProjectTask | Subtask | null, mode: "task" | "subtask", parentId?: string) => {
+    setEditTarget(target);
+    setParentTaskId(parentId || null);
+    setFormName(target ? target.name : "");
+    setFormEst(target ? target.est_minutes : 0);
+    setFormDate(target ? ((target as ProjectTask).date_key || "") : "");
+    setFormDeadline(target ? (target.deadline || "") : "");
+    setFormRecurrence(null);
+    setModalMode(mode);
+    setModalOpen(true);
+  };
+
+  const taskActions: TaskActions = {
+    toggleTimer, removeTask, removeSubtask,
+    updateTaskField, updateSubtaskField,
+    updateTaskLocal, updateSubtaskLocal,
+    openEditModal, setExpandedTasks, setMoveSubModal,
+    handleSubDragStart, handleSubDragOver, handleSubDragEnd,
   };
 
   if (!project) {
@@ -912,285 +777,28 @@ export default function ProjectDetailPage() {
 
       {/* Task list */}
       <div className="space-y-2 mb-4">
-        {tasks.map((task, idx) => {
-          const isActive = activeTaskId === task.id;
-          const isDone = task.progress >= 100;
-          const isExpanded = expandedTasks.has(task.id);
-
-          return (
-            <div
-              key={task.id}
-              draggable
-              onDragStart={() => handleDragStart(idx)}
-              onDragOver={(e) => handleDragOver(e, idx)}
-              onDragEnd={handleDragEnd}
-            >
-              <div
-                className={cn(
-                  "bg-surface border rounded-lg transition-all",
-                  isActive ? "border-green-acc shadow-lg shadow-green-acc/10" : "border-border",
-                  isDone && "opacity-60"
-                )}
-              >
-                {/* Row 1: drag + play + name */}
-                <div className="flex items-center gap-2 px-3 py-2.5">
-                  <span className="cursor-grab text-txt3 hover:text-txt select-none">⠿</span>
-                  <button
-                    onClick={() => toggleTimer(task.id)}
-                    className={cn(
-                      "w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0 transition-colors",
-                      isActive
-                        ? "bg-green-acc/20 text-green-acc"
-                        : "bg-surface2 text-txt3 hover:text-red-acc hover:bg-red-acc/10"
-                    )}
-                  >
-                    {isActive ? "⏸" : "▶"}
-                  </button>
-                  <span className={cn("flex-1 text-sm font-medium", isDone && "task-done")}>
-                    {task.name}
-                  </span>
-                  {isActive && (
-                    <span className="font-mono text-sm text-green-acc timer-active">
-                      {formatSeconds(elapsed[task.id] || 0)}
-                    </span>
-                  )}
-                </div>
-
-                {/* Row 2: meta */}
-                <div className="flex flex-wrap items-center gap-2 px-3 pb-2.5 text-xs">
-                  {/* Est */}
-                  <span className="bg-surface2 text-txt3 px-2 py-0.5 rounded font-mono">
-                    {formatMinutes(task.est_minutes)}
-                  </span>
-
-                  {/* Calendar date — when to work on it */}
-                  {task.progress < 100 && (
-                    <CalendarPicker
-                      value={task.date_key}
-                      onChange={(d) => updateTaskField(task.id, "date_key", d)}
-                      variant="date"
-                    />
-                  )}
-                  {task.date_key && task.progress >= 100 && (
-                    <span className="text-[10px] text-green-acc font-mono">✓ scheduled</span>
-                  )}
-
-                  {/* Deadline — when it's due */}
-                  {task.progress < 100 && (
-                    <>
-                      <CalendarPicker
-                        value={task.deadline}
-                        onChange={(d) => updateTaskField(task.id, "deadline", d)}
-                        variant="deadline"
-                      />
-                      <GCalButton
-                        title={`[${project.title}] ${task.name}`}
-                        date={task.date_key || task.deadline}
-                        description={task.notes}
-                      />
-                    </>
-                  )}
-                  {task.progress >= 100 && task.deadline && (
-                    <span className="text-[10px] text-green-acc font-mono">✓ done</span>
-                  )}
-
-                  {/* Progress */}
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-16 h-1.5 bg-surface3 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full transition-all" style={{
-                        width: `${Math.min(task.progress, 100)}%`,
-                        backgroundColor: progressColor(task.progress),
-                      }} />
-                    </div>
-                    <InlineEdit
-                      value={String(task.progress)}
-                      onSave={(v) => updateTaskField(task.id, "progress", parseInt(v) || 0)}
-                      type="number"
-                      min={0}
-                      max={100}
-                      className="w-10 text-xs"
-                    />
-                    <span className="text-txt3">%</span>
-                  </div>
-
-                  {/* Notes */}
-                  <div className="flex-1 min-w-[120px]">
-                    <InlineEdit
-                      value={task.notes}
-                      onSave={(v) => updateTaskField(task.id, "notes", v)}
-                      placeholder="Notes..."
-                      className="text-xs text-txt3"
-                    />
-                  </div>
-
-                  {/* File */}
-                  <FileAttachment
-                    fileUrl={task.file_url}
-                    fileName={task.file_name}
-                    userId={userId}
-                    entityId={task.id}
-                    onUploaded={async (url, name) => {
-                      const supabase = createClient();
-                      await supabase.from("project_tasks").update({ file_url: url, file_name: name }).eq("id", task.id);
-                      updateTaskLocal(task.id, { file_url: url, file_name: name });
-                    }}
-                    onRemoved={async () => {
-                      const supabase = createClient();
-                      await supabase.from("project_tasks").update({ file_url: null, file_name: null }).eq("id", task.id);
-                      updateTaskLocal(task.id, { file_url: null, file_name: null });
-                    }}
-                  />
-
-                  {/* Expand subtasks */}
-                  {(task.subtasks?.length || 0) > 0 && (
-                    <button
-                      onClick={() => {
-                        const s = new Set(expandedTasks);
-                        s.has(task.id) ? s.delete(task.id) : s.add(task.id);
-                        setExpandedTasks(s);
-                      }}
-                      className="text-txt3 hover:text-txt transition-colors"
-                    >
-                      {isExpanded ? "▾" : "▸"} {task.subtasks?.length}
-                    </button>
-                  )}
-
-                  {/* Menu */}
-                  <div className="relative">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === task.id ? null : task.id); setSubMenuOpen(null); }}
-                      className="w-6 h-6 flex items-center justify-center rounded hover:bg-surface2 text-txt3"
-                    >
-                      ⋯
-                    </button>
-                    {menuOpen === task.id && (
-                      <div className="absolute right-0 top-full mt-1 bg-surface2 border border-border rounded-lg shadow-xl py-1 w-36 z-20">
-                        <button
-                          onClick={() => {
-                            setEditTarget(task);
-                            setFormName(task.name);
-                            setFormEst(task.est_minutes);
-                            setFormDate(task.date_key || "");
-                            setFormDeadline(task.deadline || "");
-                            setFormRecurrence(null);
-                            setModalMode("task");
-                            setModalOpen(true);
-                            setMenuOpen(null);
-                          }}
-                          className="w-full text-left px-3 py-1.5 text-sm text-txt2 hover:bg-surface3"
-                        >
-                          Edit
-                        </button>
-                        {(task.subtasks?.length || 0) < 10 && (
-                          <button
-                            onClick={() => {
-                              setEditTarget(null);
-                              setParentTaskId(task.id);
-                              setFormName("");
-                              setFormEst(0);
-                              setFormDate("");
-                              setFormDeadline("");
-                              setFormRecurrence(null);
-                              setModalMode("subtask");
-                              setModalOpen(true);
-                              setMenuOpen(null);
-                            }}
-                            className="w-full text-left px-3 py-1.5 text-sm text-txt2 hover:bg-surface3"
-                          >
-                            Add subtask
-                          </button>
-                        )}
-                        <button
-                          onClick={() => { removeTask(task.id); }}
-                          className="w-full text-left px-3 py-1.5 text-sm text-danger hover:bg-surface3"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Subtasks */}
-                {isExpanded && task.subtasks && task.subtasks.length > 0 && (
-                  <div className="border-t border-border bg-surface2/50">
-                    {task.subtasks.map((sub, subIdx) => (
-                      <div
-                        key={sub.id}
-                        draggable
-                        onDragStart={() => handleSubDragStart(task.id, subIdx)}
-                        onDragOver={(e) => handleSubDragOver(e, task.id, subIdx)}
-                        onDragEnd={() => handleSubDragEnd(task.id)}
-                        className={cn(
-                          "flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border/50 last:border-b-0 text-xs",
-                          activeTaskId === `sub:${sub.id}` && "bg-green-acc/5",
-                          dragSubIdx === subIdx && dragSubParent === task.id && "opacity-50"
-                        )}
-                      >
-                        <span className="cursor-grab text-txt3 opacity-30 hover:opacity-100 select-none text-[10px]">⠿</span>
-                        <button
-                          onClick={() => toggleTimer(`sub:${sub.id}`)}
-                          className={cn(
-                            "w-6 h-6 rounded flex items-center justify-center text-[10px] shrink-0 transition-colors",
-                            activeTaskId === `sub:${sub.id}`
-                              ? "bg-green-acc/20 text-green-acc"
-                              : "bg-surface3 text-txt3 hover:text-red-acc"
-                          )}
-                        >
-                          {activeTaskId === `sub:${sub.id}` ? "⏸" : "▶"}
-                        </button>
-                        {activeTaskId === `sub:${sub.id}` && (
-                          <span className="font-mono text-[10px] text-green-acc timer-active">
-                            {formatSeconds(elapsed[`sub:${sub.id}`] || 0)}
-                          </span>
-                        )}
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: progressColor(sub.progress) }} />
-                        <InlineEdit value={sub.name} onSave={(v) => updateSubtaskField(sub.id, task.id, "name", v)} className="font-medium text-xs min-w-[100px]" />
-                        <InlineEdit value={String(sub.est_minutes)} onSave={(v) => updateSubtaskField(sub.id, task.id, "est_minutes", parseInt(v) || 0)} type="number" min={0} className="w-10 text-xs text-txt3" placeholder="0" />
-                        <span className="text-txt3 text-[10px]">min</span>
-                        <div className="flex items-center gap-1">
-                          <InlineEdit value={String(sub.progress)} onSave={(v) => updateSubtaskField(sub.id, task.id, "progress", parseInt(v) || 0)} type="number" min={0} max={100} className="w-10 text-xs" />
-                          <span className="text-txt3">%</span>
-                        </div>
-                        {sub.progress < 100 ? (
-                          <>
-                            <CalendarPicker value={sub.date_key} onChange={(d) => updateSubtaskField(sub.id, task.id, "date_key", d)} variant="date" />
-                            <CalendarPicker value={sub.deadline} onChange={(d) => updateSubtaskField(sub.id, task.id, "deadline", d)} variant="deadline" />
-                          </>
-                        ) : (sub.deadline || sub.date_key) ? (
-                          <span className="text-[10px] text-green-acc font-mono">✓</span>
-                        ) : null}
-                        <div className="flex-1 min-w-[80px]">
-                          <InlineEdit value={sub.notes} onSave={(v) => updateSubtaskField(sub.id, task.id, "notes", v)} placeholder="Notes..." className="text-xs text-txt3" />
-                        </div>
-                        <FileAttachment
-                          fileUrl={sub.file_url} fileName={sub.file_name} userId={userId} entityId={sub.id}
-                          onUploaded={async (url, name) => { const s = createClient(); await s.from("subtasks").update({ file_url: url, file_name: name }).eq("id", sub.id); updateSubtaskLocal(task.id, sub.id, { file_url: url, file_name: name }); }}
-                          onRemoved={async () => { const s = createClient(); await s.from("subtasks").update({ file_url: null, file_name: null }).eq("id", sub.id); updateSubtaskLocal(task.id, sub.id, { file_url: null, file_name: null }); }}
-                        />
-                        {/* Subtask 3-dot menu */}
-                        <div className="relative">
-                          <button onClick={(e) => { e.stopPropagation(); setSubMenuOpen(subMenuOpen === sub.id ? null : sub.id); setMenuOpen(null); }}
-                            className="w-6 h-6 flex items-center justify-center rounded hover:bg-surface3 text-txt3 text-[10px]">⋯</button>
-                          {subMenuOpen === sub.id && (
-                            <div className="absolute right-0 top-full mt-1 bg-surface2 border border-border rounded-lg shadow-xl py-1 w-40 z-20">
-                              <button onClick={() => { setEditTarget(sub); setParentTaskId(task.id); setFormName(sub.name); setFormEst(sub.est_minutes); setFormDate(sub.date_key || ""); setFormDeadline(sub.deadline || ""); setFormRecurrence(null); setModalMode("subtask"); setModalOpen(true); setSubMenuOpen(null); }}
-                                className="w-full text-left px-3 py-1.5 text-xs text-txt2 hover:bg-surface3">Edit</button>
-                              <button onClick={() => { setMoveSubModal({ subId: sub.id, subName: sub.name, fromTaskId: task.id }); setSubMenuOpen(null); }}
-                                className="w-full text-left px-3 py-1.5 text-xs text-txt2 hover:bg-surface3">Move to task...</button>
-                              <button onClick={() => { removeSubtask(sub.id, task.id); setSubMenuOpen(null); }}
-                                className="w-full text-left px-3 py-1.5 text-xs text-danger hover:bg-surface3">Remove</button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {tasks.map((task, idx) => (
+          <TaskItem
+            key={task.id}
+            task={task}
+            project={{ id: projectId, title: project.title }}
+            idx={idx}
+            activeTaskId={activeTaskId}
+            elapsed={elapsed}
+            isExpanded={expandedTasks.has(task.id)}
+            menuOpen={menuOpen}
+            setMenuOpen={setMenuOpen}
+            subMenuOpen={subMenuOpen}
+            setSubMenuOpen={setSubMenuOpen}
+            dragSubIdx={dragSubIdx}
+            dragSubParent={dragSubParent}
+            userId={userId}
+            actions={taskActions}
+            onDragStart={() => handleDragStart(idx)}
+            onDragOver={(e) => handleDragOver(e, idx)}
+            onDragEnd={handleDragEnd}
+          />
+        ))}
 
         {tasks.length === 0 && (
           <div className="text-center py-12 text-txt3">
@@ -1202,129 +810,31 @@ export default function ProjectDetailPage() {
 
       {/* Add task */}
       <button
-        onClick={() => {
-          setEditTarget(null);
-          setFormName("");
-          setFormEst(0);
-          setFormDate("");
-          setFormDeadline("");
-          setFormRecurrence(null);
-          setModalMode("task");
-          setModalOpen(true);
-        }}
+        onClick={() => openEditModal(null, "task")}
         className="w-full bg-surface border border-dashed border-border2 rounded-lg px-4 py-3 text-sm text-txt3 hover:border-red-acc hover:text-red-acc transition-colors"
       >
         ＋ Add Task
       </button>
 
       {/* Task/Subtask Modal */}
-      <Modal
+      <TaskFormModal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={
-          modalMode === "task"
-            ? editTarget ? "Edit Task" : "Add Task"
-            : editTarget ? "Edit Subtask" : "Add Subtask"
-        }
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-txt2 mb-1.5">Name</label>
-            <input
-              type="text"
-              value={formName}
-              onChange={(e) => setFormName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && saveTaskModal()}
-              className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm"
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-txt2 mb-1.5">Estimated time</label>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1">
-                <input
-                  type="number"
-                  value={Math.floor(formEst / 60) || ""}
-                  onChange={(e) => {
-                    const h = parseInt(e.target.value) || 0;
-                    setFormEst(Math.max(0, h * 60 + (formEst % 60)));
-                  }}
-                  onFocus={(e) => { if (e.target.value === "0") e.target.value = ""; e.target.select(); }}
-                  min={0}
-                  placeholder="0"
-                  className="w-16 bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm"
-                />
-                <span className="text-xs text-txt3">h</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <input
-                  type="number"
-                  value={formEst % 60 || ""}
-                  onChange={(e) => {
-                    const m = Math.min(59, Math.max(0, parseInt(e.target.value) || 0));
-                    setFormEst(Math.floor(formEst / 60) * 60 + m);
-                  }}
-                  onFocus={(e) => { if (e.target.value === "0") e.target.value = ""; e.target.select(); }}
-                  min={0}
-                  max={59}
-                  placeholder="0"
-                  className="w-16 bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm"
-                />
-                <span className="text-xs text-txt3">min</span>
-              </div>
-            </div>
-          </div>
-          <div>
-            <label className="text-sm text-txt2 mb-1.5 flex items-center gap-1.5"><CalendarDays size={14} /> Schedule on calendar</label>
-            <input
-              type="date"
-              value={formDate}
-              onChange={(e) => setFormDate(e.target.value)}
-              className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm"
-            />
-            {formDate && <p className="text-[10px] text-violet2 mt-1">Task will appear on the calendar for this date</p>}
-          </div>
-          <div>
-            <label className="text-sm text-txt2 mb-1.5 flex items-center gap-1.5"><Timer size={14} /> Deadline (due date)</label>
-            <input
-              type="date"
-              value={formDeadline}
-              onChange={(e) => setFormDeadline(e.target.value)}
-              className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm"
-            />
-            {formDeadline && <p className="text-[10px] text-danger mt-1">A countdown deadline will be created</p>}
-          </div>
-          {formDeadline && (
-            <div>
-              <label className="text-sm text-txt2 mb-1.5 flex items-center gap-1.5"><RefreshCw size={14} /> Recurring?</label>
-              <select value={formRecurrence || ""} onChange={(e) => setFormRecurrence(e.target.value || null)}
-                className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm">
-                <option value="">No — one-time deadline</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="yearly">Yearly</option>
-              </select>
-            </div>
-          )}
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              onClick={() => setModalOpen(false)}
-              className="px-4 py-2 rounded-lg text-sm text-txt2 hover:bg-surface3"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={saveTaskModal}
-              disabled={!formName.trim() || saving}
-              className="px-4 py-2 rounded-lg text-sm bg-red-acc hover:bg-red-dark text-white disabled:opacity-50"
-            >
-              {saving ? "Saving..." : "Save"}
-            </button>
-          </div>
-        </div>
-      </Modal>
+        mode={modalMode === "task" ? "task" : "subtask"}
+        isEdit={!!editTarget}
+        formName={formName}
+        setFormName={setFormName}
+        formEst={formEst}
+        setFormEst={setFormEst}
+        formDate={formDate}
+        setFormDate={setFormDate}
+        formDeadline={formDeadline}
+        setFormDeadline={setFormDeadline}
+        formRecurrence={formRecurrence}
+        setFormRecurrence={setFormRecurrence}
+        saving={saving}
+        onSave={saveTaskModal}
+      />
 
       {/* Description Modal */}
       <Modal

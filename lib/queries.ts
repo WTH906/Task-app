@@ -13,6 +13,12 @@ import {
  */
 function logQueryError(fn: string, error: { message: string; code?: string }) {
   console.error(`[queries.${fn}]`, error.message, error.code || "");
+  // Surface to UI via custom event (caught by AppShell toast listener)
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("query-error", {
+      detail: { fn, message: error.message, code: error.code },
+    }));
+  }
 }
 
 // ─── Helpers ───────────────────────────────────────────────────

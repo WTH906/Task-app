@@ -133,18 +133,11 @@ export default function WeekPage() {
 
     // Sync to project if linked
     if (task.project_task_id) {
-      const isSubtaskEntry = task.text.includes("↳");
       const newProgress = newDone ? 100 : 0;
 
-      if (isSubtaskEntry) {
-        // Subtask entry — update only that specific subtask, then recalc parent
-        const subName = task.text.split("↳").pop()?.trim() || "";
-        const { data: matchedSub } = await supabase
-          .from("subtasks").select("id").eq("task_id", task.project_task_id)
-          .ilike("name", subName).limit(1).maybeSingle();
-        if (matchedSub) {
-          await supabase.from("subtasks").update({ progress: newProgress }).eq("id", matchedSub.id);
-        }
+      if (task.subtask_id) {
+        // Subtask entry — update only that specific subtask via FK, then recalc parent
+        await supabase.from("subtasks").update({ progress: newProgress }).eq("id", task.subtask_id);
         const { data: allSubs } = await supabase
           .from("subtasks").select("progress").eq("task_id", task.project_task_id);
         if (allSubs && allSubs.length > 0) {
@@ -162,13 +155,8 @@ export default function WeekPage() {
             .update({ progress: newProgress })
             .eq("id", task.project_task_id);
           if (ptError) {
-            toast("Failed to sync project progress", "error");
-            await supabase.from("week_tasks").update({ done: !newDone }).eq("id", task.id);
-            setTasks((prev) => {
-              const copy = { ...prev };
-              copy[task.date_key] = copy[task.date_key].map((t) => t.id === task.id ? { ...t, done: !newDone } : t);
-              return copy;
-            });
+            toast("Failed to sync project progress — reloading", "error");
+            loadData();
             return;
           }
         } else {
@@ -197,6 +185,7 @@ export default function WeekPage() {
       : text;
 
     let projectTaskId: string | null = null;
+    let subtaskId: string | null = null;
 
     if (proj && linkType === "main") {
       const { data: pt } = await supabase.from("project_tasks").insert({
@@ -213,6 +202,7 @@ export default function WeekPage() {
       }).select().single();
       if (sub) {
         projectTaskId = linkParentTask;
+        subtaskId = (sub as { id: string }).id;
         // Recalc parent progress to include the new 0% subtask
         const { data: allSubs } = await supabase
           .from("subtasks").select("progress").eq("task_id", linkParentTask);
@@ -228,6 +218,7 @@ export default function WeekPage() {
       sort_order: existing.length,
       project_id: proj?.id || null,
       project_task_id: projectTaskId,
+      subtask_id: subtaskId,
     }).select().single();
 
     if (newWeekTask) {
