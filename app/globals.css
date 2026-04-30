@@ -53,7 +53,7 @@ select:focus {
 
 /* Modal backdrop */
 .modal-backdrop {
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.3);
 }
 
 /* Smooth transitions */

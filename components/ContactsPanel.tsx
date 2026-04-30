@@ -245,9 +245,15 @@ function DetailsModal({ open, onClose, contact, onCopy }: { open: boolean; onClo
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.35)" }} />
+      <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.25)" }} />
       <div className="relative w-full max-w-md max-h-[85vh] overflow-y-auto rounded-2xl border"
-        style={{ background: "rgba(22,21,42,0.88)", borderColor: "rgba(124,110,196,0.25)", boxShadow: "0 16px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(124,110,196,0.1) inset" }}
+        style={{
+          background: "rgba(30,24,52,0.5)",
+          backdropFilter: "blur(24px) saturate(1.4)",
+          WebkitBackdropFilter: "blur(24px) saturate(1.4)",
+          borderColor: "rgba(140,120,220,0.25)",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.4), inset 0 1px 0 rgba(140,120,220,0.15), inset 0 0 40px rgba(100,80,180,0.06)",
+        }}
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid rgba(124,110,196,0.15)" }}>
           <h2 className="text-lg font-semibold text-bright">{contact.name}</h2>
