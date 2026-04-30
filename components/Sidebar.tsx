@@ -14,6 +14,7 @@ import {
   LayoutDashboard, ListChecks, RefreshCw, CalendarDays, ClipboardList,
   Map, BarChart3, Timer, Search, Download, ClipboardCopy, FolderPlus,
   ChevronDown, LogOut, Menu, X, CalendarRange, User as UserIcon, PieChart,
+  BookUser,
 } from "lucide-react";
 
 export function Sidebar({ user }: { user: User }) {
@@ -276,8 +277,15 @@ export function Sidebar({ user }: { user: User }) {
           </button>
         </nav>
 
-        <div className="p-3 border-t border-border text-[10px] text-txt3 px-5 space-y-0.5">
-          <p><kbd className="bg-surface3 px-1 py-0.5 rounded">⌘K</kbd> Search · <kbd className="bg-surface3 px-1 py-0.5 rounded">D</kbd> Home · <kbd className="bg-surface3 px-1 py-0.5 rounded">R</kbd> Routine · <kbd className="bg-surface3 px-1 py-0.5 rounded">W</kbd> Calendar · <kbd className="bg-surface3 px-1 py-0.5 rounded">M</kbd> Map · <kbd className="bg-surface3 px-1 py-0.5 rounded">N</kbd> New</p>
+        <div className="p-3 border-t border-border space-y-2">
+          <button onClick={() => window.dispatchEvent(new Event("toggle-contacts"))}
+            className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-xs text-txt3 hover:bg-surface2 hover:text-txt transition-colors">
+            <BookUser size={15} /> <span>Contacts</span>
+            <span className="ml-auto text-[9px] text-txt3">→</span>
+          </button>
+          <div className="text-[10px] text-txt3 px-2 space-y-0.5">
+            <p><kbd className="bg-surface3 px-1 py-0.5 rounded">⌘K</kbd> Search · <kbd className="bg-surface3 px-1 py-0.5 rounded">D</kbd> Home · <kbd className="bg-surface3 px-1 py-0.5 rounded">R</kbd> Routine · <kbd className="bg-surface3 px-1 py-0.5 rounded">W</kbd> Calendar · <kbd className="bg-surface3 px-1 py-0.5 rounded">M</kbd> Map · <kbd className="bg-surface3 px-1 py-0.5 rounded">N</kbd> New</p>
+          </div>
         </div>
       </aside>
 

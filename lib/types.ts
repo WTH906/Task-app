@@ -88,3 +88,20 @@ export interface QuickTask {
   recurrence: string | null;
   sort_order: number; created_at: string;
 }
+
+export interface ContactTag {
+  id: string; user_id: string; name: string;
+  color: string; sort_order: number; created_at: string;
+}
+
+export interface Contact {
+  id: string; user_id: string; name: string;
+  email: string; phone: string; address: string;
+  alt_phone: string; alt_email: string; notes: string;
+  company_number: string; sort_order: number; created_at: string;
+  tags?: ContactTag[];
+}
+
+export interface ContactTagLink {
+  contact_id: string; tag_id: string;
+}

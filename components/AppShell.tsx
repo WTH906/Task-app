@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js";
 import { Sidebar } from "./Sidebar";
+import { ContactsPanel } from "./ContactsPanel";
 import { ToastProvider, useToast } from "./Toast";
 
 function QueryErrorListener() {
@@ -23,6 +24,7 @@ function QueryErrorListener() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [contactsOpen, setContactsOpen] = useState(false);
   const pathname = usePathname();
   const isLogin = pathname === "/login";
 
@@ -40,6 +42,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  // Listen for toggle-contacts event from Sidebar
+  useEffect(() => {
+    const handler = () => setContactsOpen(prev => !prev);
+    window.addEventListener("toggle-contacts", handler);
+    return () => window.removeEventListener("toggle-contacts", handler);
   }, []);
 
   if (loading) {
@@ -62,6 +71,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main className="flex-1 ml-0 md:ml-60 min-h-screen animate-fade-in">
           {children}
         </main>
+        <ContactsPanel open={contactsOpen} onClose={() => setContactsOpen(false)} userId={user.id} />
       </div>
     </ToastProvider>
   );

@@ -31,9 +31,10 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-md" }:
     >
       <div
         ref={ref}
-        className={`bg-surface2 border border-border rounded-xl ${maxWidth} w-full max-h-[85vh] overflow-y-auto shadow-2xl`}
+        className={`border rounded-xl ${maxWidth} w-full max-h-[85vh] overflow-y-auto shadow-2xl`}
+        style={{ background: "rgba(26,26,38,0.92)", borderColor: "rgba(124,110,196,0.2)", boxShadow: "0 16px 48px rgba(0,0,0,0.5), 0 0 0 1px rgba(124,110,196,0.08) inset" }}
       >
-        <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-surface2 z-10">
+        <div className="flex items-center justify-between p-4 border-b sticky top-0 z-10 rounded-t-xl" style={{ borderColor: "rgba(124,110,196,0.15)", background: "rgba(26,26,38,0.95)" }}>
           <h2 className="font-title text-bright text-lg">{title}</h2>
           <button
             onClick={onClose}
