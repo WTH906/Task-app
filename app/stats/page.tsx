@@ -52,22 +52,22 @@ export default function StatsPage() {
 
       {/* Top highlight cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <div className="bg-surface border border-border rounded-xl p-4 text-center">
+        <div className="bg-surface border border-border rounded-xl p-4 text-center card-float">
           <div className="flex items-center justify-center gap-1.5 text-green-acc mb-2"><CheckCircle size={18} /></div>
           <p className="text-2xl font-bold text-bright">{s.overallCompletionRate}%</p>
           <p className="text-[10px] text-txt3 uppercase tracking-wider mt-1">Completion Rate</p>
         </div>
-        <div className="bg-surface border border-border rounded-xl p-4 text-center">
+        <div className="bg-surface border border-border rounded-xl p-4 text-center card-float">
           <div className="flex items-center justify-center gap-1.5 text-muted-acc2 mb-2"><Clock size={18} /></div>
           <p className="text-2xl font-bold text-bright">{totalHours}h {totalMins}m</p>
           <p className="text-[10px] text-txt3 uppercase tracking-wider mt-1">Total Tracked</p>
         </div>
-        <div className="bg-surface border border-border rounded-xl p-4 text-center">
+        <div className="bg-surface border border-border rounded-xl p-4 text-center card-float">
           <div className="flex items-center justify-center gap-1.5 mb-2" style={{ color: streakColor }}><Flame size={18} /></div>
           <p className="text-2xl font-bold text-bright">{s.dailyStreak}</p>
           <p className="text-[10px] text-txt3 uppercase tracking-wider mt-1">Day Streak</p>
         </div>
-        <div className="bg-surface border border-border rounded-xl p-4 text-center">
+        <div className="bg-surface border border-border rounded-xl p-4 text-center card-float">
           <div className="flex items-center justify-center gap-1.5 text-red-acc mb-2"><Target size={18} /></div>
           <p className="text-2xl font-bold text-bright">{s.completedTasks + s.completedSubtasks}</p>
           <p className="text-[10px] text-txt3 uppercase tracking-wider mt-1">Tasks Done</p>
@@ -76,7 +76,7 @@ export default function StatsPage() {
 
       {/* Projects & Tasks */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <div className="bg-surface border border-border rounded-xl p-4">
+        <div className="bg-surface border border-border rounded-xl p-4 card-float">
           <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-4"><Folder size={15} /> Projects</h2>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -111,7 +111,7 @@ export default function StatsPage() {
         </div>
 
         {/* Time tracking */}
-        <div className="bg-surface border border-border rounded-xl p-4">
+        <div className="bg-surface border border-border rounded-xl p-4 card-float">
           <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-4"><Clock size={15} /> Time Tracking</h2>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -152,7 +152,7 @@ export default function StatsPage() {
       </div>
 
       {/* Routines */}
-      <div className="bg-surface border border-border rounded-xl p-4 mb-4">
+      <div className="bg-surface border border-border rounded-xl p-4 mb-4 card-float">
         <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-4"><Trophy size={15} /> Routine Streaks</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Daily */}
@@ -198,7 +198,7 @@ export default function StatsPage() {
 
       {/* Weekly comparison */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <div className="bg-surface border border-border rounded-xl p-4">
+        <div className="bg-surface border border-border rounded-xl p-4 card-float">
           <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-4"><Calendar size={15} /> This Week vs Last Week</h2>
           <div className="space-y-4">
             <div>
@@ -254,7 +254,7 @@ export default function StatsPage() {
         </div>
 
         {/* Most productive day */}
-        <div className="bg-surface border border-border rounded-xl p-4">
+        <div className="bg-surface border border-border rounded-xl p-4 card-float">
           <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-4"><BarChart3 size={15} /> Most Productive Day</h2>
           {(() => {
             const maxCount = Math.max(...s.productiveDayStats.map((d) => d.count), 1);
@@ -286,7 +286,7 @@ export default function StatsPage() {
 
       {/* Time per project */}
       {s.projectTimeStats.length > 0 && (
-        <div className="bg-surface border border-border rounded-xl p-4 mb-4">
+        <div className="bg-surface border border-border rounded-xl p-4 mb-4 card-float">
           <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-4"><Folder size={15} /> Time per Project</h2>
           {(() => {
             const maxSecs = Math.max(...s.projectTimeStats.map((p) => p.seconds), 1);

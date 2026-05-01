@@ -168,7 +168,7 @@ export default function DeadlinesPage() {
           });
 
           return (
-            <div key={d.id} className="bg-surface border border-border rounded-xl p-4 group"
+            <div key={d.id} className="bg-surface border border-border rounded-xl p-4 group card-float"
               style={{ borderLeftWidth: 3, borderLeftColor: color }}>
               <div className="flex items-start justify-between mb-2">
                 <h3 className={cn("text-sm font-medium", passed ? "text-txt3" : "text-bright")}>{d.label}</h3>

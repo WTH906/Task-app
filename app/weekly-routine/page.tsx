@@ -221,7 +221,7 @@ export default function WeeklyRoutinePage() {
             onDragOver={(e) => handleDragOver(e, idx)}
             onDragEnd={handleDragEnd}
             className={cn(
-              "flex items-center gap-3 bg-surface border border-border rounded-lg px-3 py-3 group transition-all",
+              "flex items-center gap-3 bg-surface border border-border rounded-lg px-3 py-3 group transition-all card-float",
               dragIdx === idx && "opacity-50 scale-[0.98]",
               task.checked && "opacity-60"
             )}>
@@ -269,7 +269,7 @@ export default function WeeklyRoutinePage() {
             <label className="block text-sm text-txt2 mb-1.5">Task name</label>
             <input type="text" value={formText} onChange={(e) => setFormText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && saveTask()}
-              className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-txt text-sm"
+              className="w-full glass-field px-3 py-2 text-txt text-sm"
               placeholder="e.g. Review weekly goals" autoFocus />
           </div>
           <div>
@@ -278,13 +278,13 @@ export default function WeeklyRoutinePage() {
               <div className="flex items-center gap-1">
                 <input type="number" value={Math.floor(formEst / 60) || ""} onChange={(e) => { const h = parseInt(e.target.value) || 0; setFormEst(Math.max(0, h * 60 + (formEst % 60))); }}
                   onFocus={(e) => { if (e.target.value === "0") e.target.value = ""; e.target.select(); }} min={0} placeholder="0"
-                  className="w-16 bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-txt text-sm" />
+                  className="w-16 glass-field px-3 py-2 text-txt text-sm" />
                 <span className="text-xs text-txt3">h</span>
               </div>
               <div className="flex items-center gap-1">
                 <input type="number" value={formEst % 60 || ""} onChange={(e) => { const m = Math.min(59, Math.max(0, parseInt(e.target.value) || 0)); setFormEst(Math.floor(formEst / 60) * 60 + m); }}
                   onFocus={(e) => { if (e.target.value === "0") e.target.value = ""; e.target.select(); }} min={0} max={59} placeholder="0"
-                  className="w-16 bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-txt text-sm" />
+                  className="w-16 glass-field px-3 py-2 text-txt text-sm" />
                 <span className="text-xs text-txt3">min</span>
               </div>
             </div>

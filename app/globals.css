@@ -7,7 +7,16 @@ html {
 }
 
 body {
-  background: #0a0a0f;
+  background-color: #0c0a18;
+  background-image:
+    radial-gradient(ellipse 700px 500px at 10% 20%, rgba(60,30,120,0.45) 0%, transparent 55%),
+    radial-gradient(ellipse 600px 450px at 85% 65%, rgba(35,20,80,0.5) 0%, transparent 50%),
+    radial-gradient(ellipse 500px 350px at 50% 50%, rgba(50,25,100,0.35) 0%, transparent 45%),
+    radial-gradient(ellipse 650px 400px at 75% 10%, rgba(25,15,60,0.5) 0%, transparent 55%),
+    radial-gradient(ellipse 550px 400px at 20% 80%, rgba(55,20,110,0.4) 0%, transparent 50%),
+    radial-gradient(ellipse 400px 300px at 60% 80%, rgba(40,18,90,0.45) 0%, transparent 48%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
   color: #e8e6ff;
   font-family: Inter, system-ui, -apple-system, sans-serif;
 }
@@ -61,12 +70,159 @@ input:focus,
 textarea:focus,
 select:focus {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(124, 111, 255, 0.4);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--glass-accent) 40%, transparent);
 }
 
 /* Modal backdrop */
+/* Floating card shadow — used on dashboard, project, and list cards */
+.card-float {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.25),
+    0 8px 24px rgba(0, 0, 0, 0.2);
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.card-float:hover {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    0 12px 32px rgba(0, 0, 0, 0.25);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Glass dialog (Liquid-Glass-style)
+   Uses color-mix() so the accent tint auto-adapts if --glass-accent changes.
+   Only ONE element owns backdrop-filter — the panel itself.
+   ───────────────────────────────────────────────────────────────── */
+:root {
+  --glass-accent: #7c6fff;
+  --glass-surface: #1a1432;
+  --glass-text: #e8e6ff;
+  --glass-bg: #0c0a18;
+}
+
+/* Backdrop: dim scrim only — NO blur. Sharp page behind, click-to-close. */
+.glass-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+/* The panel — layered build:
+   1. accent-tinted background (low alpha, picks up --glass-accent)
+   2. backdrop-filter: blur + saturate (the "liquid" feel)
+   3. ::before rim highlight (top edge gleam)
+   4. ::after bottom inner glow (material weight)
+   5. isolation: isolate (clips pseudo-elements on Safari) */
+.glass-panel {
+  position: relative;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  isolation: isolate;
+
+  /* Fallback for browsers without backdrop-filter */
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--glass-accent) 22%, var(--glass-surface)) 0%,
+      var(--glass-surface) 100%);
+  border: 1px solid color-mix(in srgb, var(--glass-text) 10%, transparent);
+  box-shadow:
+    0 24px 48px -16px rgba(0, 0, 0, 0.45),
+    0 4px 12px -2px rgba(0, 0, 0, 0.18);
+}
+
+@supports (backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px)) {
+  .glass-panel {
+    background:
+      linear-gradient(135deg,
+        color-mix(in srgb, var(--glass-accent) 22%, transparent) 0%,
+        color-mix(in srgb, var(--glass-accent) 10%, transparent) 100%),
+      color-mix(in srgb, var(--glass-surface) 25%, transparent);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    backdrop-filter: blur(30px) saturate(180%);
+    border: 1px solid color-mix(in srgb, var(--glass-text) 14%, transparent);
+  }
+}
+
+/* Top rim highlight — edge-of-glass gleam */
+.glass-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent,
+    color-mix(in srgb, var(--glass-text) 24%, transparent) 50%,
+    transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Bottom inner glow — gives material weight */
+.glass-panel::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 35%;
+  background: linear-gradient(to top,
+    color-mix(in srgb, var(--glass-accent) 6%, transparent),
+    transparent);
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 0 0 16px 16px;
+}
+
+/* Form fields inside glass — translucent, not opaque */
+.glass-field {
+  width: 100%;
+  border-radius: 10px;
+  color: var(--glass-text);
+  outline: none;
+  transition: border-color 150ms, background 150ms, box-shadow 150ms;
+
+  /* Fallback */
+  background: color-mix(in srgb, var(--glass-surface) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--glass-text) 12%, transparent);
+}
+@supports (backdrop-filter: blur(8px)) {
+  .glass-field {
+    background: color-mix(in srgb, var(--glass-surface) 40%, transparent);
+    border: 1px solid color-mix(in srgb, var(--glass-text) 16%, transparent);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+}
+.glass-field:focus {
+  border-color: var(--glass-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--glass-accent) 22%, transparent);
+}
+.glass-field::placeholder {
+  color: color-mix(in srgb, var(--glass-text) 35%, transparent);
+}
+
+/* Header divider — same plate of glass, not a separate bar */
+.glass-header {
+  border-bottom: 1px solid color-mix(in srgb, var(--glass-text) 8%, transparent);
+}
+
+/* Color pickers inside glass */
+.glass-panel input[type="color"] {
+  border: 1px solid color-mix(in srgb, var(--glass-text) 12%, transparent);
+  background: color-mix(in srgb, var(--glass-bg) 50%, transparent);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Legacy class kept for backward compat — maps to glass-backdrop */
 .modal-backdrop {
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.25);
 }
 
 /* Smooth transitions */

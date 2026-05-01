@@ -9,7 +9,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        bg: "#0a0a0f",
+        bg: "#0c0a18",
         surface: "#12121a",
         surface2: "#1a1a26",
         surface3: "#22223a",

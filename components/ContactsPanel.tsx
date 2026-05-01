@@ -66,7 +66,7 @@ function TagManager({ open, onClose, userId, tags, onSaved }: {
         <div className="flex gap-2">
           <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Tag name..."
             onKeyDown={e => e.key === "Enter" && addTag()}
-            className="flex-1 bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-txt focus:outline-none focus:border-violet" />
+            className="flex-1 glass-field px-3 py-2 text-sm text-txt focus:outline-none focus:border-violet" />
           <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)}
             className="w-10 h-10 rounded-lg border border-border bg-surface3 cursor-pointer" />
           <button onClick={addTag} disabled={!newName.trim()}
@@ -82,11 +82,11 @@ function TagManager({ open, onClose, userId, tags, onSaved }: {
         {local.length === 0 && <p className="text-sm text-txt3 text-center py-4">No tags yet</p>}
         <div className="space-y-2">
           {local.map(tag => (
-            <div key={tag.id} className="flex items-center gap-2 bg-white/[0.06] rounded-lg px-3 py-2">
+            <div key={tag.id} className="flex items-center gap-2 glass-field px-3 py-2">
               {editId === tag.id ? (
                 <>
                   <input value={editName} onChange={e => setEditName(e.target.value)} onKeyDown={e => e.key === "Enter" && saveEdit()}
-                    className="flex-1 bg-white/[0.06] border border-white/[0.08] rounded px-2 py-1 text-sm text-txt focus:outline-none" autoFocus />
+                    className="flex-1 glass-field rounded px-2 py-1 text-sm text-txt focus:outline-none" autoFocus />
                   <input type="color" value={editColor} onChange={e => setEditColor(e.target.value)}
                     className="w-8 h-8 rounded border border-border bg-surface2 cursor-pointer" />
                   <button onClick={saveEdit} className="text-xs text-green-acc">Save</button>
@@ -171,20 +171,20 @@ function ContactForm({ open, onClose, userId, tags, initial, onSaved }: {
     <div>
       <label className="block text-xs text-txt3 mb-1.5">{label}{required && <span className="text-danger"> *</span>}</label>
       <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-txt focus:outline-none focus:border-violet" />
+        className="w-full glass-field px-3 py-2 text-sm text-txt focus:outline-none focus:border-violet" />
     </div>
   );
 
   return (
     <Modal open={open} onClose={onClose} title={initial ? "Edit Contact" : "Add Contact"} maxWidth="max-w-xl">
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <F label="Name" value={name} onChange={setName} placeholder="John Doe" required />
           <F label="Email" value={email} onChange={setEmail} placeholder="john@example.com" type="email" />
           <F label="Phone" value={phone} onChange={setPhone} placeholder="+33 6 12 34 56 78" />
           <div>
             <label className="block text-xs text-txt3 mb-1.5">Tags</label>
-            <div className="flex flex-wrap gap-1.5 min-h-[38px] bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 items-center">
+            <div className="flex flex-wrap gap-1.5 min-h-[38px] glass-field px-3 py-2 items-center">
               {tags.length === 0 && <span className="text-xs text-txt3">No tags — create some first</span>}
               {tags.map(tag => (
                 <button key={tag.id} onClick={() => toggleTag(tag.id)}
@@ -201,15 +201,15 @@ function ContactForm({ open, onClose, userId, tags, initial, onSaved }: {
           {showMore ? "▾ Hide additional details" : "▸ Show additional details"}
         </button>
         {showMore && (
-          <div className="grid grid-cols-2 gap-4 pt-3 border-t border-border/50">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-border/50">
             <F label="Address" value={address} onChange={setAddress} placeholder="123 Main St" />
             <F label="Company number" value={companyNumber} onChange={setCompanyNumber} placeholder="IČO / VAT" />
             <F label="Other phone" value={altPhone} onChange={setAltPhone} />
             <F label="Other email" value={altEmail} onChange={setAltEmail} type="email" />
-            <div className="col-span-2">
+            <div className="sm:col-span-2">
               <label className="block text-xs text-txt3 mb-1.5">Notes</label>
               <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Any notes..."
-                className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-txt focus:outline-none focus:border-violet resize-none" />
+                className="w-full glass-field px-3 py-2 text-sm text-txt focus:outline-none focus:border-violet resize-none" />
             </div>
           </div>
         )}
@@ -244,23 +244,15 @@ function DetailsModal({ open, onClose, contact, onCopy }: { open: boolean; onClo
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.15)" }} />
-      <div className="relative w-full max-w-md max-h-[85vh] overflow-y-auto rounded-2xl border"
-        style={{
-          background: "rgba(28,18,55,0.3)",
-          backdropFilter: "blur(32px) saturate(1.6)",
-          WebkitBackdropFilter: "blur(32px) saturate(1.6)",
-          borderColor: "rgba(160,130,255,0.2)",
-          boxShadow: "0 24px 80px rgba(0,0,0,0.3), inset 0 1px 0 rgba(160,130,255,0.12), inset 0 0 60px rgba(80,50,160,0.05)",
-        }}
+    <div className="glass-backdrop" style={{ zIndex: 60 }} onClick={onClose}>
+      <div className="glass-panel w-full max-w-md"
         onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid rgba(124,110,196,0.15)" }}>
+        <div className="glass-header flex items-center justify-between px-4 sm:px-6 py-4">
           <h2 className="text-lg font-semibold text-bright">{contact.name}</h2>
           <button onClick={onClose} className="text-txt3 hover:text-txt text-xl leading-none">×</button>
         </div>
-        <div className="p-6">
-          <div className="grid grid-cols-2 gap-1">
+        <div className="p-4 sm:p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
             <Row label="Email" value={contact.email} copyable />
             <Row label="Phone" value={contact.phone} copyable />
           </div>
@@ -370,9 +362,8 @@ export function ContactsPanel({ open, onClose, userId }: { open: boolean; onClos
 
       {/* Panel */}
       <div
-        className="fixed top-0 right-0 bottom-0 z-50 flex flex-col border-l transition-transform duration-300 ease-in-out"
+        className="fixed top-0 right-0 bottom-0 z-50 flex flex-col border-l transition-transform duration-300 ease-in-out w-full sm:w-[440px]"
         style={{
-          width: 440,
           transform: open ? "translateX(0)" : "translateX(100%)",
           background: "#16152a",
           borderColor: "#2e2d3d",
@@ -389,13 +380,13 @@ export function ContactsPanel({ open, onClose, userId }: { open: boolean; onClos
         </div>
 
         {/* Actions */}
-        <div className="px-4 py-3 space-y-3 border-b border-border shrink-0">
-          <div className="flex gap-2">
+        <div className="px-4 py-3 space-y-2.5 border-b border-border shrink-0">
+          <div className="flex flex-wrap gap-2 items-center">
             <button onClick={() => { setEditContact(null); setFormOpen(true); }}
-              className="px-3 py-2 rounded-lg text-xs font-semibold bg-red-acc hover:bg-red-dark text-white">＋ Add Contact</button>
+              className="px-3 py-2 rounded-lg text-xs font-semibold bg-red-acc hover:bg-red-dark text-white">＋ Add</button>
             <button onClick={() => setTagModalOpen(true)}
               className="px-3 py-2 rounded-lg text-xs bg-surface2 border border-border text-txt3 hover:text-txt">🏷 Tags</button>
-            <div className="flex-1" />
+            <div className="flex-1 min-w-[20px]" />
             <button onClick={() => setSortBy(s => s === "name" ? "newest" : "name")}
               className="px-2 py-2 rounded-lg text-[10px] text-txt3 hover:text-txt bg-surface2 border border-border">
               {sortBy === "name" ? "A→Z" : "🕐"} ↕

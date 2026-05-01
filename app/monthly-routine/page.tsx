@@ -131,7 +131,7 @@ export default function MonthlyRoutinePage() {
         {tasks.map((task, idx) => (
           <div key={task.id} draggable onDragStart={() => handleDragStart(idx)}
             onDragOver={(e) => handleDragOver(e, idx)} onDragEnd={handleDragEnd}
-            className={cn("bg-surface border border-border rounded-lg px-4 py-3 flex items-center gap-3 group transition-all",
+            className={cn("bg-surface border border-border rounded-lg px-4 py-3 flex items-center gap-3 group transition-all card-float",
               dragIdx === idx && "opacity-50 scale-[0.98]")}>
             <span className="cursor-grab text-txt3 opacity-0 group-hover:opacity-100 select-none">⠿</span>
             <input type="checkbox" checked={task.checked || false} onChange={() => toggleCheck(task)}
@@ -163,7 +163,7 @@ export default function MonthlyRoutinePage() {
             <label className="block text-sm text-txt2 mb-1.5">Task</label>
             <input type="text" value={formText} onChange={(e) => setFormText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && saveTask()}
-              className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-txt text-sm" autoFocus />
+              className="w-full glass-field px-3 py-2 text-txt text-sm" autoFocus />
           </div>
           <div>
             <label className="block text-sm text-txt2 mb-1.5">Estimated time</label>
@@ -171,13 +171,13 @@ export default function MonthlyRoutinePage() {
               <div className="flex items-center gap-1">
                 <input type="number" value={Math.floor(formEst / 60) || ""} onChange={(e) => { const h = parseInt(e.target.value) || 0; setFormEst(Math.max(0, h * 60 + (formEst % 60))); }}
                   onFocus={(e) => { if (e.target.value === "0") e.target.value = ""; e.target.select(); }} min={0} placeholder="0"
-                  className="w-16 bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-txt text-sm" />
+                  className="w-16 glass-field px-3 py-2 text-txt text-sm" />
                 <span className="text-xs text-txt3">h</span>
               </div>
               <div className="flex items-center gap-1">
                 <input type="number" value={formEst % 60 || ""} onChange={(e) => { const m = Math.min(59, Math.max(0, parseInt(e.target.value) || 0)); setFormEst(Math.floor(formEst / 60) * 60 + m); }}
                   onFocus={(e) => { if (e.target.value === "0") e.target.value = ""; e.target.select(); }} min={0} max={59} placeholder="0"
-                  className="w-16 bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-txt text-sm" />
+                  className="w-16 glass-field px-3 py-2 text-txt text-sm" />
                 <span className="text-xs text-txt3">min</span>
               </div>
             </div>

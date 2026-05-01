@@ -839,7 +839,7 @@ export default function ProjectDetailPage() {
           <textarea
             value={descDraft}
             onChange={(e) => setDescDraft(e.target.value)}
-            className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-txt text-sm h-32 resize-none"
+            className="w-full glass-field px-3 py-2 text-txt text-sm h-32 resize-none"
             placeholder="Add a description..."
           />
           <div className="flex justify-end gap-2">
@@ -874,7 +874,7 @@ export default function ProjectDetailPage() {
             <p className="text-sm text-txt2 mb-3">Select the target task:</p>
             {tasks.filter((t) => t.id !== moveSubModal.fromTaskId).map((t) => (
               <button key={t.id} onClick={() => moveSubtask(moveSubModal.subId, moveSubModal.fromTaskId, t.id)}
-                className="w-full text-left px-3 py-2.5 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-txt hover:border-violet/50 hover:text-violet2 transition-colors">
+                className="glass-field w-full text-left px-3 py-2.5 text-sm text-txt hover:border-violet/50 hover:text-violet2 transition-colors">
                 {t.name}
                 <span className="text-[10px] text-txt3 ml-2">{t.subtasks?.length || 0} subtasks</span>
               </button>

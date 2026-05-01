@@ -488,7 +488,7 @@ export default function ProjectsPage() {
             onDragEnd={handleDragEnd}
             onClick={() => router.push(`/projects/${p.id}`)}
             className={cn(
-              "bg-surface border border-border rounded-xl p-4 text-left hover:border-border2 transition-all group cursor-pointer",
+              "bg-surface border border-border rounded-xl p-4 text-left hover:border-border2 transition-all group cursor-pointer card-float",
               dragIdx === idx && "opacity-50 scale-[0.98]"
             )}>
             <div className="flex items-start justify-between gap-2">

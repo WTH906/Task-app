@@ -46,18 +46,12 @@ export function ConfirmDeleteModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop"
+      className="glass-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget && !loading) onClose();
       }}
     >
-      <div className="border border-danger/20 rounded-xl max-w-sm w-full"
-        style={{
-          background: "rgba(28,18,55,0.35)",
-          backdropFilter: "blur(32px) saturate(1.6)",
-          WebkitBackdropFilter: "blur(32px) saturate(1.6)",
-          boxShadow: "0 24px 80px rgba(0,0,0,0.3), inset 0 1px 0 rgba(160,130,255,0.12)",
-        }}>
+      <div className="glass-panel max-w-sm w-full">
         <div className="p-5">
           <h2 className="text-lg font-title text-danger mb-2">{title}</h2>
           {description && (
@@ -74,7 +68,7 @@ export function ConfirmDeleteModal({
             onKeyDown={(e) => {
               if (e.key === "Enter" && canConfirm && !loading) onConfirm();
             }}
-            className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-txt text-sm font-mono placeholder-txt3"
+            className="glass-field px-3 py-2 text-sm font-mono"
             placeholder={confirmText}
             disabled={loading}
           />

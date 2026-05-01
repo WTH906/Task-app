@@ -57,7 +57,7 @@ export function TaskItem({
   return (
     <div draggable onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
       <div className={cn(
-        "bg-surface border rounded-lg transition-all",
+        "bg-surface border rounded-lg transition-all card-float",
         isActive ? "border-green-acc shadow-lg shadow-green-acc/10" : "border-border",
         isDone && "opacity-60"
       )}>

@@ -328,7 +328,7 @@ export default function DashboardPage() {
     switch (id) {
       case "routine": {
         content = (
-          <div className="bg-surface border border-border rounded-xl p-4 hover:border-border2 transition-colors">
+          <div className="bg-surface border border-border rounded-xl p-4 hover:border-border2 transition-colors card-float">
             <div className="flex items-center justify-between mb-3">
               <Link href="/routine" className="text-sm font-medium text-txt2 hover:text-red-acc transition-colors flex items-center gap-1.5"><ListChecks size={15} /> Daily Routine</Link>
               <span className="text-xs font-mono text-red-acc">{routineChecked}/{routineTotal}</span>
@@ -350,7 +350,7 @@ export default function DashboardPage() {
       }
       case "today": {
         content = (
-          <div className="bg-surface border border-border rounded-xl p-4 hover:border-border2 transition-colors">
+          <div className="bg-surface border border-border rounded-xl p-4 hover:border-border2 transition-colors card-float">
             <div className="flex items-center justify-between mb-3">
               <Link href={`/week/${today}`} className="text-sm font-medium text-txt2 hover:text-violet2 transition-colors flex items-center gap-1.5"><CalendarDays size={15} /> Today&apos;s Tasks</Link>
               <span className="text-xs font-mono text-muted-acc2">{todayDone}/{todayTotal}</span>
@@ -383,7 +383,7 @@ export default function DashboardPage() {
         const wrTotal = weeklyRoutine.length;
         const wrPct = wrTotal > 0 ? Math.round((wrChecked / wrTotal) * 100) : 0;
         content = (
-          <div className="bg-surface border border-border rounded-xl p-4">
+          <div className="bg-surface border border-border rounded-xl p-4 card-float">
             <div className="flex items-center justify-between mb-3">
               <Link href="/weekly-routine" className="text-sm font-medium text-txt2 hover:text-violet2 transition-colors flex items-center gap-1.5"><RefreshCw size={15} /> Weekly Routine</Link>
               <span className="text-xs font-mono text-violet2">{wrChecked}/{wrTotal}</span>
@@ -424,7 +424,7 @@ export default function DashboardPage() {
           if (t.done) tagStats[tag].done++;
         }
         content = (
-          <Link href="/week" className="bg-surface border border-border rounded-xl p-4 block hover:border-border2 transition-colors group">
+          <Link href="/week" className="bg-surface border border-border rounded-xl p-4 block hover:border-border2 transition-colors group card-float">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-medium text-txt2 group-hover:text-violet2 transition-colors flex items-center gap-1.5"><BarChart3 size={15} /> This Week</h2>
               <span className="text-xs font-mono text-violet2">{weekDone}/{weekTotal} · {weekPct}%</span>
@@ -449,7 +449,7 @@ export default function DashboardPage() {
         const mrTotal = monthlyRoutine.length;
         const mrPct = mrTotal > 0 ? Math.round((mrChecked / mrTotal) * 100) : 0;
         content = (
-          <div className="bg-surface border border-border rounded-xl p-4">
+          <div className="bg-surface border border-border rounded-xl p-4 card-float">
             <div className="flex items-center justify-between mb-3">
               <Link href="/monthly-routine" className="text-sm font-medium text-txt2 hover:text-violet2 transition-colors flex items-center gap-1.5"><CalendarRange size={15} /> Monthly Routine</Link>
               <span className="text-xs font-mono text-violet2">{mrChecked}/{mrTotal}</span>
@@ -470,7 +470,7 @@ export default function DashboardPage() {
       }
       case "taskList": {
         content = (
-          <div className="bg-surface border border-border rounded-xl p-4">
+          <div className="bg-surface border border-border rounded-xl p-4 card-float">
             <div className="flex items-center justify-between mb-3">
               <Link href="/tasks" className="text-sm font-medium text-txt2 hover:text-violet2 transition-colors flex items-center gap-1.5"><ClipboardList size={15} /> Task List</Link>
               <span className="text-xs font-mono text-txt3">{quickTasks.length} tasks</span>
@@ -535,7 +535,7 @@ export default function DashboardPage() {
       }
       case "deadlines": {
         content = (
-          <div className="bg-surface border border-border rounded-xl p-4">
+          <div className="bg-surface border border-border rounded-xl p-4 card-float">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5"><Timer size={15} /> Upcoming Deadlines</h2>
               <Link href="/deadlines" className="text-[10px] text-txt3 hover:text-violet2 transition-colors">View all →</Link>
@@ -557,7 +557,7 @@ export default function DashboardPage() {
       }
       case "projects": {
         content = (
-          <div className="bg-surface border border-border rounded-xl p-4">
+          <div className="bg-surface border border-border rounded-xl p-4 card-float">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5"><Folder size={15} /> Projects</h2>
               <Link href="/projects" className="text-[10px] text-txt3 hover:text-red-acc transition-colors">View all →</Link>
@@ -581,7 +581,7 @@ export default function DashboardPage() {
       case "activity": {
         if (activity.length === 0) return null;
         content = (
-          <div className="bg-surface border border-border rounded-xl p-4">
+          <div className="bg-surface border border-border rounded-xl p-4 card-float">
             <h2 className="text-sm font-medium text-txt2 mb-3 flex items-center gap-1.5"><Activity size={15} /> Recent Activity</h2>
             <div className="space-y-1.5">
               {activity.map((a) => (

@@ -421,7 +421,7 @@ export default function WeekPage() {
 
             return (
               <div key={dateKey}
-                className={cn("bg-surface border rounded-xl p-3 flex flex-col transition-all",
+                className={cn("bg-surface border rounded-xl p-3 flex flex-col transition-all card-float",
                   isToday ? "border-violet shadow-lg shadow-violet/10" : "border-border hover:border-border2")}>
                 <div className="mb-2">
                   <div className="flex items-center justify-between">

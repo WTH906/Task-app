@@ -334,7 +334,7 @@ export default function DayDetailPage() {
             onDragOver={(e) => handleDragOver(e, idx)}
             onDragEnd={handleDragEnd}
             className={cn(
-              "flex items-center gap-2 bg-surface border border-border rounded-lg px-3 py-2.5 group",
+              "flex items-center gap-2 bg-surface border border-border rounded-lg px-3 py-2.5 group card-float",
               dragIdx === idx && "opacity-50"
             )}
           >
