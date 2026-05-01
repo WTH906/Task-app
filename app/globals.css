@@ -142,8 +142,8 @@ select:focus {
   .glass-panel {
     background:
       linear-gradient(135deg,
-        color-mix(in srgb, var(--glass-accent) 14%, transparent) 0%,
-        color-mix(in srgb, var(--glass-accent) 4%, transparent) 100%),
+        color-mix(in srgb, var(--glass-accent) 18%, transparent) 0%,
+        color-mix(in srgb, var(--glass-accent) 8%, transparent) 100%),
       color-mix(in srgb, var(--glass-surface) 10%, transparent);
     -webkit-backdrop-filter: blur(28px) saturate(160%);
     backdrop-filter: blur(28px) saturate(160%);
@@ -193,8 +193,8 @@ select:focus {
 }
 @supports (backdrop-filter: blur(8px)) {
   .glass-field {
-    background: color-mix(in srgb, var(--glass-accent) 8%, transparent);
-    border: 1px solid color-mix(in srgb, var(--glass-text) 12%, transparent);
+    background: color-mix(in srgb, var(--glass-bg) 45%, transparent);
+    border: 1px solid color-mix(in srgb, var(--glass-text) 10%, transparent);
     -webkit-backdrop-filter: blur(6px);
     backdrop-filter: blur(6px);
   }

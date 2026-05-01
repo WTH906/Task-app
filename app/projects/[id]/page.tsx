@@ -178,10 +178,10 @@ export default function ProjectDetailPage() {
       if (editTarget && "project_id" in editTarget) {
         await supabase
           .from("project_tasks")
-          .update({ name, est_minutes: formEst, deadline, date_key: calDate, recurrence: formRecurrence })
+          .update({ name, est_minutes: formEst, deadline, date_key: calDate })
           .eq("id", editTarget.id);
 
-        updateTaskLocal(editTarget.id, { name, est_minutes: formEst, deadline, date_key: calDate, recurrence: formRecurrence });
+        updateTaskLocal(editTarget.id, { name, est_minutes: formEst, deadline, date_key: calDate });
 
         if (project) {
           await syncProjectTaskToWeek(supabase, userId, editTarget.id, name, projectId, project.title, calDate, (editTarget as ProjectTask).date_key, formRecurrence);
@@ -191,7 +191,6 @@ export default function ProjectDetailPage() {
         const { data: newTask } = await supabase.from("project_tasks").insert({
           project_id: projectId, user_id: userId, name,
           est_minutes: formEst, deadline, date_key: calDate, sort_order: tasks.length,
-          recurrence: formRecurrence,
         }).select().single();
 
         if (newTask && project) {
@@ -394,20 +393,16 @@ export default function ProjectDetailPage() {
       const subName = sub?.name || "Subtask";
       const label = `[${project.title}] ↳ ${subName}`;
 
-      // Delete existing deadlines for this subtask label, then insert if new value
+      // Delete-then-insert — no maybeSingle
       await supabase.from("deadlines").delete().eq("user_id", userId).eq("label", label);
-
       if (value) {
         await supabase.from("deadlines").insert({
-          user_id: userId,
-          label,
-          target_datetime: `${value}T23:59:00`,
+          user_id: userId, label, target_datetime: `${value}T23:59:00`,
         });
       }
     }
 
     if (field === "est_minutes") {
-      // Recalc parent est_minutes = sum of all subtask est_minutes
       const parent = tasks.find((t) => t.id === parentId);
       if (parent?.subtasks) {
         const subs = parent.subtasks.map((s) =>
@@ -585,7 +580,7 @@ export default function ProjectDetailPage() {
     setFormEst(target ? target.est_minutes : 0);
     setFormDate(target ? ((target as ProjectTask).date_key || "") : "");
     setFormDeadline(target ? (target.deadline || "") : "");
-    setFormRecurrence(target && "recurrence" in target ? (target as ProjectTask).recurrence : null);
+    setFormRecurrence(null);
     setModalMode(mode);
     setModalOpen(true);
   };
