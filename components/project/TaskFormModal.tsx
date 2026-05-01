@@ -103,17 +103,19 @@ export function TaskFormModal({
           />
           {formDeadline && <p className="text-[10px] text-danger mt-1">A countdown deadline will be created</p>}
         </div>
-        {formDeadline && (
+        {(formDate || formDeadline) && (
           <div>
             <label className="text-sm text-txt2 mb-1.5 flex items-center gap-1.5"><RefreshCw size={14} /> Recurring?</label>
             <select value={formRecurrence || ""} onChange={(e) => setFormRecurrence(e.target.value || null)}
               className="w-full glass-field px-3 py-2 text-txt text-sm">
-              <option value="">No — one-time deadline</option>
+              <option value="">No — one-time</option>
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
               <option value="yearly">Yearly</option>
             </select>
+            {formRecurrence && formDate && <p className="text-[10px] text-violet2 mt-1">Task will repeat on the calendar {formRecurrence}</p>}
+            {formRecurrence && formDeadline && <p className="text-[10px] text-danger mt-1">Deadline will recur {formRecurrence}</p>}
           </div>
         )}
         <div className="flex justify-end gap-2 pt-2">

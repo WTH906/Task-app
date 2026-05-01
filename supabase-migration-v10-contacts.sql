@@ -1,6 +1,10 @@
 -- ============================================================
--- Migration v10: Contacts & Contact Tags
+-- Migration v10: Contacts, Contact Tags, and Task Recurrence
 -- ============================================================
+
+-- Add recurrence to project_tasks for calendar repeating
+ALTER TABLE project_tasks ADD COLUMN IF NOT EXISTS recurrence TEXT NULL
+  CHECK (recurrence IN ('daily', 'weekly', 'monthly', 'yearly'));
 
 -- Contact tags (lawyer, developer, client, etc.)
 CREATE TABLE IF NOT EXISTS contact_tags (

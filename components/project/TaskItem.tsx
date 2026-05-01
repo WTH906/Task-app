@@ -64,6 +64,13 @@ export function TaskItem({
         {/* Row 1: drag + play + name */}
         <div className="flex items-center gap-2 px-3 py-2.5">
           <span className="cursor-grab text-txt3 hover:text-txt select-none">⠿</span>
+          <input
+            type="checkbox"
+            checked={isDone}
+            onChange={() => actions.updateTaskField(task.id, "progress", isDone ? 0 : 100)}
+            className="shrink-0"
+            title={isDone ? "Mark as incomplete" : "Mark as complete"}
+          />
           <button
             onClick={() => actions.toggleTimer(task.id)}
             className={cn(
@@ -162,6 +169,13 @@ export function TaskItem({
                 )}
               >
                 <span className="cursor-grab text-txt3 opacity-30 hover:opacity-100 select-none text-[10px]">⠿</span>
+                <input
+                  type="checkbox"
+                  checked={sub.progress >= 100}
+                  onChange={() => actions.updateSubtaskField(sub.id, task.id, "progress", sub.progress >= 100 ? 0 : 100)}
+                  className="shrink-0"
+                  title={sub.progress >= 100 ? "Mark as incomplete" : "Mark as complete"}
+                />
                 <button onClick={() => actions.toggleTimer(`sub:${sub.id}`)}
                   className={cn("w-6 h-6 rounded flex items-center justify-center text-[10px] shrink-0 transition-colors",
                     activeTaskId === `sub:${sub.id}` ? "bg-green-acc/20 text-green-acc" : "bg-surface3 text-txt3 hover:text-red-acc"
@@ -172,7 +186,7 @@ export function TaskItem({
                   <span className="font-mono text-[10px] text-green-acc timer-active">{formatSeconds(elapsed[`sub:${sub.id}`] || 0)}</span>
                 )}
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: progressColor(sub.progress) }} />
-                <InlineEdit value={sub.name} onSave={(v) => actions.updateSubtaskField(sub.id, task.id, "name", v)} className="font-medium text-xs min-w-[100px]" />
+                <InlineEdit value={sub.name} onSave={(v) => actions.updateSubtaskField(sub.id, task.id, "name", v)} className={cn("font-medium text-xs min-w-[100px]", sub.progress >= 100 && "line-through opacity-50")} />
                 <InlineEdit value={String(sub.est_minutes)} onSave={(v) => actions.updateSubtaskField(sub.id, task.id, "est_minutes", parseInt(v) || 0)} type="number" min={0} className="w-10 text-xs text-txt3" placeholder="0" />
                 <span className="text-txt3 text-[10px]">min</span>
                 <div className="flex items-center gap-1">

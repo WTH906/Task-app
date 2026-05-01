@@ -93,7 +93,7 @@ select:focus {
    Only ONE element owns backdrop-filter — the panel itself.
    ───────────────────────────────────────────────────────────────── */
 :root {
-  --glass-accent: #7c6fff;
+  --glass-accent: #9217BF;
   --glass-surface: #1a1432;
   --glass-text: #e8e6ff;
   --glass-bg: #0c0a18;

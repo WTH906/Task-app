@@ -24,6 +24,7 @@ export interface ProjectTask {
   archived_at: string | null;
   alarm_fired_at: string | null;
   timer_started_at: string | null;
+  recurrence: string | null;
 }
 
 export interface Subtask {

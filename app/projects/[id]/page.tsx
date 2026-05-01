@@ -10,7 +10,7 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { InlineEdit } from "@/components/InlineEdit";
 import { CalendarPicker } from "@/components/CalendarPicker";
 import { Modal } from "@/components/Modal";
-import { syncProjectTaskToWeek, syncSubtaskToWeek, removeWeekTasksForProjectTask, syncTaskDeadlineToDeadlines, syncTaskCompletion } from "@/lib/sync";
+import { syncProjectTaskToWeek, syncSubtaskToWeek, removeWeekTasksForProjectTask, syncTaskDeadlineToDeadlines, syncTaskCompletion, syncSubtaskCompletion } from "@/lib/sync";
 import { GCalSyncModal } from "@/components/GCalButton";
 import { ColorPicker } from "@/components/ColorPicker";
 import { logActivity } from "@/lib/activity";
@@ -178,25 +178,26 @@ export default function ProjectDetailPage() {
       if (editTarget && "project_id" in editTarget) {
         await supabase
           .from("project_tasks")
-          .update({ name, est_minutes: formEst, deadline, date_key: calDate })
+          .update({ name, est_minutes: formEst, deadline, date_key: calDate, recurrence: formRecurrence })
           .eq("id", editTarget.id);
 
-        updateTaskLocal(editTarget.id, { name, est_minutes: formEst, deadline, date_key: calDate });
+        updateTaskLocal(editTarget.id, { name, est_minutes: formEst, deadline, date_key: calDate, recurrence: formRecurrence });
 
         if (project) {
-          await syncProjectTaskToWeek(supabase, userId, editTarget.id, name, projectId, project.title, calDate, (editTarget as ProjectTask).date_key);
+          await syncProjectTaskToWeek(supabase, userId, editTarget.id, name, projectId, project.title, calDate, (editTarget as ProjectTask).date_key, formRecurrence);
           await syncTaskDeadlineToDeadlines(supabase, userId, editTarget.id, name, project.title, deadline, formRecurrence);
         }
       } else {
         const { data: newTask } = await supabase.from("project_tasks").insert({
           project_id: projectId, user_id: userId, name,
           est_minutes: formEst, deadline, date_key: calDate, sort_order: tasks.length,
+          recurrence: formRecurrence,
         }).select().single();
 
         if (newTask && project) {
           addTaskLocal(newTask as ProjectTask);
           if (calDate) {
-            await syncProjectTaskToWeek(supabase, userId, newTask.id, name, projectId, project.title, calDate, null);
+            await syncProjectTaskToWeek(supabase, userId, newTask.id, name, projectId, project.title, calDate, null, formRecurrence);
           }
           if (deadline) {
             await syncTaskDeadlineToDeadlines(supabase, userId, newTask.id, name, project.title, deadline, formRecurrence);
@@ -393,26 +394,10 @@ export default function ProjectDetailPage() {
       const subName = sub?.name || "Subtask";
       const label = `[${project.title}] ↳ ${subName}`;
 
-      // Find existing deadline for this subtask (by label match)
-      const { data: existing } = await supabase
-        .from("deadlines")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("label", label)
-        .maybeSingle();
+      // Delete existing deadlines for this subtask label, then insert if new value
+      await supabase.from("deadlines").delete().eq("user_id", userId).eq("label", label);
 
-      if (!value) {
-        // Deadline cleared — delete
-        if (existing) {
-          await supabase.from("deadlines").delete().eq("id", existing.id);
-        }
-      } else if (existing) {
-        // Deadline changed — update
-        await supabase.from("deadlines").update({
-          target_datetime: `${value}T23:59:00`,
-        }).eq("id", existing.id);
-      } else {
-        // New deadline — create
+      if (value) {
         await supabase.from("deadlines").insert({
           user_id: userId,
           label,
@@ -435,6 +420,10 @@ export default function ProjectDetailPage() {
     }
 
     if (field === "progress") {
+      // Sync subtask's own linked week_tasks
+      const subRes = await syncSubtaskCompletion(supabase, userId, subtaskId, value as number);
+      if (subRes.error) toast("Sync error: " + subRes.error, "error");
+
       const parent = tasks.find((t) => t.id === parentId);
       if (parent?.subtasks) {
         const subs = parent.subtasks.map((s) =>
@@ -596,7 +585,7 @@ export default function ProjectDetailPage() {
     setFormEst(target ? target.est_minutes : 0);
     setFormDate(target ? ((target as ProjectTask).date_key || "") : "");
     setFormDeadline(target ? (target.deadline || "") : "");
-    setFormRecurrence(null);
+    setFormRecurrence(target && "recurrence" in target ? (target as ProjectTask).recurrence : null);
     setModalMode(mode);
     setModalOpen(true);
   };
