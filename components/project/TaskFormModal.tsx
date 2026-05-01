@@ -43,7 +43,7 @@ export function TaskFormModal({
             value={formName}
             onChange={(e) => setFormName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && onSave()}
-            className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm"
+            className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-txt text-sm"
             autoFocus
           />
         </div>
@@ -61,7 +61,7 @@ export function TaskFormModal({
                 onFocus={(e) => { if (e.target.value === "0") e.target.value = ""; e.target.select(); }}
                 min={0}
                 placeholder="0"
-                className="w-16 bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm"
+                className="w-16 bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-txt text-sm"
               />
               <span className="text-xs text-txt3">h</span>
             </div>
@@ -77,7 +77,7 @@ export function TaskFormModal({
                 min={0}
                 max={59}
                 placeholder="0"
-                className="w-16 bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm"
+                className="w-16 bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-txt text-sm"
               />
               <span className="text-xs text-txt3">min</span>
             </div>
@@ -89,7 +89,7 @@ export function TaskFormModal({
             type="date"
             value={formDate}
             onChange={(e) => setFormDate(e.target.value)}
-            className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm"
+            className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-txt text-sm"
           />
           {formDate && <p className="text-[10px] text-violet2 mt-1">Task will appear on the calendar for this date</p>}
         </div>
@@ -99,7 +99,7 @@ export function TaskFormModal({
             type="date"
             value={formDeadline}
             onChange={(e) => setFormDeadline(e.target.value)}
-            className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm"
+            className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-txt text-sm"
           />
           {formDeadline && <p className="text-[10px] text-danger mt-1">A countdown deadline will be created</p>}
         </div>
@@ -107,7 +107,7 @@ export function TaskFormModal({
           <div>
             <label className="text-sm text-txt2 mb-1.5 flex items-center gap-1.5"><RefreshCw size={14} /> Recurring?</label>
             <select value={formRecurrence || ""} onChange={(e) => setFormRecurrence(e.target.value || null)}
-              className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm">
+              className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-txt text-sm">
               <option value="">No — one-time deadline</option>
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>

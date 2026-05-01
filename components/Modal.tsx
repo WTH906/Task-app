@@ -33,19 +33,19 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-md" }:
         ref={ref}
         className={`border rounded-xl ${maxWidth} w-full max-h-[85vh] overflow-y-auto`}
         style={{
-          background: "rgba(30,24,52,0.55)",
-          backdropFilter: "blur(24px) saturate(1.4)",
-          WebkitBackdropFilter: "blur(24px) saturate(1.4)",
-          borderColor: "rgba(140,120,220,0.25)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.4), inset 0 1px 0 rgba(140,120,220,0.15), inset 0 0 40px rgba(100,80,180,0.06)",
+          background: "rgba(28,18,55,0.35)",
+          backdropFilter: "blur(32px) saturate(1.6)",
+          WebkitBackdropFilter: "blur(32px) saturate(1.6)",
+          borderColor: "rgba(160,130,255,0.2)",
+          boxShadow: "0 24px 80px rgba(0,0,0,0.3), inset 0 1px 0 rgba(160,130,255,0.12), inset 0 0 60px rgba(80,50,160,0.05)",
         }}
       >
         <div className="flex items-center justify-between p-4 border-b sticky top-0 z-10 rounded-t-xl"
           style={{
-            borderColor: "rgba(140,120,220,0.15)",
-            background: "rgba(30,24,52,0.45)",
-            backdropFilter: "blur(24px)",
-            WebkitBackdropFilter: "blur(24px)",
+            borderColor: "rgba(160,130,255,0.12)",
+            background: "rgba(28,18,55,0.3)",
+            backdropFilter: "blur(32px)",
+            WebkitBackdropFilter: "blur(32px)",
           }}>
           <h2 className="font-title text-bright text-lg">{title}</h2>
           <button

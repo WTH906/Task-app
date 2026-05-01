@@ -66,7 +66,7 @@ function TagManager({ open, onClose, userId, tags, onSaved }: {
         <div className="flex gap-2">
           <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Tag name..."
             onKeyDown={e => e.key === "Enter" && addTag()}
-            className="flex-1 bg-surface3 border border-border rounded-lg px-3 py-2 text-sm text-txt focus:outline-none focus:border-violet" />
+            className="flex-1 bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-txt focus:outline-none focus:border-violet" />
           <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)}
             className="w-10 h-10 rounded-lg border border-border bg-surface3 cursor-pointer" />
           <button onClick={addTag} disabled={!newName.trim()}
@@ -82,11 +82,11 @@ function TagManager({ open, onClose, userId, tags, onSaved }: {
         {local.length === 0 && <p className="text-sm text-txt3 text-center py-4">No tags yet</p>}
         <div className="space-y-2">
           {local.map(tag => (
-            <div key={tag.id} className="flex items-center gap-2 bg-surface3 rounded-lg px-3 py-2">
+            <div key={tag.id} className="flex items-center gap-2 bg-white/[0.06] rounded-lg px-3 py-2">
               {editId === tag.id ? (
                 <>
                   <input value={editName} onChange={e => setEditName(e.target.value)} onKeyDown={e => e.key === "Enter" && saveEdit()}
-                    className="flex-1 bg-surface2 border border-border rounded px-2 py-1 text-sm text-txt focus:outline-none" autoFocus />
+                    className="flex-1 bg-white/[0.06] border border-white/[0.08] rounded px-2 py-1 text-sm text-txt focus:outline-none" autoFocus />
                   <input type="color" value={editColor} onChange={e => setEditColor(e.target.value)}
                     className="w-8 h-8 rounded border border-border bg-surface2 cursor-pointer" />
                   <button onClick={saveEdit} className="text-xs text-green-acc">Save</button>
@@ -171,7 +171,7 @@ function ContactForm({ open, onClose, userId, tags, initial, onSaved }: {
     <div>
       <label className="block text-xs text-txt3 mb-1.5">{label}{required && <span className="text-danger"> *</span>}</label>
       <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-sm text-txt focus:outline-none focus:border-violet" />
+        className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-txt focus:outline-none focus:border-violet" />
     </div>
   );
 
@@ -184,7 +184,7 @@ function ContactForm({ open, onClose, userId, tags, initial, onSaved }: {
           <F label="Phone" value={phone} onChange={setPhone} placeholder="+33 6 12 34 56 78" />
           <div>
             <label className="block text-xs text-txt3 mb-1.5">Tags</label>
-            <div className="flex flex-wrap gap-1.5 min-h-[38px] bg-surface3 border border-border rounded-lg px-3 py-2 items-center">
+            <div className="flex flex-wrap gap-1.5 min-h-[38px] bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 items-center">
               {tags.length === 0 && <span className="text-xs text-txt3">No tags — create some first</span>}
               {tags.map(tag => (
                 <button key={tag.id} onClick={() => toggleTag(tag.id)}
@@ -209,7 +209,7 @@ function ContactForm({ open, onClose, userId, tags, initial, onSaved }: {
             <div className="col-span-2">
               <label className="block text-xs text-txt3 mb-1.5">Notes</label>
               <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Any notes..."
-                className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-sm text-txt focus:outline-none focus:border-violet resize-none" />
+                className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-txt focus:outline-none focus:border-violet resize-none" />
             </div>
           </div>
         )}
@@ -245,14 +245,14 @@ function DetailsModal({ open, onClose, contact, onCopy }: { open: boolean; onClo
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.25)" }} />
+      <div className="absolute inset-0" style={{ background: "rgba(0,0,0,0.15)" }} />
       <div className="relative w-full max-w-md max-h-[85vh] overflow-y-auto rounded-2xl border"
         style={{
-          background: "rgba(30,24,52,0.5)",
-          backdropFilter: "blur(24px) saturate(1.4)",
-          WebkitBackdropFilter: "blur(24px) saturate(1.4)",
-          borderColor: "rgba(140,120,220,0.25)",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.4), inset 0 1px 0 rgba(140,120,220,0.15), inset 0 0 40px rgba(100,80,180,0.06)",
+          background: "rgba(28,18,55,0.3)",
+          backdropFilter: "blur(32px) saturate(1.6)",
+          WebkitBackdropFilter: "blur(32px) saturate(1.6)",
+          borderColor: "rgba(160,130,255,0.2)",
+          boxShadow: "0 24px 80px rgba(0,0,0,0.3), inset 0 1px 0 rgba(160,130,255,0.12), inset 0 0 60px rgba(80,50,160,0.05)",
         }}
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid rgba(124,110,196,0.15)" }}>

@@ -679,46 +679,39 @@ export default function ProjectDetailPage() {
               />
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-1 shrink-0 mt-1">
-            <button
-              onClick={saveAsTemplate}
-              className="px-3 py-1.5 rounded-lg text-xs bg-surface border border-border text-txt2 hover:text-violet2 hover:border-violet/30 transition-colors"
-              title="Save as template"
-            >
-              <span className="flex items-center gap-1"><Save size={12} /> Template</span>
-            </button>
-            <button
-              onClick={exportProject}
-              className="px-3 py-1.5 rounded-lg text-xs bg-surface border border-border text-txt2 hover:text-green-acc hover:border-green-acc/30 transition-colors"
-              title="Export as JSON"
-            >
-              <span className="flex items-center gap-1"><Upload size={12} /> JSON</span>
-            </button>
-            <button
-              onClick={exportProjectCSV}
-              className="px-3 py-1.5 rounded-lg text-xs bg-surface border border-border text-txt2 hover:text-green-acc hover:border-green-acc/30 transition-colors"
-              title="Export as CSV"
-            >
-              <span className="flex items-center gap-1"><Upload size={12} /> CSV</span>
-            </button>
-            <button
-              onClick={() => setGcalModalOpen(true)}
-              className="px-3 py-1.5 rounded-lg text-xs bg-surface border border-border text-txt2 hover:text-amber hover:border-amber/30 transition-colors"
-              title="Sync deadlines to Google Calendar"
-            >
-              <span className="flex items-center gap-1"><Calendar size={12} /> GCal Sync</span>
-            </button>
+          <div className="flex flex-wrap items-center gap-2 shrink-0 mt-1">
+            {/* Primary actions */}
             <button
               onClick={() => { setDescDraft(project.description || ""); setDescModalOpen(true); }}
-              className="px-3 py-1.5 rounded-lg text-xs bg-surface border border-border text-txt2 hover:text-txt hover:border-border2 transition-colors"
+              className="text-xs text-txt3 hover:text-txt transition-colors"
             >
-              <span className="flex items-center gap-1"><Pencil size={12} /> Edit</span>
+              <span className="flex items-center gap-1"><Pencil size={12} /> Edit description</span>
             </button>
             <button
               onClick={() => setConfirmDeleteOpen(true)}
-              className="px-3 py-1.5 rounded-lg text-xs bg-surface border border-border text-txt3 hover:text-danger hover:border-danger/30 transition-colors"
+              className="text-xs text-txt3 hover:text-danger transition-colors"
             >
               <span className="flex items-center gap-1"><Trash2 size={12} /> Delete</span>
+            </button>
+
+            <div className="w-px h-4 bg-border mx-1" />
+
+            {/* Secondary: exports — icon-only with tooltips */}
+            <button onClick={saveAsTemplate} title="Save as template"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface2 transition-colors">
+              <Save size={13} />
+            </button>
+            <button onClick={exportProject} title="Export JSON"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface2 transition-colors">
+              <Upload size={13} />
+            </button>
+            <button onClick={exportProjectCSV} title="Export CSV"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface2 transition-colors text-[10px] font-mono font-bold">
+              CSV
+            </button>
+            <button onClick={() => setGcalModalOpen(true)} title="Sync to Google Calendar"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-txt3 hover:text-amber hover:bg-amber/10 transition-colors">
+              <Calendar size={13} />
             </button>
           </div>
         </div>
@@ -846,7 +839,7 @@ export default function ProjectDetailPage() {
           <textarea
             value={descDraft}
             onChange={(e) => setDescDraft(e.target.value)}
-            className="w-full bg-surface3 border border-border rounded-lg px-3 py-2 text-txt text-sm h-32 resize-none"
+            className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-3 py-2 text-txt text-sm h-32 resize-none"
             placeholder="Add a description..."
           />
           <div className="flex justify-end gap-2">
@@ -881,7 +874,7 @@ export default function ProjectDetailPage() {
             <p className="text-sm text-txt2 mb-3">Select the target task:</p>
             {tasks.filter((t) => t.id !== moveSubModal.fromTaskId).map((t) => (
               <button key={t.id} onClick={() => moveSubtask(moveSubModal.subId, moveSubModal.fromTaskId, t.id)}
-                className="w-full text-left px-3 py-2.5 rounded-lg bg-surface border border-border text-sm text-txt hover:border-violet/50 hover:text-violet2 transition-colors">
+                className="w-full text-left px-3 py-2.5 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-txt hover:border-violet/50 hover:text-violet2 transition-colors">
                 {t.name}
                 <span className="text-[10px] text-txt3 ml-2">{t.subtasks?.length || 0} subtasks</span>
               </button>

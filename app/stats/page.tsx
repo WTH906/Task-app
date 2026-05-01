@@ -58,7 +58,7 @@ export default function StatsPage() {
           <p className="text-[10px] text-txt3 uppercase tracking-wider mt-1">Completion Rate</p>
         </div>
         <div className="bg-surface border border-border rounded-xl p-4 text-center">
-          <div className="flex items-center justify-center gap-1.5 text-violet2 mb-2"><Clock size={18} /></div>
+          <div className="flex items-center justify-center gap-1.5 text-muted-acc2 mb-2"><Clock size={18} /></div>
           <p className="text-2xl font-bold text-bright">{totalHours}h {totalMins}m</p>
           <p className="text-[10px] text-txt3 uppercase tracking-wider mt-1">Total Tracked</p>
         </div>
@@ -130,11 +130,11 @@ export default function StatsPage() {
               <div className="mt-2">
                 <p className="text-[10px] text-txt3 mb-1">Task vs Subtask time</p>
                 <div className="flex h-3 rounded-full overflow-hidden bg-surface3">
-                  <div className="bg-violet transition-all" style={{ width: `${(s.taskTrackedSeconds / s.totalTrackedSeconds) * 100}%` }} />
+                  <div className="bg-muted-acc transition-all" style={{ width: `${(s.taskTrackedSeconds / s.totalTrackedSeconds) * 100}%` }} />
                   <div className="bg-red-acc transition-all" style={{ width: `${(s.subtaskTrackedSeconds / s.totalTrackedSeconds) * 100}%` }} />
                 </div>
                 <div className="flex justify-between mt-1">
-                  <span className="text-[10px] text-violet2">Tasks {Math.round((s.taskTrackedSeconds / s.totalTrackedSeconds) * 100)}%</span>
+                  <span className="text-[10px] text-muted-acc2">Tasks {Math.round((s.taskTrackedSeconds / s.totalTrackedSeconds) * 100)}%</span>
                   <span className="text-[10px] text-red-acc">Subtasks {Math.round((s.subtaskTrackedSeconds / s.totalTrackedSeconds) * 100)}%</span>
                 </div>
               </div>
@@ -216,8 +216,8 @@ export default function StatsPage() {
                 </div>
               </div>
               <div className="flex h-2 rounded-full overflow-hidden gap-1">
-                <div className="bg-violet/30 rounded-full flex-1 overflow-hidden">
-                  <div className="h-full bg-violet rounded-full transition-all" style={{
+                <div className="bg-muted-acc/30 rounded-full flex-1 overflow-hidden">
+                  <div className="h-full bg-muted-acc rounded-full transition-all" style={{
                     width: `${Math.max(s.thisWeekCompleted, s.lastWeekCompleted) > 0 ? (s.lastWeekCompleted / Math.max(s.thisWeekCompleted, s.lastWeekCompleted)) * 100 : 0}%`
                   }} />
                 </div>
@@ -228,7 +228,7 @@ export default function StatsPage() {
                 </div>
               </div>
               <div className="flex justify-between mt-1">
-                <span className="text-[10px] text-violet2">Last: {s.lastWeekCompleted}</span>
+                <span className="text-[10px] text-muted-acc2">Last: {s.lastWeekCompleted}</span>
                 <span className="text-[10px] text-green-acc">This: {s.thisWeekCompleted}</span>
               </div>
             </div>
@@ -268,7 +268,7 @@ export default function StatsPage() {
                     <div key={d.day} className="flex items-center gap-3">
                       <span className={cn("text-xs w-8 font-mono", isBest ? "text-bright font-bold" : "text-txt3")}>{d.day}</span>
                       <div className="flex-1 h-3 bg-surface3 rounded-full overflow-hidden">
-                        <div className={cn("h-full rounded-full transition-all", isBest ? "bg-green-acc" : "bg-violet/40")}
+                        <div className={cn("h-full rounded-full transition-all", isBest ? "bg-green-acc" : "bg-muted-acc/40")}
                           style={{ width: `${pct}%` }} />
                       </div>
                       <span className={cn("text-xs font-mono w-8 text-right", isBest ? "text-green-acc" : "text-txt3")}>{d.count}</span>
