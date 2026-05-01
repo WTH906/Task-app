@@ -104,7 +104,7 @@ select:focus {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(0, 0, 0, 0.12);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -142,11 +142,11 @@ select:focus {
   .glass-panel {
     background:
       linear-gradient(135deg,
-        color-mix(in srgb, var(--glass-accent) 22%, transparent) 0%,
-        color-mix(in srgb, var(--glass-accent) 10%, transparent) 100%),
-      color-mix(in srgb, var(--glass-surface) 25%, transparent);
-    -webkit-backdrop-filter: blur(30px) saturate(180%);
-    backdrop-filter: blur(30px) saturate(180%);
+        color-mix(in srgb, var(--glass-accent) 14%, transparent) 0%,
+        color-mix(in srgb, var(--glass-accent) 4%, transparent) 100%),
+      color-mix(in srgb, var(--glass-surface) 10%, transparent);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    backdrop-filter: blur(28px) saturate(160%);
     border: 1px solid color-mix(in srgb, var(--glass-text) 14%, transparent);
   }
 }
@@ -172,7 +172,7 @@ select:focus {
   bottom: 0; left: 0; right: 0;
   height: 35%;
   background: linear-gradient(to top,
-    color-mix(in srgb, var(--glass-accent) 6%, transparent),
+    color-mix(in srgb, var(--glass-accent) 4%, transparent),
     transparent);
   pointer-events: none;
   z-index: 0;
@@ -188,15 +188,15 @@ select:focus {
   transition: border-color 150ms, background 150ms, box-shadow 150ms;
 
   /* Fallback */
-  background: color-mix(in srgb, var(--glass-surface) 60%, transparent);
+  background: color-mix(in srgb, var(--glass-surface) 40%, transparent);
   border: 1px solid color-mix(in srgb, var(--glass-text) 12%, transparent);
 }
 @supports (backdrop-filter: blur(8px)) {
   .glass-field {
-    background: color-mix(in srgb, var(--glass-surface) 40%, transparent);
-    border: 1px solid color-mix(in srgb, var(--glass-text) 16%, transparent);
-    -webkit-backdrop-filter: blur(8px);
-    backdrop-filter: blur(8px);
+    background: color-mix(in srgb, var(--glass-accent) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--glass-text) 12%, transparent);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
   }
 }
 .glass-field:focus {
@@ -222,7 +222,7 @@ select:focus {
 
 /* Legacy class kept for backward compat — maps to glass-backdrop */
 .modal-backdrop {
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.12);
 }
 
 /* Smooth transitions */
