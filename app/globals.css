@@ -6,18 +6,78 @@ html {
   color-scheme: dark;
 }
 
+/* ─── Theme variables ─────────────────────────────────────────── */
+:root {
+  --bg: #0c0a18;
+  --surface: #12121a;
+  --surface2: #1a1a26;
+  --surface3: #22223a;
+  --border: #2a2a40;
+  --border2: #3a3a55;
+  --txt: #e8e6ff;
+  --txt2: #9896b8;
+  --txt3: #7b79a0;
+  --bright: #f0eeff;
+  --accent: #7c6fff;
+  --accent2: #a594ff;
+  --accent-dim: #534ab7;
+  --muted-acc: #5b6a8a;
+  --muted-acc2: #7889a8;
+  --sidebar-bg: var(--surface);
+
+  /* Body gradient blotches */
+  --blotch1: rgba(60,30,120,0.45);
+  --blotch2: rgba(35,20,80,0.5);
+  --blotch3: rgba(50,25,100,0.35);
+  --blotch4: rgba(25,15,60,0.5);
+  --blotch5: rgba(55,20,110,0.4);
+  --blotch6: rgba(40,18,90,0.45);
+}
+
+/* ─── Ocean theme ─────────────────────────────────────────────── */
+[data-theme="ocean"] {
+  --bg: #060d14;
+  --surface: #0a1520;
+  --surface2: #0f1c2a;
+  --surface3: #152636;
+  --border: #1a3048;
+  --border2: #254060;
+  --txt: #e0f0ff;
+  --txt2: #88a8c8;
+  --txt3: #6088a8;
+  --bright: #f0f8ff;
+  --accent: #0087D6;
+  --accent2: #43B8FA;
+  --accent-dim: #0066a8;
+  --muted-acc: #3a7090;
+  --muted-acc2: #5090b0;
+  --sidebar-bg: var(--surface);
+
+  --glass-accent: #43B8FA;
+  --glass-surface: #0a1828;
+  --glass-bg: #060d14;
+  --glass-text: #e0f0ff;
+
+  --blotch1: rgba(0,80,160,0.35);
+  --blotch2: rgba(0,50,120,0.4);
+  --blotch3: rgba(0,60,140,0.3);
+  --blotch4: rgba(0,40,100,0.4);
+  --blotch5: rgba(0,70,150,0.35);
+  --blotch6: rgba(0,55,130,0.35);
+}
+
 body {
-  background-color: #0c0a18;
+  background-color: var(--bg);
   background-image:
-    radial-gradient(ellipse 700px 500px at 10% 20%, rgba(60,30,120,0.45) 0%, transparent 55%),
-    radial-gradient(ellipse 600px 450px at 85% 65%, rgba(35,20,80,0.5) 0%, transparent 50%),
-    radial-gradient(ellipse 500px 350px at 50% 50%, rgba(50,25,100,0.35) 0%, transparent 45%),
-    radial-gradient(ellipse 650px 400px at 75% 10%, rgba(25,15,60,0.5) 0%, transparent 55%),
-    radial-gradient(ellipse 550px 400px at 20% 80%, rgba(55,20,110,0.4) 0%, transparent 50%),
-    radial-gradient(ellipse 400px 300px at 60% 80%, rgba(40,18,90,0.45) 0%, transparent 48%);
+    radial-gradient(ellipse 700px 500px at 10% 20%, var(--blotch1) 0%, transparent 55%),
+    radial-gradient(ellipse 600px 450px at 85% 65%, var(--blotch2) 0%, transparent 50%),
+    radial-gradient(ellipse 500px 350px at 50% 50%, var(--blotch3) 0%, transparent 45%),
+    radial-gradient(ellipse 650px 400px at 75% 10%, var(--blotch4) 0%, transparent 55%),
+    radial-gradient(ellipse 550px 400px at 20% 80%, var(--blotch5) 0%, transparent 50%),
+    radial-gradient(ellipse 400px 300px at 60% 80%, var(--blotch6) 0%, transparent 48%);
   background-attachment: fixed;
   background-repeat: no-repeat;
-  color: #e8e6ff;
+  color: var(--txt);
   font-family: Inter, system-ui, -apple-system, sans-serif;
 }
 
@@ -247,3 +307,27 @@ select:focus {
 .animate-fade-in {
   animation: fade-in 200ms ease-out;
 }
+
+/* ─── Opacity utility overrides for CSS-variable colors ───────── */
+/* Tailwind can't decompose CSS variables for opacity modifiers,
+   so we provide explicit color-mix() utilities for the ~25 usages */
+.bg-surface\/90    { background-color: color-mix(in srgb, var(--surface) 90%, transparent) !important; }
+.bg-surface2\/20   { background-color: color-mix(in srgb, var(--surface2) 20%, transparent) !important; }
+.bg-surface2\/30   { background-color: color-mix(in srgb, var(--surface2) 30%, transparent) !important; }
+.bg-surface2\/50   { background-color: color-mix(in srgb, var(--surface2) 50%, transparent) !important; }
+.bg-violet\/5      { background-color: color-mix(in srgb, var(--accent) 5%, transparent) !important; }
+.bg-violet\/10     { background-color: color-mix(in srgb, var(--accent) 10%, transparent) !important; }
+.bg-violet\/20     { background-color: color-mix(in srgb, var(--accent) 20%, transparent) !important; }
+.bg-violet\/30     { background-color: color-mix(in srgb, var(--accent) 30%, transparent) !important; }
+.bg-muted-acc\/30  { background-color: color-mix(in srgb, var(--muted-acc) 30%, transparent) !important; }
+.bg-muted-acc\/40  { background-color: color-mix(in srgb, var(--muted-acc) 40%, transparent) !important; }
+.border-border\/20 { border-color: color-mix(in srgb, var(--border) 20%, transparent) !important; }
+.border-border\/30 { border-color: color-mix(in srgb, var(--border) 30%, transparent) !important; }
+.border-border\/50 { border-color: color-mix(in srgb, var(--border) 50%, transparent) !important; }
+.border-violet\/10 { border-color: color-mix(in srgb, var(--accent) 10%, transparent) !important; }
+.border-violet\/30 { border-color: color-mix(in srgb, var(--accent) 30%, transparent) !important; }
+.border-violet\/50 { border-color: color-mix(in srgb, var(--accent) 50%, transparent) !important; }
+.border-violet\/60 { border-color: color-mix(in srgb, var(--accent) 60%, transparent) !important; }
+.shadow-violet\/10 { --tw-shadow-color: color-mix(in srgb, var(--accent) 10%, transparent); }
+.hover\:bg-violet\/5:hover  { background-color: color-mix(in srgb, var(--accent) 5%, transparent) !important; }
+.hover\:border-violet\/50:hover { border-color: color-mix(in srgb, var(--accent) 50%, transparent) !important; }

@@ -264,32 +264,45 @@ export default function ProjectDetailPage() {
 
   const removeTask = async (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
-    const supabase = createClient();
-    await removeWeekTasksForProjectTask(supabase, userId, taskId);
-    await supabase.from("project_tasks").delete().eq("id", taskId);
     if (activeTaskId === taskId) stopTimer();
-    await logActivity(supabase, userId, projectId, "Task removed", task?.name || "");
     setMenuOpen(null);
+    // Optimistic: remove from UI immediately
     removeTaskLocal(taskId);
+
+    // Fire DB cleanup in background
+    const supabase = createClient();
+    Promise.all([
+      removeWeekTasksForProjectTask(supabase, userId, taskId),
+      supabase.from("project_tasks").delete().eq("id", taskId),
+      logActivity(supabase, userId, projectId, "Task removed", task?.name || ""),
+    ]);
   };
 
   const removeSubtask = async (subtaskId: string, parentId: string) => {
     if (!confirm("Remove this subtask?")) return;
-    const supabase = createClient();
-    await supabase.from("subtasks").delete().eq("id", subtaskId);
+
+    // Optimistic: remove from UI immediately and recalc parent
     removeSubtaskLocal(parentId, subtaskId);
-    // Recalc parent progress and est_minutes from remaining subtasks
     const parent = tasks.find((t) => t.id === parentId);
     const remaining = (parent?.subtasks || []).filter((s) => s.id !== subtaskId);
+
+    const supabase = createClient();
+
     if (remaining.length > 0) {
       const avg = Math.round(remaining.reduce((s, st) => s + st.progress, 0) / remaining.length);
       const totalEst = remaining.reduce((s, st) => s + st.est_minutes, 0);
-      await supabase.from("project_tasks").update({ progress: avg, est_minutes: totalEst }).eq("id", parentId);
       updateTaskLocal(parentId, { progress: avg, est_minutes: totalEst });
+      // Background DB calls in parallel
+      Promise.all([
+        supabase.from("subtasks").delete().eq("id", subtaskId),
+        supabase.from("project_tasks").update({ progress: avg, est_minutes: totalEst }).eq("id", parentId),
+      ]);
     } else {
-      // No subtasks left — reset est_minutes to 0
-      await supabase.from("project_tasks").update({ est_minutes: 0 }).eq("id", parentId);
       updateTaskLocal(parentId, { est_minutes: 0 });
+      Promise.all([
+        supabase.from("subtasks").delete().eq("id", subtaskId),
+        supabase.from("project_tasks").update({ est_minutes: 0 }).eq("id", parentId),
+      ]);
     }
   };
 
@@ -346,45 +359,48 @@ export default function ProjectDetailPage() {
   };
 
   const updateTaskField = async (taskId: string, field: string, value: string | number | null) => {
-    const supabase = createClient();
-    const { error } = await supabase.from("project_tasks").update({ [field]: value }).eq("id", taskId);
-    if (error) { toast("Failed to update task: " + error.message, "error"); return; }
-
-    // Granular local update
+    // Optimistic: update UI immediately
     updateTaskLocal(taskId, { [field]: value } as Partial<ProjectTask>);
-
     const task = tasks.find((t) => t.id === taskId);
 
+    const supabase = createClient();
+
+    // Fire DB update + syncs in parallel, don't block UI
+    const dbUpdate = supabase.from("project_tasks").update({ [field]: value }).eq("id", taskId)
+      .then(({ error }) => { if (error) toast("Failed to save: " + error.message, "error"); });
+
+    // Fire syncs in background — don't await
     if (field === "deadline" && task && project) {
-      const res = await syncTaskDeadlineToDeadlines(supabase, userId, taskId, task.name, project.title, value as string | null);
-      if (res.error) toast("Sync error: " + res.error, "error");
+      syncTaskDeadlineToDeadlines(supabase, userId, taskId, task.name, project.title, value as string | null)
+        .then(r => { if (r.error) toast("Sync error: " + r.error, "error"); });
     }
-
     if (field === "date_key" && task && project) {
-      const res = await syncProjectTaskToWeek(supabase, userId, taskId, task.name, projectId, project.title, value as string | null, task.date_key);
-      if (res.error) toast("Sync error: " + res.error, "error");
+      syncProjectTaskToWeek(supabase, userId, taskId, task.name, projectId, project.title, value as string | null, task.date_key)
+        .then(r => { if (r.error) toast("Sync error: " + r.error, "error"); });
+    }
+    if (field === "progress" && task) {
+      syncTaskCompletion(supabase, userId, taskId, value as number)
+        .then(r => { if (r.error) toast("Sync error: " + r.error, "error"); });
     }
 
-    if (field === "progress" && task) {
-      const res = await syncTaskCompletion(supabase, userId, taskId, value as number);
-      if (res.error) toast("Sync error: " + res.error, "error");
-    }
+    await dbUpdate;
   };
 
   const updateSubtaskField = async (subtaskId: string, parentId: string, field: string, value: string | number | null) => {
-    const supabase = createClient();
-    const { error } = await supabase.from("subtasks").update({ [field]: value }).eq("id", subtaskId);
-    if (error) { toast("Failed to update subtask: " + error.message, "error"); return; }
-
-    // Granular local update
+    // Optimistic: update UI immediately
     updateSubtaskLocal(parentId, subtaskId, { [field]: value } as Partial<Subtask>);
+
+    const supabase = createClient();
+
+    // Fire DB update in background
+    supabase.from("subtasks").update({ [field]: value }).eq("id", subtaskId)
+      .then(({ error }) => { if (error) toast("Failed to save: " + error.message, "error"); });
 
     if (field === "date_key" && project) {
       const parent = tasks.find((t) => t.id === parentId);
       const sub = parent?.subtasks?.find((s) => s.id === subtaskId);
       const subName = sub?.name || "Subtask";
-      // Sync via subtask_id FK — not text matching
-      await syncSubtaskToWeek(supabase, userId, subtaskId, parentId, subName, projectId, project.title, value as string | null);
+      syncSubtaskToWeek(supabase, userId, subtaskId, parentId, subName, projectId, project.title, value as string | null);
     }
 
     if (field === "deadline" && project) {
@@ -392,45 +408,35 @@ export default function ProjectDetailPage() {
       const sub = parent?.subtasks?.find((s) => s.id === subtaskId);
       const subName = sub?.name || "Subtask";
       const label = `[${project.title}] ↳ ${subName}`;
-
-      // Delete-then-insert — no maybeSingle
-      await supabase.from("deadlines").delete().eq("user_id", userId).eq("label", label);
-      if (value) {
-        await supabase.from("deadlines").insert({
-          user_id: userId, label, target_datetime: `${value}T23:59:00`,
-        });
-      }
+      // Fire delete-then-insert in background
+      supabase.from("deadlines").delete().eq("user_id", userId).eq("label", label).then(() => {
+        if (value) supabase.from("deadlines").insert({ user_id: userId, label, target_datetime: `${value}T23:59:00` });
+      });
     }
 
     if (field === "est_minutes") {
       const parent = tasks.find((t) => t.id === parentId);
       if (parent?.subtasks) {
-        const subs = parent.subtasks.map((s) =>
-          s.id === subtaskId ? { ...s, est_minutes: value as number } : s
-        );
+        const subs = parent.subtasks.map((s) => s.id === subtaskId ? { ...s, est_minutes: value as number } : s);
         const totalEst = subs.reduce((s, st) => s + st.est_minutes, 0);
-        await supabase.from("project_tasks").update({ est_minutes: totalEst }).eq("id", parentId);
         updateTaskLocal(parentId, { est_minutes: totalEst });
+        supabase.from("project_tasks").update({ est_minutes: totalEst }).eq("id", parentId);
       }
     }
 
     if (field === "progress") {
-      // Sync subtask's own linked week_tasks
-      const subRes = await syncSubtaskCompletion(supabase, userId, subtaskId, value as number);
-      if (subRes.error) toast("Sync error: " + subRes.error, "error");
+      // Sync subtask completion in background
+      syncSubtaskCompletion(supabase, userId, subtaskId, value as number);
 
       const parent = tasks.find((t) => t.id === parentId);
       if (parent?.subtasks) {
-        const subs = parent.subtasks.map((s) =>
-          s.id === subtaskId ? { ...s, progress: value as number } : s
-        );
+        const subs = parent.subtasks.map((s) => s.id === subtaskId ? { ...s, progress: value as number } : s);
         const avg = Math.round(subs.reduce((s, st) => s + st.progress, 0) / subs.length);
-        const { error: upErr } = await supabase.from("project_tasks").update({ progress: avg }).eq("id", parentId);
-        if (upErr) { toast("Failed to update parent progress", "error"); }
+        // Optimistic parent update
         updateTaskLocal(parentId, { progress: avg });
-
-        const res = await syncTaskCompletion(supabase, userId, parentId, avg);
-        if (res.error) toast("Sync error: " + res.error, "error");
+        // Background DB calls
+        supabase.from("project_tasks").update({ progress: avg }).eq("id", parentId);
+        syncTaskCompletion(supabase, userId, parentId, avg);
       }
     }
   };

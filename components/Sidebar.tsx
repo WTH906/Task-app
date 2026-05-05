@@ -14,7 +14,7 @@ import {
   LayoutDashboard, ListChecks, RefreshCw, CalendarDays, ClipboardList,
   Map, BarChart3, Timer, Search, Download, ClipboardCopy, FolderPlus,
   ChevronDown, LogOut, Menu, X, CalendarRange, User as UserIcon, PieChart,
-  BookUser,
+  BookUser, Palette,
 } from "lucide-react";
 
 export function Sidebar({ user }: { user: User }) {
@@ -28,6 +28,28 @@ export function Sidebar({ user }: { user: User }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [monthlyEnabled, setMonthlyEnabled] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  const THEMES = [
+    { id: "purple", label: "Purple", dot: "#9217BF" },
+    { id: "ocean", label: "Ocean", dot: "#43B8FA" },
+  ] as const;
+
+  const [theme, setTheme] = useState("purple");
+
+  // Init theme from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("comfy-theme") || "purple";
+    setTheme(saved);
+    document.documentElement.setAttribute("data-theme", saved === "purple" ? "" : saved);
+  }, []);
+
+  const cycleTheme = () => {
+    const idx = THEMES.findIndex(t => t.id === theme);
+    const next = THEMES[(idx + 1) % THEMES.length];
+    setTheme(next.id);
+    localStorage.setItem("comfy-theme", next.id);
+    document.documentElement.setAttribute("data-theme", next.id === "purple" ? "" : next.id);
+  };
 
   // Load monthly routine toggle from localStorage
   useEffect(() => {
@@ -195,6 +217,13 @@ export function Sidebar({ user }: { user: User }) {
                   className="flex items-center gap-2 px-3 py-2 text-xs text-txt2 hover:bg-surface3 transition-colors w-full">
                   <PieChart size={13} /> Stats & Activity
                 </Link>
+                <button onClick={(e) => { e.stopPropagation(); cycleTheme(); }}
+                  className="flex items-center gap-2 px-3 py-2 text-xs text-txt2 hover:bg-surface3 transition-colors w-full">
+                  <Palette size={13} />
+                  <span className="flex-1 text-left">Theme</span>
+                  <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: THEMES.find(t => t.id === theme)?.dot }} />
+                  <span className="text-[10px] text-txt3">{THEMES.find(t => t.id === theme)?.label}</span>
+                </button>
                 <div className="border-t border-border my-1" />
                 <button onClick={handleSignOut}
                   className="flex items-center gap-2 px-3 py-2 text-xs text-txt3 hover:text-danger hover:bg-surface3 transition-colors w-full">

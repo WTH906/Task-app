@@ -131,39 +131,33 @@ export default function WeekPage() {
       return;
     }
 
-    // Sync to project if linked
+    // Sync to project in background — don't block UI
     if (task.project_task_id) {
       const newProgress = newDone ? 100 : 0;
+      const ptId = task.project_task_id;
 
       if (task.subtask_id) {
-        // Subtask entry — update only that specific subtask via FK, then recalc parent
-        await supabase.from("subtasks").update({ progress: newProgress }).eq("id", task.subtask_id);
-        const { data: allSubs } = await supabase
-          .from("subtasks").select("progress").eq("task_id", task.project_task_id);
-        if (allSubs && allSubs.length > 0) {
-          const avg = Math.round(allSubs.reduce((s, st) => s + st.progress, 0) / allSubs.length);
-          await supabase.from("project_tasks").update({ progress: avg }).eq("id", task.project_task_id);
-          await syncTaskCompletion(supabase, userId, task.project_task_id, avg);
-        }
+        supabase.from("subtasks").update({ progress: newProgress }).eq("id", task.subtask_id).then(() =>
+          supabase.from("subtasks").select("progress").eq("task_id", ptId).then(({ data: allSubs }) => {
+            if (allSubs && allSubs.length > 0) {
+              const avg = Math.round(allSubs.reduce((s: number, st: { progress: number }) => s + st.progress, 0) / allSubs.length);
+              supabase.from("project_tasks").update({ progress: avg }).eq("id", ptId);
+              syncTaskCompletion(supabase, userId, ptId, avg);
+            }
+          })
+        );
       } else {
-        // Main task entry
-        const { data: subs } = await supabase
-          .from("subtasks").select("id").eq("task_id", task.project_task_id).limit(1);
-
-        if (!subs || subs.length === 0) {
-          const { error: ptError } = await supabase.from("project_tasks")
-            .update({ progress: newProgress })
-            .eq("id", task.project_task_id);
-          if (ptError) {
-            toast("Failed to sync project progress — reloading", "error");
-            loadData();
-            return;
+        supabase.from("subtasks").select("id").eq("task_id", ptId).limit(1).then(({ data: subs }) => {
+          if (!subs || subs.length === 0) {
+            supabase.from("project_tasks").update({ progress: newProgress }).eq("id", ptId);
+          } else {
+            Promise.all([
+              supabase.from("subtasks").update({ progress: newProgress }).eq("task_id", ptId),
+              supabase.from("project_tasks").update({ progress: newProgress }).eq("id", ptId),
+            ]);
           }
-        } else {
-          await supabase.from("subtasks").update({ progress: newProgress }).eq("task_id", task.project_task_id);
-          await supabase.from("project_tasks").update({ progress: newProgress }).eq("id", task.project_task_id);
-        }
-        await syncTaskCompletion(supabase, userId, task.project_task_id, newProgress);
+          syncTaskCompletion(supabase, userId, ptId, newProgress);
+        });
       }
     }
     // If marking done and this came from a quick task, remove it from quick_tasks
