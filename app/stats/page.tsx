@@ -1,16 +1,172 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { formatSeconds, cn } from "@/lib/utils";
 import { ProgressBar } from "@/components/ProgressBar";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 import { useToast } from "@/components/Toast";
 import { useStats } from "@/lib/hooks/useStats";
+import { createClient } from "@/lib/supabase";
 import {
   PieChart, CheckCircle, Clock, Target, Flame, Trophy,
   ListChecks, RefreshCw, CalendarRange, Folder, ClipboardList,
   TrendingUp, TrendingDown, Minus, Calendar, BarChart3,
+  ChevronLeft, ChevronRight, Download,
 } from "lucide-react";
+
+// ─── Weekly Time Summary ─────────────────────────────────────
+function getWeekRange(offset: number) {
+  const now = new Date();
+  const day = now.getDay();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
+  monday.setHours(0, 0, 0, 0);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  const label = `${monday.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} — ${sunday.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
+  return { start: fmt(monday), end: fmt(sunday), label };
+}
+
+interface WeekLog { project_title: string; project_color: string; seconds: number; tasks: Record<string, number>; }
+
+function WeeklyTimeSummary({ userId }: { userId: string }) {
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [logs, setLogs] = useState<WeekLog[]>([]);
+  const [totalSec, setTotalSec] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { start, end } = getWeekRange(weekOffset);
+    const supabase = createClient();
+
+    const { data } = await supabase
+      .from("time_logs")
+      .select("project_id, task_id, subtask_id, duration_seconds, date_key")
+      .eq("user_id", userId)
+      .gte("date_key", start)
+      .lte("date_key", end)
+      .order("date_key");
+
+    if (!data || data.length === 0) { setLogs([]); setTotalSec(0); setLoading(false); return; }
+
+    // Get project names + colors
+    const pIds = [...new Set(data.map(d => d.project_id).filter(Boolean))];
+    const { data: projects } = await supabase.from("projects").select("id, title, color").in("id", pIds);
+    const pMap: Record<string, { title: string; color: string }> = {};
+    for (const p of projects || []) pMap[p.id] = { title: p.title, color: p.color || "#7c6fff" };
+
+    // Get task names
+    const tIds = [...new Set(data.map(d => d.task_id).filter(Boolean))];
+    const { data: taskData } = tIds.length > 0
+      ? await supabase.from("project_tasks").select("id, name").in("id", tIds)
+      : { data: [] };
+    const tMap: Record<string, string> = {};
+    for (const t of taskData || []) tMap[t.id] = t.name;
+
+    // Group by project
+    const byProject: Record<string, WeekLog> = {};
+    let total = 0;
+    for (const row of data) {
+      const pid = row.project_id || "unknown";
+      if (!byProject[pid]) {
+        const p = pMap[pid] || { title: "Unknown", color: "#5c5a7a" };
+        byProject[pid] = { project_title: p.title, project_color: p.color, seconds: 0, tasks: {} };
+      }
+      byProject[pid].seconds += row.duration_seconds;
+      total += row.duration_seconds;
+
+      const taskName = tMap[row.task_id] || "Untitled";
+      byProject[pid].tasks[taskName] = (byProject[pid].tasks[taskName] || 0) + row.duration_seconds;
+    }
+
+    setLogs(Object.values(byProject).sort((a, b) => b.seconds - a.seconds));
+    setTotalSec(total);
+    setLoading(false);
+  }, [userId, weekOffset]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const { label } = getWeekRange(weekOffset);
+  const isThisWeek = weekOffset === 0;
+
+  const exportCSV = () => {
+    const { start, end } = getWeekRange(weekOffset);
+    let csv = "Project,Task,Hours,Minutes,Seconds\n";
+    for (const log of logs) {
+      for (const [task, sec] of Object.entries(log.tasks)) {
+        csv += `"${log.project_title}","${task}",${Math.floor(sec / 3600)},${Math.floor((sec % 3600) / 60)},${sec % 60}\n`;
+      }
+    }
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `time-log-${start}-to-${end}.csv`; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="bg-surface border border-border rounded-xl p-4 mb-6 card-float">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Clock size={16} className="text-violet2" />
+          <h3 className="text-sm font-semibold text-bright">Weekly Time</h3>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setWeekOffset(w => w - 1)} className="w-6 h-6 rounded flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface3"><ChevronLeft size={14} /></button>
+          <span className="text-xs text-txt2 min-w-[160px] text-center">{label}</span>
+          <button onClick={() => setWeekOffset(w => w + 1)} disabled={isThisWeek} className="w-6 h-6 rounded flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface3 disabled:opacity-30"><ChevronRight size={14} /></button>
+          {logs.length > 0 && (
+            <button onClick={exportCSV} title="Export CSV" className="w-6 h-6 rounded flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface3 ml-1"><Download size={13} /></button>
+          )}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-6 text-txt3 text-xs">Loading...</div>
+      ) : logs.length === 0 ? (
+        <div className="text-center py-6">
+          <p className="text-txt3 text-xs">No time tracked this week</p>
+          <p className="text-[10px] text-txt3 mt-1">Timer sessions are logged automatically when you stop a timer</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex items-baseline gap-2 mb-3">
+            <span className="text-2xl font-bold text-bright">{formatSeconds(totalSec)}</span>
+            <span className="text-xs text-txt3">total</span>
+          </div>
+          {logs.map(log => {
+            const pct = totalSec > 0 ? (log.seconds / totalSec) * 100 : 0;
+            return (
+              <div key={log.project_title}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: log.project_color }} />
+                  <span className="text-xs font-medium flex-1 truncate" style={{ color: log.project_color }}>{log.project_title}</span>
+                  <span className="text-xs font-mono text-txt3">{formatSeconds(log.seconds)}</span>
+                  <span className="text-[10px] text-txt3 w-10 text-right">{Math.round(pct)}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-surface3 rounded-full overflow-hidden ml-4 mb-1" style={{ width: "calc(100% - 16px)" }}>
+                  <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: log.project_color }} />
+                </div>
+                {Object.entries(log.tasks).length > 1 && (
+                  <div className="ml-5 space-y-0.5">
+                    {Object.entries(log.tasks).sort((a, b) => b[1] - a[1]).map(([task, sec]) => (
+                      <div key={task} className="flex items-center gap-2 text-[10px] text-txt3">
+                        <span className="truncate flex-1">{task}</span>
+                        <span className="font-mono">{formatSeconds(sec)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function StatsPage() {
   const { userId, loading: authLoading } = useCurrentUser();
@@ -73,6 +229,9 @@ export default function StatsPage() {
           <p className="text-[10px] text-txt3 uppercase tracking-wider mt-1">Tasks Done</p>
         </div>
       </div>
+
+      {/* Weekly Time Summary */}
+      <WeeklyTimeSummary userId={userId!} />
 
       {/* Projects & Tasks */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">

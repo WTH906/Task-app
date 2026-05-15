@@ -128,16 +128,25 @@ export function useTimer({ userId, projectId, tasks, onElapsedChange, onTaskUpda
     const sessionTime = finalElapsed - Math.round(baseElapsedRef.current);
     const { isSub, id, task, sub } = resolveTimer(activeTaskId);
 
-    // Save elapsed + clear started_at
+    // Save elapsed + clear started_at + log session
+    const today = new Date().toISOString().slice(0, 10);
     if (isSub) {
       await supabase.from("subtasks").update({ elapsed_seconds: finalElapsed, timer_started_at: null }).eq("id", id);
       if (sessionTime > 5 && sub) {
-        await logActivity(supabase, userId, projectId, "Timer stopped", `↳ ${sub.name} — ${formatSeconds(sessionTime)} tracked`);
+        logActivity(supabase, userId, projectId, "Timer stopped", `↳ ${sub.name} — ${formatSeconds(sessionTime)} tracked`);
+        supabase.from("time_logs").insert({
+          user_id: userId, project_id: projectId, task_id: task?.id || null,
+          subtask_id: id, duration_seconds: sessionTime, date_key: today,
+        });
       }
     } else {
       await supabase.from("project_tasks").update({ elapsed_seconds: finalElapsed, timer_started_at: null }).eq("id", id);
       if (sessionTime > 5 && task) {
-        await logActivity(supabase, userId, projectId, "Timer stopped", `${task.name} — ${formatSeconds(sessionTime)} tracked`);
+        logActivity(supabase, userId, projectId, "Timer stopped", `${task.name} — ${formatSeconds(sessionTime)} tracked`);
+        supabase.from("time_logs").insert({
+          user_id: userId, project_id: projectId, task_id: id,
+          subtask_id: null, duration_seconds: sessionTime, date_key: today,
+        });
       }
     }
 

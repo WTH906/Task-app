@@ -32,6 +32,12 @@ html {
   --blotch4: rgba(25,15,60,0.5);
   --blotch5: rgba(55,20,110,0.4);
   --blotch6: rgba(40,18,90,0.45);
+
+  /* Glass (purple default) */
+  --glass-accent: #9217BF;
+  --glass-surface: #1a1432;
+  --glass-text: #e8e6ff;
+  --glass-bg: #0c0a18;
 }
 
 /* ─── Ocean theme ─────────────────────────────────────────────── */
@@ -152,12 +158,6 @@ select:focus {
    Uses color-mix() so the accent tint auto-adapts if --glass-accent changes.
    Only ONE element owns backdrop-filter — the panel itself.
    ───────────────────────────────────────────────────────────────── */
-:root {
-  --glass-accent: #9217BF;
-  --glass-surface: #1a1432;
-  --glass-text: #e8e6ff;
-  --glass-bg: #0c0a18;
-}
 
 /* Backdrop: dim scrim only — NO blur. Sharp page behind, click-to-close. */
 .glass-backdrop {
