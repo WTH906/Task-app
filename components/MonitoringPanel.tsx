@@ -25,6 +25,13 @@ export function MonitoringPanel({ open, onClose, userId }: { open: boolean; onCl
 
   useEffect(() => { if (open) loadData(); }, [open, loadData]);
 
+  // Reload when tasks are added/removed from monitoring
+  useEffect(() => {
+    const handler = () => loadData();
+    window.addEventListener("monitoring-changed", handler);
+    return () => window.removeEventListener("monitoring-changed", handler);
+  }, [loadData]);
+
   // Escape closes panel
   useEffect(() => {
     if (!open) return;

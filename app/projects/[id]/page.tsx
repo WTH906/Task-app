@@ -16,7 +16,7 @@ import { ColorPicker } from "@/components/ColorPicker";
 import { logActivity } from "@/lib/activity";
 import { useToast } from "@/components/Toast";
 import { reorderRows, reorderSubtasks, cleanupActivityLog } from "@/lib/db-helpers";
-import { Save, Upload, Calendar, Pencil, Trash2, AlertTriangle } from "lucide-react";
+import { Save, Upload, Calendar, Pencil, Trash2, AlertTriangle, Archive } from "lucide-react";
 import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
 import { TaskFormModal } from "@/components/project/TaskFormModal";
 import { TaskItem, TaskActions } from "@/components/project/TaskItem";
@@ -630,7 +630,7 @@ export default function ProjectDetailPage() {
       }
       toast("Removed from monitoring", "info");
     } else {
-      supabase.from("monitored_tasks").insert({
+      await supabase.from("monitored_tasks").insert({
         user_id: userId, project_id: projectId, task_id: taskId,
         subtask_id: isSubtask ? subtaskId : null,
         project_title: project?.title || "", task_name: taskName,
@@ -642,6 +642,7 @@ export default function ProjectDetailPage() {
       } else {
         updateTaskLocal(taskId, { monitoring: true } as Partial<ProjectTask>);
       }
+      window.dispatchEvent(new Event("monitoring-changed"));
       toast("Added to monitoring", "success");
     }
   };
@@ -761,6 +762,18 @@ export default function ProjectDetailPage() {
               className="text-xs text-txt3 hover:text-txt transition-colors"
             >
               <span className="flex items-center gap-1"><Pencil size={12} /> Edit description</span>
+            </button>
+            <button
+              onClick={async () => {
+                const supabase = createClient();
+                await supabase.from("projects").update({ archived_at: new Date().toISOString() }).eq("id", projectId);
+                router.push("/projects");
+                window.dispatchEvent(new Event("projects-changed"));
+                toast("Project archived", "success");
+              }}
+              className="text-xs text-txt3 hover:text-amber transition-colors"
+            >
+              <span className="flex items-center gap-1"><Archive size={12} /> Archive</span>
             </button>
             <button
               onClick={() => setConfirmDeleteOpen(true)}

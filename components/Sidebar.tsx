@@ -309,8 +309,9 @@ export function Sidebar({ user }: { user: User }) {
             return sorted.map((p, idx) => {
             const active = pathname === `/projects/${p.id}`;
             return (
-              <Link key={p.id} href={`/projects/${p.id}`} onClick={() => setOpen(false)}
+              <div key={p.id}
                 draggable
+                onClick={() => { router.push(`/projects/${p.id}`); setOpen(false); }}
                 onDragStart={() => setDragProjectIdx(idx)}
                 onDragOver={(e) => { e.preventDefault(); if (dragProjectIdx !== null && dragProjectIdx !== idx) {
                   setProjects(prev => {
@@ -326,12 +327,12 @@ export function Sidebar({ user }: { user: User }) {
                   const supabase = createClient();
                   projects.forEach((proj, i) => supabase.from("projects").update({ sort_order: i }).eq("id", proj.id));
                 }}
-                className={cn("flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors truncate cursor-grab",
+                className={cn("flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors truncate cursor-grab select-none",
                   active ? "" : "text-txt2 hover:bg-surface2 hover:text-txt")}
                 style={active ? { backgroundColor: `${p.color || "#e05555"}20`, color: p.color || "#e05555" } : undefined}>
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color || "#e05555" }} />
                 <span className="truncate">{p.title}</span>
-              </Link>
+              </div>
             );
           });
           })()}

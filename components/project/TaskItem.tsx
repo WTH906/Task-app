@@ -60,7 +60,7 @@ export function TaskItem({
   return (
     <div draggable onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
       <div className={cn(
-        "bg-surface border rounded-lg transition-all card-float",
+        "bg-surface border rounded-lg transition-all card-float overflow-visible",
         isActive ? "border-green-acc shadow-lg shadow-green-acc/10" :
           task.monitoring ? "border-amber shadow-sm shadow-amber/10" : "border-border",
         isDone && "opacity-60"
@@ -165,7 +165,7 @@ export function TaskItem({
 
         {/* Subtasks */}
         {isExpanded && task.subtasks && task.subtasks.length > 0 && (
-          <div className="border-t border-border bg-surface2/50">
+          <div className="border-t border-border bg-surface2/50 overflow-visible">
             {task.subtasks.map((sub, subIdx) => (
               <div
                 key={sub.id} draggable
@@ -175,6 +175,7 @@ export function TaskItem({
                 className={cn(
                   "flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border/50 last:border-b-0 text-xs",
                   activeTaskId === `sub:${sub.id}` && "bg-green-acc/5",
+                  sub.monitoring && "border-l-2 border-l-amber",
                   dragSubIdx === subIdx && dragSubParent === task.id && "opacity-50"
                 )}
               >

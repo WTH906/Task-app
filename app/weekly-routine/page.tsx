@@ -235,8 +235,8 @@ export default function WeeklyRoutinePage() {
               className="accent-violet" />
             <span className={cn("flex-1 text-sm", task.checked && "task-done")}>{task.text}</span>
             {task.day_of_week !== null && task.day_of_week !== undefined && (
-              <span className="text-[9px] text-txt3 bg-surface3 px-1.5 py-0.5 rounded shrink-0">
-                {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][task.day_of_week]}
+              <span className="text-xs text-violet2 bg-violet/10 px-2 py-0.5 rounded-md font-medium shrink-0">
+                {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"][task.day_of_week]}
               </span>
             )}
             {task.est_minutes > 0 && (
