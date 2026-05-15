@@ -23,6 +23,9 @@ export interface TaskActions {
   handleSubDragStart: (parentId: string, idx: number) => void;
   handleSubDragOver: (e: React.DragEvent, parentId: string, idx: number) => void;
   handleSubDragEnd: (parentId: string) => void;
+  archiveTask: (id: string) => void;
+  monitorTask: (taskId: string, taskName: string, isSubtask?: boolean, subtaskId?: string) => void;
+  duplicateSubtask: (sub: Subtask, parentTaskId: string) => void;
 }
 
 interface TaskItemProps {
@@ -58,7 +61,8 @@ export function TaskItem({
     <div draggable onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
       <div className={cn(
         "bg-surface border rounded-lg transition-all card-float",
-        isActive ? "border-green-acc shadow-lg shadow-green-acc/10" : "border-border",
+        isActive ? "border-green-acc shadow-lg shadow-green-acc/10" :
+          task.monitoring ? "border-amber shadow-sm shadow-amber/10" : "border-border",
         isDone && "opacity-60"
       )}>
         {/* Row 1: drag + play + name */}
@@ -139,13 +143,19 @@ export function TaskItem({
             <button onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === task.id ? null : task.id); setSubMenuOpen(null); }}
               className="w-6 h-6 flex items-center justify-center rounded hover:bg-surface2 text-txt3">⋯</button>
             {menuOpen === task.id && (
-              <div className="absolute right-0 top-full mt-1 bg-surface2 border border-border rounded-lg shadow-xl py-1 w-36 z-20">
+              <div className="absolute right-0 top-full mt-1 bg-surface2 border border-border rounded-lg shadow-xl py-1 w-40 z-20">
                 <button onClick={() => { actions.openEditModal(task, "task"); setMenuOpen(null); }}
                   className="w-full text-left px-3 py-1.5 text-sm text-txt2 hover:bg-surface3">Edit</button>
                 {(task.subtasks?.length || 0) < 10 && (
                   <button onClick={() => { actions.openEditModal(null, "subtask", task.id); setMenuOpen(null); }}
                     className="w-full text-left px-3 py-1.5 text-sm text-txt2 hover:bg-surface3">Add subtask</button>
                 )}
+                <button onClick={() => { actions.monitorTask(task.id, task.name); setMenuOpen(null); }}
+                  className="w-full text-left px-3 py-1.5 text-sm text-amber hover:bg-surface3">
+                  {task.monitoring ? "Unmonitor" : "Monitor"}
+                </button>
+                <button onClick={() => { actions.archiveTask(task.id); setMenuOpen(null); }}
+                  className="w-full text-left px-3 py-1.5 text-sm text-txt3 hover:bg-surface3">Archive</button>
                 <button onClick={() => actions.removeTask(task.id)}
                   className="w-full text-left px-3 py-1.5 text-sm text-danger hover:bg-surface3">Remove</button>
               </div>
@@ -216,8 +226,14 @@ export function TaskItem({
                     <div className="absolute right-0 top-full mt-1 bg-surface2 border border-border rounded-lg shadow-xl py-1 w-40 z-20">
                       <button onClick={() => { actions.openEditModal(sub, "subtask", task.id); setSubMenuOpen(null); }}
                         className="w-full text-left px-3 py-1.5 text-xs text-txt2 hover:bg-surface3">Edit</button>
+                      <button onClick={() => { actions.duplicateSubtask(sub, task.id); setSubMenuOpen(null); }}
+                        className="w-full text-left px-3 py-1.5 text-xs text-txt2 hover:bg-surface3">Duplicate</button>
                       <button onClick={() => { actions.setMoveSubModal({ subId: sub.id, subName: sub.name, fromTaskId: task.id }); setSubMenuOpen(null); }}
                         className="w-full text-left px-3 py-1.5 text-xs text-txt2 hover:bg-surface3">Move to task...</button>
+                      <button onClick={() => { actions.monitorTask(task.id, sub.name, true, sub.id); setSubMenuOpen(null); }}
+                        className="w-full text-left px-3 py-1.5 text-xs text-amber hover:bg-surface3">
+                        {sub.monitoring ? "Unmonitor" : "Monitor"}
+                      </button>
                       <button onClick={() => { actions.removeSubtask(sub.id, task.id); setSubMenuOpen(null); }}
                         className="w-full text-left px-3 py-1.5 text-xs text-danger hover:bg-surface3">Remove</button>
                     </div>

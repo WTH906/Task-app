@@ -11,6 +11,7 @@ export interface Project {
   sort_order: number; created_at: string;
   color: string;
   deadline: string | null;
+  start_date: string | null;
   archived_at: string | null;
 }
 
@@ -24,6 +25,7 @@ export interface ProjectTask {
   archived_at: string | null;
   alarm_fired_at: string | null;
   timer_started_at: string | null;
+  monitoring: boolean;
 }
 
 export interface Subtask {
@@ -34,6 +36,7 @@ export interface Subtask {
   created_at: string; elapsed_seconds: number;
   file_url: string | null; file_name: string | null;
   timer_started_at: string | null;
+  monitoring: boolean;
 }
 
 export interface Template {
@@ -72,12 +75,14 @@ export interface ActivityLog {
 export interface WeeklyRoutineTask {
   id: string; user_id: string; text: string;
   est_minutes: number; sort_order: number; created_at: string;
+  day_of_week: number | null;
   checked?: boolean;
 }
 
 export interface MonthlyRoutineTask {
   id: string; user_id: string; text: string;
   est_minutes: number; sort_order: number; created_at: string;
+  date_from: number | null; date_to: number | null;
   checked?: boolean;
 }
 
@@ -104,4 +109,12 @@ export interface Contact {
 
 export interface ContactTagLink {
   contact_id: string; tag_id: string;
+}
+
+export interface MonitoredTask {
+  id: string; user_id: string;
+  project_id: string | null; task_id: string | null; subtask_id: string | null;
+  project_title: string; task_name: string;
+  notes: string; status: "waiting" | "resolved";
+  added_at: string;
 }

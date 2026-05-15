@@ -20,6 +20,7 @@ export default function WeeklyRoutinePage() {
   const [editingTask, setEditingTask] = useState<WeeklyRoutineTask | null>(null);
   const [formText, setFormText] = useState("");
   const [formEst, setFormEst] = useState(0);
+  const [formDay, setFormDay] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
 
@@ -90,16 +91,17 @@ export default function WeeklyRoutinePage() {
     if (editingTask) {
       const { error } = await supabase
         .from("weekly_routine_tasks")
-        .update({ text: formText.trim(), est_minutes: formEst })
+        .update({ text: formText.trim(), est_minutes: formEst, day_of_week: formDay })
         .eq("id", editingTask.id);
       if (error) { toast("Failed to save: " + error.message, "error"); return; }
       setTasks((prev) => prev.map((t) => t.id === editingTask.id
-        ? { ...t, text: formText.trim(), est_minutes: formEst } : t));
+        ? { ...t, text: formText.trim(), est_minutes: formEst, day_of_week: formDay } : t));
     } else {
       const { data: newTask, error } = await supabase.from("weekly_routine_tasks").insert({
         user_id: userId,
         text: formText.trim(),
         est_minutes: formEst,
+        day_of_week: formDay,
         sort_order: tasks.length,
       }).select().single();
       if (error) { toast("Failed to save: " + error.message, "error"); return; }
@@ -110,6 +112,7 @@ export default function WeeklyRoutinePage() {
     setEditingTask(null);
     setFormText("");
     setFormEst(0);
+    setFormDay(null);
   };
 
   const removeTask = async (id: string) => {
@@ -122,6 +125,7 @@ export default function WeeklyRoutinePage() {
     setEditingTask(task);
     setFormText(task.text);
     setFormEst(task.est_minutes);
+    setFormDay(task.day_of_week);
     setModalOpen(true);
     setMenuOpen(null);
   };
@@ -130,6 +134,7 @@ export default function WeeklyRoutinePage() {
     setEditingTask(null);
     setFormText("");
     setFormEst(0);
+    setFormDay(null);
     setModalOpen(true);
   };
 
@@ -229,6 +234,11 @@ export default function WeeklyRoutinePage() {
             <input type="checkbox" checked={task.checked || false} onChange={() => toggleCheck(task)}
               className="accent-violet" />
             <span className={cn("flex-1 text-sm", task.checked && "task-done")}>{task.text}</span>
+            {task.day_of_week !== null && task.day_of_week !== undefined && (
+              <span className="text-[9px] text-txt3 bg-surface3 px-1.5 py-0.5 rounded shrink-0">
+                {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][task.day_of_week]}
+              </span>
+            )}
             {task.est_minutes > 0 && (
               <span className="text-xs bg-surface2 text-txt3 px-2 py-0.5 rounded-full font-mono">
                 {formatMinutes(task.est_minutes)}
@@ -287,6 +297,23 @@ export default function WeeklyRoutinePage() {
                   className="w-16 glass-field px-3 py-2 text-txt text-sm" />
                 <span className="text-xs text-txt3">min</span>
               </div>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm text-txt2 mb-1.5">Preferred day</label>
+            <div className="flex flex-wrap gap-1.5">
+              <button onClick={() => setFormDay(null)}
+                className={cn("px-2.5 py-1 rounded text-xs transition-colors",
+                  formDay === null ? "bg-violet text-white" : "bg-surface3 text-txt3 hover:text-txt")}>
+                Any
+              </button>
+              {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((d, i) => (
+                <button key={d} onClick={() => setFormDay(i)}
+                  className={cn("px-2.5 py-1 rounded text-xs transition-colors",
+                    formDay === i ? "bg-violet text-white" : "bg-surface3 text-txt3 hover:text-txt")}>
+                  {d}
+                </button>
+              ))}
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">

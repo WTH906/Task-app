@@ -58,6 +58,9 @@ export default function ProjectDetailPage() {
   const [moveSubModal, setMoveSubModal] = useState<{ subId: string; subName: string; fromTaskId: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archivedTasks, setArchivedTasks] = useState<ProjectTask[]>([]);
+  const [archivedCount, setArchivedCount] = useState(0);
   const loadIdRef = useRef(0);
 
   // Timer hook — DB-backed started_at, drift-proof
@@ -95,6 +98,11 @@ export default function ProjectDetailPage() {
       const tasksWithSubs = await fetchProjectTasksWithSubs(supabase, projectId);
       if (loadIdRef.current !== thisLoad) return;
       setTasks(tasksWithSubs);
+
+      // Count archived tasks
+      supabase.from("project_tasks").select("*", { count: "exact", head: true })
+        .eq("project_id", projectId).not("archived_at", "is", null)
+        .then(({ count }) => setArchivedCount(count || 0));
 
       const el: Record<string, number> = {};
       for (const t of tasksWithSubs) {
@@ -591,12 +599,79 @@ export default function ProjectDetailPage() {
     setModalOpen(true);
   };
 
+  const archiveTask = async (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    updateTaskLocal(taskId, { archived_at: new Date().toISOString() } as Partial<ProjectTask>);
+    setTasks(prev => prev.filter(t => t.id !== taskId));
+    const supabase = createClient();
+    supabase.from("project_tasks").update({ archived_at: new Date().toISOString() }).eq("id", taskId);
+    toast(`"${task.name}" archived`, "success");
+  };
+
+  const monitorTask = async (taskId: string, taskName: string, isSubtask?: boolean, subtaskId?: string) => {
+    const supabase = createClient();
+    const table = isSubtask ? "subtasks" : "project_tasks";
+    const id = isSubtask ? subtaskId! : taskId;
+
+    // Check if already monitored — toggle off
+    const { data: existing } = await supabase.from("monitored_tasks")
+      .select("id").eq("user_id", userId)
+      .eq(isSubtask ? "subtask_id" : "task_id", id).limit(1).maybeSingle();
+
+    if (existing) {
+      supabase.from("monitored_tasks").delete().eq("id", existing.id);
+      supabase.from(table).update({ monitoring: false }).eq("id", id);
+      if (isSubtask) {
+        const parentTask = tasks.find(t => t.subtasks?.some(s => s.id === id));
+        if (parentTask) updateSubtaskLocal(parentTask.id, id, { monitoring: false });
+      } else {
+        updateTaskLocal(taskId, { monitoring: false } as Partial<ProjectTask>);
+      }
+      toast("Removed from monitoring", "info");
+    } else {
+      supabase.from("monitored_tasks").insert({
+        user_id: userId, project_id: projectId, task_id: taskId,
+        subtask_id: isSubtask ? subtaskId : null,
+        project_title: project?.title || "", task_name: taskName,
+      });
+      supabase.from(table).update({ monitoring: true }).eq("id", id);
+      if (isSubtask) {
+        const parentTask = tasks.find(t => t.subtasks?.some(s => s.id === id));
+        if (parentTask) updateSubtaskLocal(parentTask.id, id, { monitoring: true });
+      } else {
+        updateTaskLocal(taskId, { monitoring: true } as Partial<ProjectTask>);
+      }
+      toast("Added to monitoring", "success");
+    }
+  };
+
+  const duplicateSubtask = async (sub: Subtask, parentTaskId: string) => {
+    const supabase = createClient();
+    const parent = tasks.find(t => t.id === parentTaskId);
+    const newSortOrder = (parent?.subtasks?.length || 0);
+    const { data } = await supabase.from("subtasks").insert({
+      user_id: userId, task_id: parentTaskId,
+      name: `${sub.name} (copy)`, est_minutes: sub.est_minutes,
+      deadline: sub.deadline, date_key: sub.date_key,
+      progress: 0, notes: sub.notes, sort_order: newSortOrder,
+      elapsed_seconds: 0,
+    }).select().single();
+    if (data) {
+      const newSub = data as Subtask;
+      setTasks(prev => prev.map(t => t.id === parentTaskId
+        ? { ...t, subtasks: [...(t.subtasks || []), newSub] } : t));
+      toast("Subtask duplicated", "success");
+    }
+  };
+
   const taskActions: TaskActions = {
     toggleTimer, removeTask, removeSubtask,
     updateTaskField, updateSubtaskField,
     updateTaskLocal, updateSubtaskLocal,
     openEditModal, setExpandedTasks, setMoveSubModal,
     handleSubDragStart, handleSubDragOver, handleSubDragEnd,
+    archiveTask, monitorTask, duplicateSubtask,
   };
 
   if (!project) {
@@ -636,7 +711,17 @@ export default function ProjectDetailPage() {
                 placeholder="Project title"
               />
             </div>
-            <div className="mt-1 flex items-center gap-3">
+            <div className="mt-1 flex items-center gap-3 flex-wrap">
+              <CalendarPicker
+                value={project.start_date || null}
+                variant="date"
+                onChange={async (d) => {
+                  const supabase = createClient();
+                  await supabase.from("projects").update({ start_date: d }).eq("id", projectId);
+                  setProject({ ...project, start_date: d });
+                }}
+              />
+              {project.start_date && <span className="text-[10px] text-txt3">Start: {project.start_date}</span>}
               <CalendarPicker
                 value={project.deadline || null}
                 variant="deadline"
@@ -787,6 +872,41 @@ export default function ProjectDetailPage() {
           <div className="text-center py-12 text-txt3">
             <p className="text-lg mb-2">No tasks yet</p>
             <p className="text-sm">Add tasks to track your project progress</p>
+          </div>
+        )}
+      </div>
+
+      {/* Archived tasks */}
+      <div className="mb-4">
+        <button onClick={async () => {
+          if (showArchived) { setShowArchived(false); return; }
+          const supabase = createClient();
+          const { data } = await supabase.from("project_tasks")
+            .select("*, subtasks(*)").eq("project_id", projectId).not("archived_at", "is", null)
+            .order("archived_at", { ascending: false });
+          setArchivedTasks((data || []) as ProjectTask[]);
+          setShowArchived(true);
+        }}
+          className="text-xs text-txt3 hover:text-txt transition-colors flex items-center gap-1.5">
+          {showArchived ? "▾ Hide archived" : "▸ Show archived tasks"}
+          {!showArchived && archivedCount > 0 && <span className="text-[10px] font-mono">({archivedCount})</span>}
+        </button>
+        {showArchived && archivedTasks.length > 0 && (
+          <div className="mt-2 space-y-1.5 opacity-60">
+            {archivedTasks.map(task => (
+              <div key={task.id} className="flex items-center gap-2 bg-surface border border-border rounded-lg px-3 py-2 text-xs">
+                <span className="text-txt3 line-through flex-1 truncate">{task.name}</span>
+                <span className="text-[10px] text-txt3 font-mono">{formatSeconds(task.elapsed_seconds)}</span>
+                <button onClick={async () => {
+                  const supabase = createClient();
+                  await supabase.from("project_tasks").update({ archived_at: null }).eq("id", task.id);
+                  setArchivedTasks(prev => prev.filter(t => t.id !== task.id));
+                  setArchivedCount(c => c - 1);
+                  loadProject();
+                  toast("Task restored", "success");
+                }} className="text-[10px] text-violet2 hover:text-violet">Restore</button>
+              </div>
+            ))}
           </div>
         )}
       </div>

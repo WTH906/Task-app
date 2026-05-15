@@ -20,6 +20,8 @@ export default function MonthlyRoutinePage() {
   const [editingTask, setEditingTask] = useState<MonthlyRoutineTask | null>(null);
   const [formText, setFormText] = useState("");
   const [formEst, setFormEst] = useState(0);
+  const [formDateFrom, setFormDateFrom] = useState<number | null>(null);
+  const [formDateTo, setFormDateTo] = useState<number | null>(null);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
 
   const monthKey = getMonthKey(new Date());
@@ -59,21 +61,20 @@ export default function MonthlyRoutinePage() {
     if (!formText.trim()) return;
     const supabase = createClient();
     if (editingTask) {
-      const { error } = await supabase.from("monthly_routine_tasks").update({ text: formText.trim(), est_minutes: formEst }).eq("id", editingTask.id);
+      const { error } = await supabase.from("monthly_routine_tasks").update({ text: formText.trim(), est_minutes: formEst, date_from: formDateFrom, date_to: formDateTo }).eq("id", editingTask.id);
       if (error) { toast("Failed to save: " + error.message, "error"); return; }
       setTasks((prev) => prev.map((t) => t.id === editingTask.id
-        ? { ...t, text: formText.trim(), est_minutes: formEst } : t));
+        ? { ...t, text: formText.trim(), est_minutes: formEst, date_from: formDateFrom, date_to: formDateTo } : t));
     } else {
       const { data: newTask, error } = await supabase.from("monthly_routine_tasks").insert({
-        user_id: userId, text: formText.trim(), est_minutes: formEst, sort_order: tasks.length,
+        user_id: userId, text: formText.trim(), est_minutes: formEst, date_from: formDateFrom, date_to: formDateTo, sort_order: tasks.length,
       }).select().single();
       if (error) { toast("Failed to save: " + error.message, "error"); return; }
       if (newTask) setTasks((prev) => [...prev, { ...newTask as MonthlyRoutineTask, checked: false }]);
     }
     setModalOpen(false);
     setEditingTask(null);
-    setFormText("");
-    setFormEst(0);
+    setFormText(""); setFormEst(0); setFormDateFrom(null); setFormDateTo(null);
   };
 
   const deleteTask = async (id: string) => {
@@ -115,7 +116,7 @@ export default function MonthlyRoutinePage() {
           </h1>
           <p className="text-sm text-txt2 mt-0.5">{monthName} · {daysLeft} days left</p>
         </div>
-        <button onClick={() => { setEditingTask(null); setFormText(""); setFormEst(0); setModalOpen(true); }}
+        <button onClick={() => { setEditingTask(null); setFormText(""); setFormEst(0); setFormDateFrom(null); setFormDateTo(null); setModalOpen(true); }}
           className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-white transition-colors">
           ＋ Add Task
         </button>
@@ -141,7 +142,7 @@ export default function MonthlyRoutinePage() {
               {task.est_minutes > 0 && <p className="text-[10px] text-txt3 font-mono">{formatMinutes(task.est_minutes)}</p>}
             </div>
             <div className="relative">
-              <button onClick={() => { setEditingTask(task); setFormText(task.text); setFormEst(task.est_minutes); setModalOpen(true); }}
+              <button onClick={() => { setEditingTask(task); setFormText(task.text); setFormEst(task.est_minutes); setFormDateFrom(task.date_from); setFormDateTo(task.date_to); setModalOpen(true); }}
                 className="text-xs text-txt3 opacity-0 group-hover:opacity-100 hover:text-violet2 transition-all px-1">Edit</button>
               <button onClick={() => deleteTask(task.id)}
                 className="text-xs text-txt3 opacity-0 group-hover:opacity-100 hover:text-danger transition-all px-1">✕</button>
@@ -181,6 +182,20 @@ export default function MonthlyRoutinePage() {
                 <span className="text-xs text-txt3">min</span>
               </div>
             </div>
+          </div>
+          <div>
+            <label className="block text-sm text-txt2 mb-1.5">Date range (optional)</label>
+            <div className="flex items-center gap-2">
+              <input type="number" value={formDateFrom || ""} onChange={(e) => setFormDateFrom(parseInt(e.target.value) || null)}
+                min={1} max={31} placeholder="From"
+                className="w-20 glass-field px-3 py-2 text-txt text-sm" />
+              <span className="text-xs text-txt3">to</span>
+              <input type="number" value={formDateTo || ""} onChange={(e) => setFormDateTo(parseInt(e.target.value) || null)}
+                min={1} max={31} placeholder="To"
+                className="w-20 glass-field px-3 py-2 text-txt text-sm" />
+              <span className="text-[10px] text-txt3">of the month</span>
+            </div>
+            {formDateFrom && formDateTo && <p className="text-[10px] text-txt3 mt-1">Do between the {formDateFrom}th and {formDateTo}th of each month</p>}
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button onClick={() => setModalOpen(false)} className="px-4 py-2 rounded-lg text-sm text-txt2 hover:bg-surface3">Cancel</button>

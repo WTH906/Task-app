@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js";
 import { Sidebar } from "./Sidebar";
 import { ContactsPanel } from "./ContactsPanel";
+import { MonitoringPanel } from "./MonitoringPanel";
 import { ToastProvider, useToast } from "./Toast";
 
 function QueryErrorListener() {
@@ -25,6 +26,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [contactsOpen, setContactsOpen] = useState(false);
+  const [monitoringOpen, setMonitoringOpen] = useState(false);
   const pathname = usePathname();
   const isLogin = pathname === "/login";
 
@@ -47,8 +49,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // Listen for toggle-contacts event from Sidebar
   useEffect(() => {
     const handler = () => setContactsOpen(prev => !prev);
+    const monHandler = () => setMonitoringOpen(prev => !prev);
     window.addEventListener("toggle-contacts", handler);
-    return () => window.removeEventListener("toggle-contacts", handler);
+    window.addEventListener("toggle-monitoring", monHandler);
+    return () => {
+      window.removeEventListener("toggle-contacts", handler);
+      window.removeEventListener("toggle-monitoring", monHandler);
+    };
   }, []);
 
   if (loading) {
@@ -72,6 +79,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
         <ContactsPanel open={contactsOpen} onClose={() => setContactsOpen(false)} userId={user.id} />
+        <MonitoringPanel open={monitoringOpen} onClose={() => setMonitoringOpen(false)} userId={user.id} />
       </div>
     </ToastProvider>
   );

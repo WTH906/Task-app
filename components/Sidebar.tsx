@@ -16,13 +16,15 @@ import {
   LayoutDashboard, ListChecks, RefreshCw, CalendarDays, ClipboardList,
   Map, BarChart3, Timer, Search, Download, ClipboardCopy, FolderPlus,
   ChevronDown, LogOut, Menu, X, CalendarRange, User as UserIcon, PieChart,
-  BookUser, Palette,
+  BookUser, Palette, Clock,
 } from "lucide-react";
 
 export function Sidebar({ user }: { user: User }) {
   const pathname = usePathname();
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [dragProjectIdx, setDragProjectIdx] = useState<number | null>(null);
+  const [projectSort, setProjectSort] = useState<"custom" | "alpha" | "deadline">("custom");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [open, setOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -266,6 +268,11 @@ export function Sidebar({ user }: { user: User }) {
             <Link href="/projects" onClick={() => setOpen(false)}
               className="text-[11px] uppercase tracking-wider text-txt3 hover:text-red-acc transition-colors">Projects</Link>
             <div className="flex items-center gap-1">
+              <button onClick={() => setProjectSort(s => s === "custom" ? "alpha" : s === "alpha" ? "deadline" : "custom")}
+                title={`Sort: ${projectSort}`}
+                className="text-[9px] text-txt3 hover:text-txt transition-colors px-1 py-0.5 rounded bg-surface3">
+                {projectSort === "custom" ? "⠿" : projectSort === "alpha" ? "AZ" : "📅"}
+              </button>
               <button onClick={() => setImportOpen(true)} title="Import" className="text-txt3 hover:text-green-acc transition-colors p-0.5"><Download size={14} /></button>
               <button onClick={() => { fetchTemplates(); setTemplateOpen(!templateOpen); }} title="Templates" className="text-txt3 hover:text-violet2 transition-colors p-0.5"><ClipboardCopy size={14} /></button>
             </div>
@@ -288,18 +295,46 @@ export function Sidebar({ user }: { user: User }) {
             </div>
           )}
 
-          {projects.map((p) => {
+          {(() => {
+            const sorted = projectSort === "alpha"
+              ? [...projects].sort((a, b) => a.title.localeCompare(b.title))
+              : projectSort === "deadline"
+              ? [...projects].sort((a, b) => {
+                  if (!a.deadline && !b.deadline) return 0;
+                  if (!a.deadline) return 1;
+                  if (!b.deadline) return -1;
+                  return a.deadline.localeCompare(b.deadline);
+                })
+              : projects;
+            return sorted.map((p, idx) => {
             const active = pathname === `/projects/${p.id}`;
             return (
               <Link key={p.id} href={`/projects/${p.id}`} onClick={() => setOpen(false)}
-                className={cn("flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors truncate",
+                draggable
+                onDragStart={() => setDragProjectIdx(idx)}
+                onDragOver={(e) => { e.preventDefault(); if (dragProjectIdx !== null && dragProjectIdx !== idx) {
+                  setProjects(prev => {
+                    const copy = [...prev];
+                    const [item] = copy.splice(dragProjectIdx!, 1);
+                    copy.splice(idx, 0, item);
+                    return copy;
+                  });
+                  setDragProjectIdx(idx);
+                }}}
+                onDragEnd={() => {
+                  setDragProjectIdx(null);
+                  const supabase = createClient();
+                  projects.forEach((proj, i) => supabase.from("projects").update({ sort_order: i }).eq("id", proj.id));
+                }}
+                className={cn("flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors truncate cursor-grab",
                   active ? "" : "text-txt2 hover:bg-surface2 hover:text-txt")}
                 style={active ? { backgroundColor: `${p.color || "#e05555"}20`, color: p.color || "#e05555" } : undefined}>
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color || "#e05555" }} />
                 <span className="truncate">{p.title}</span>
               </Link>
             );
-          })}
+          });
+          })()}
 
           <button onClick={handleNewProject}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-txt3 hover:bg-surface2 hover:text-txt w-full transition-colors">
@@ -315,6 +350,11 @@ export function Sidebar({ user }: { user: User }) {
             className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-xs text-txt3 hover:bg-surface2 hover:text-txt transition-colors">
             <BookUser size={15} /> <span>Contacts</span>
             <span className="ml-auto text-[9px] text-txt3">→</span>
+          </button>
+          <button onClick={() => window.dispatchEvent(new Event("toggle-monitoring"))}
+            className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-xs text-txt3 hover:bg-surface2 hover:text-amber transition-colors">
+            <Clock size={15} /> <span>Monitoring</span>
+            <span className="ml-auto text-[9px] text-txt3">←</span>
           </button>
           <div className="text-[10px] text-txt3 px-2 space-y-0.5">
             <p><kbd className="bg-surface3 px-1 py-0.5 rounded">⌘K</kbd> Search · <kbd className="bg-surface3 px-1 py-0.5 rounded">D</kbd> Home · <kbd className="bg-surface3 px-1 py-0.5 rounded">R</kbd> Routine · <kbd className="bg-surface3 px-1 py-0.5 rounded">W</kbd> Calendar · <kbd className="bg-surface3 px-1 py-0.5 rounded">M</kbd> Map · <kbd className="bg-surface3 px-1 py-0.5 rounded">N</kbd> New</p>
