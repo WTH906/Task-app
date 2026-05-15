@@ -9,6 +9,8 @@ import { Project, Template } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ImportModal } from "./ImportModal";
 import { SearchModal } from "./SearchModal";
+import { WorkClock } from "./WorkClock";
+import { ActiveTimerBadge } from "./ActiveTimerBadge";
 import { fetchProjects as fetchProjectsQuery, fetchTemplates as fetchTemplatesQuery } from "@/lib/queries";
 import {
   LayoutDashboard, ListChecks, RefreshCw, CalendarDays, ClipboardList,
@@ -306,7 +308,9 @@ export function Sidebar({ user }: { user: User }) {
           </button>
         </nav>
 
-        <div className="p-3 border-t border-border space-y-2">
+        <div className="p-3 border-t border-border space-y-1">
+          <ActiveTimerBadge userId={user.id} />
+          <WorkClock userId={user.id} />
           <button onClick={() => window.dispatchEvent(new Event("toggle-contacts"))}
             className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-xs text-txt3 hover:bg-surface2 hover:text-txt transition-colors">
             <BookUser size={15} /> <span>Contacts</span>

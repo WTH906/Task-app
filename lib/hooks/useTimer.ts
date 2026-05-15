@@ -174,20 +174,16 @@ export function useTimer({ userId, projectId, tasks, onElapsedChange, onTaskUpda
     const autoSave = setInterval(saveToDB, 5000);
     const handleVisibility = () => { if (document.visibilityState === "hidden") saveToDB(); };
     document.addEventListener("visibilitychange", handleVisibility);
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "Timer is running — are you sure you want to leave?";
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
     return () => {
       clearInterval(autoSave);
       document.removeEventListener("visibilitychange", handleVisibility);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [activeTaskId, saveToDB]);
 
-  // On mount: check if any task has timer_started_at (resume after page reload)
+  // On mount / when tasks load: check if any task has timer_started_at (resume)
   useEffect(() => {
+    // Only auto-resume if no timer is currently active
+    if (activeTaskId) return;
     for (const t of tasks) {
       if (t.timer_started_at) {
         startedAtRef.current = new Date(t.timer_started_at).getTime();
@@ -204,9 +200,16 @@ export function useTimer({ userId, projectId, tasks, onElapsedChange, onTaskUpda
         }
       }
     }
-  // Only run on initial load, not on every tasks change
+  }, [tasks, activeTaskId]);
+
+  // Save elapsed on unmount (navigation away) — don't stop, just persist
+  useEffect(() => {
+    return () => {
+      if (!activeTaskId) return;
+      saveToDB();
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeTaskId, saveToDB]);
 
   return { activeTaskId, startTimer, stopTimer, toggleTimer };
 }

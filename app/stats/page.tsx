@@ -53,9 +53,11 @@ function WeeklyTimeSummary({ userId }: { userId: string }) {
 
     // Get project names + colors
     const pIds = [...new Set(data.map(d => d.project_id).filter(Boolean))];
-    const { data: projects } = await supabase.from("projects").select("id, title, color").in("id", pIds);
+    const { data: projects } = pIds.length > 0
+      ? await supabase.from("projects").select("id, title, color").in("id", pIds)
+      : { data: [] };
     const pMap: Record<string, { title: string; color: string }> = {};
-    for (const p of projects || []) pMap[p.id] = { title: p.title, color: p.color || "#7c6fff" };
+    for (const p of projects || []) pMap[p.id] = { title: p.title, color: p.color || "var(--accent)" };
 
     // Get task names
     const tIds = [...new Set(data.map(d => d.task_id).filter(Boolean))];
@@ -69,15 +71,17 @@ function WeeklyTimeSummary({ userId }: { userId: string }) {
     const byProject: Record<string, WeekLog> = {};
     let total = 0;
     for (const row of data) {
-      const pid = row.project_id || "unknown";
+      const pid = row.project_id || "_general";
       if (!byProject[pid]) {
-        const p = pMap[pid] || { title: "Unknown", color: "#5c5a7a" };
+        const p = pid === "_general"
+          ? { title: "General", color: "var(--muted-acc2)" }
+          : (pMap[pid] || { title: "Unknown", color: "var(--txt3)" });
         byProject[pid] = { project_title: p.title, project_color: p.color, seconds: 0, tasks: {} };
       }
       byProject[pid].seconds += row.duration_seconds;
       total += row.duration_seconds;
 
-      const taskName = tMap[row.task_id] || "Untitled";
+      const taskName = row.task_id ? (tMap[row.task_id] || "Untitled") : "Work session";
       byProject[pid].tasks[taskName] = (byProject[pid].tasks[taskName] || 0) + row.duration_seconds;
     }
 
