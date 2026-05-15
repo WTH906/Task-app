@@ -17,20 +17,24 @@ export function WorkClock({ userId }: WorkClockProps) {
 
   // Load persisted clock state
   useEffect(() => {
-    const supabase = createClient();
-    supabase
-      .from("user_settings")
-      .select("work_clock_started_at")
-      .eq("user_id", userId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.work_clock_started_at) {
+    (async () => {
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from("user_settings")
+          .select("work_clock_started_at")
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (!error && data?.work_clock_started_at) {
           const ts = new Date(data.work_clock_started_at).getTime();
           setStartedAt(ts);
           setElapsed(Math.round((Date.now() - ts) / 1000));
         }
-        setLoading(false);
-      });
+      } catch {
+        // silently handle
+      }
+      setLoading(false);
+    })();
   }, [userId]);
 
   // Tick every second

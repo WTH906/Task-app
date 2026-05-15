@@ -21,59 +21,64 @@ export function ActiveTimerBadge({ userId }: { userId: string }) {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const check = useCallback(async () => {
-    const supabase = createClient();
+    try {
+      const supabase = createClient();
 
-    // Check project_tasks
-    const { data: runningTask } = await supabase
-      .from("project_tasks")
-      .select("id, name, elapsed_seconds, timer_started_at, project_id")
-      .eq("user_id", userId)
-      .not("timer_started_at", "is", null)
-      .limit(1)
-      .maybeSingle();
+      // Check project_tasks
+      const { data: runningTask } = await supabase
+        .from("project_tasks")
+        .select("id, name, elapsed_seconds, timer_started_at, project_id")
+        .eq("user_id", userId)
+        .not("timer_started_at", "is", null)
+        .limit(1)
+        .maybeSingle();
 
-    if (runningTask?.timer_started_at) {
-      const { data: proj } = await supabase
-        .from("projects").select("title, color").eq("id", runningTask.project_id).single();
-      setTimer({
-        projectId: runningTask.project_id,
-        projectTitle: proj?.title || "Project",
-        projectColor: proj?.color || "var(--accent)",
-        taskName: runningTask.name,
-        startedAt: new Date(runningTask.timer_started_at).getTime(),
-        baseElapsed: runningTask.elapsed_seconds || 0,
-      });
-      return;
+      if (runningTask?.timer_started_at) {
+        const { data: proj } = await supabase
+          .from("projects").select("title, color").eq("id", runningTask.project_id).single();
+        setTimer({
+          projectId: runningTask.project_id,
+          projectTitle: proj?.title || "Project",
+          projectColor: proj?.color || "var(--accent)",
+          taskName: runningTask.name,
+          startedAt: new Date(runningTask.timer_started_at).getTime(),
+          baseElapsed: runningTask.elapsed_seconds || 0,
+        });
+        return;
+      }
+
+      // Check subtasks
+      const { data: runningSub } = await supabase
+        .from("subtasks")
+        .select("id, name, elapsed_seconds, timer_started_at, task_id")
+        .eq("user_id", userId)
+        .not("timer_started_at", "is", null)
+        .limit(1)
+        .maybeSingle();
+
+      if (runningSub?.timer_started_at) {
+        const { data: parent } = await supabase
+          .from("project_tasks").select("project_id").eq("id", runningSub.task_id).single();
+        const pid = parent?.project_id;
+        const { data: proj } = pid
+          ? await supabase.from("projects").select("title, color").eq("id", pid).single()
+          : { data: null };
+        setTimer({
+          projectId: pid || "",
+          projectTitle: proj?.title || "Project",
+          projectColor: proj?.color || "var(--accent)",
+          taskName: `↳ ${runningSub.name}`,
+          startedAt: new Date(runningSub.timer_started_at).getTime(),
+          baseElapsed: runningSub.elapsed_seconds || 0,
+        });
+        return;
+      }
+
+      setTimer(null);
+    } catch {
+      // Silently handle — component just won't show a timer badge
+      setTimer(null);
     }
-
-    // Check subtasks
-    const { data: runningSub } = await supabase
-      .from("subtasks")
-      .select("id, name, elapsed_seconds, timer_started_at, task_id")
-      .eq("user_id", userId)
-      .not("timer_started_at", "is", null)
-      .limit(1)
-      .maybeSingle();
-
-    if (runningSub?.timer_started_at) {
-      const { data: parent } = await supabase
-        .from("project_tasks").select("project_id").eq("id", runningSub.task_id).single();
-      const pid = parent?.project_id;
-      const { data: proj } = pid
-        ? await supabase.from("projects").select("title, color").eq("id", pid).single()
-        : { data: null };
-      setTimer({
-        projectId: pid || "",
-        projectTitle: proj?.title || "Project",
-        projectColor: proj?.color || "var(--accent)",
-        taskName: `↳ ${runningSub.name}`,
-        startedAt: new Date(runningSub.timer_started_at).getTime(),
-        baseElapsed: runningSub.elapsed_seconds || 0,
-      });
-      return;
-    }
-
-    setTimer(null);
   }, [userId]);
 
   // Check on mount and when navigating (pathname changes trigger re-render of parent)

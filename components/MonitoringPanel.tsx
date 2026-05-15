@@ -64,13 +64,18 @@ export function MonitoringPanel({ open, onClose, userId }: { open: boolean; onCl
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const toggleCollapse = (key: string) => setCollapsed(prev => ({ ...prev, [key]: !prev[key] }));
 
+  if (!open) return null;
+
   return (
     <>
       {open && <div className="fixed inset-0 z-40" style={{ background: "rgba(0,0,0,0.3)" }} onClick={onClose} />}
       <div
-        className="fixed top-0 left-60 bottom-0 z-50 flex flex-col border-r transition-transform duration-300 ease-in-out w-full sm:w-[400px]"
+        className="fixed top-0 bottom-0 z-50 flex flex-col border-r w-full sm:w-[400px]"
         style={{
+          left: 0,
           transform: open ? "translateX(0)" : "translateX(-100%)",
+          transition: "transform 0.3s ease-in-out, visibility 0.3s",
+          visibility: open ? "visible" : "hidden",
           background: "var(--surface)",
           borderColor: "var(--border)",
         }}
