@@ -186,15 +186,19 @@ export function useTimer({ userId, projectId, tasks, onElapsedChange, onTaskUpda
     if (activeTaskId) return;
     for (const t of tasks) {
       if (t.timer_started_at) {
-        startedAtRef.current = new Date(t.timer_started_at).getTime();
-        baseElapsedRef.current = t.elapsed_seconds;
+        // Compute correct elapsed: max of saved elapsed vs time since timer_started_at
+        // This handles both: normal resume (elapsed is up-to-date) and crash recovery (elapsed is stale)
+        const sinceStart = Math.round((Date.now() - new Date(t.timer_started_at).getTime()) / 1000);
+        baseElapsedRef.current = Math.max(t.elapsed_seconds, sinceStart);
+        startedAtRef.current = Date.now(); // start LOCAL counter from NOW, not from timer_started_at
         setActiveTaskId(t.id);
         return;
       }
       for (const s of t.subtasks || []) {
         if (s.timer_started_at) {
-          startedAtRef.current = new Date(s.timer_started_at).getTime();
-          baseElapsedRef.current = s.elapsed_seconds;
+          const sinceStart = Math.round((Date.now() - new Date(s.timer_started_at).getTime()) / 1000);
+          baseElapsedRef.current = Math.max(s.elapsed_seconds, sinceStart);
+          startedAtRef.current = Date.now();
           setActiveTaskId(`sub:${s.id}`);
           return;
         }

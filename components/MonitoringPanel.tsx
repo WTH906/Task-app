@@ -1,15 +1,28 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { MonitoredTask } from "@/lib/types";
 import { useToast } from "@/components/Toast";
-import { X, CheckCircle, Clock, ChevronDown, ChevronRight } from "lucide-react";
+import { X, CheckCircle, Clock, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 
 export function MonitoringPanel({ open, onClose, userId }: { open: boolean; onClose: () => void; userId: string }) {
   const [items, setItems] = useState<MonitoredTask[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const router = useRouter();
+
+  const goToTask = (item: MonitoredTask) => {
+    if (item.project_id) {
+      // If it's a subtask, tell the project page to expand the parent task
+      if (item.task_id) {
+        window.dispatchEvent(new CustomEvent("expand-task", { detail: item.task_id }));
+      }
+      router.push(`/projects/${item.project_id}`);
+      onClose();
+    }
+  };
 
   const loadData = useCallback(async () => {
     const supabase = createClient();
@@ -118,7 +131,9 @@ export function MonitoringPanel({ open, onClose, userId }: { open: boolean; onCl
                   {!collapsed[key] && group.items.map(item => (
                     <div key={item.id} className="px-4 py-2.5 mx-2 mb-1 rounded-lg bg-surface2 border border-border">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-bright flex-1 truncate">{item.task_name}</span>
+                        <button onClick={() => goToTask(item)} className="text-xs font-medium text-bright flex-1 truncate text-left hover:text-violet2 transition-colors" title="Go to project">
+                          {item.task_name}
+                        </button>
                         <button onClick={() => resolve(item.id)} title="Mark as resolved"
                           className="w-6 h-6 rounded flex items-center justify-center text-txt3 hover:text-green-acc hover:bg-green-acc/10 transition-colors shrink-0">
                           <CheckCircle size={14} />

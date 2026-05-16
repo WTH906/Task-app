@@ -1,3 +1,5 @@
+const path = require("path");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   allowedDevOrigins: [
@@ -8,6 +10,9 @@ const nextConfig = {
     "169.",
     "172.",
   ],
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
   experimental: {},
 };
 

@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { Project, ProjectTask, Subtask } from "@/lib/types";
-import { formatSeconds, formatMinutes } from "@/lib/utils";
+import { formatSeconds, formatMinutes, cn } from "@/lib/utils";
 import { useTimer } from "@/lib/hooks/useTimer";
 import { ProgressBar } from "@/components/ProgressBar";
 import { InlineEdit } from "@/components/InlineEdit";
@@ -125,6 +125,16 @@ export default function ProjectDetailPage() {
   }, [projectId, router, activeTaskId, userId, toast]);
 
   useEffect(() => { loadProject(); }, [loadProject]);
+
+  // Listen for expand-task events from monitoring panel
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const taskId = (e as CustomEvent).detail;
+      if (taskId) setExpandedTasks(prev => new Set(prev).add(taskId));
+    };
+    window.addEventListener("expand-task", handler);
+    return () => window.removeEventListener("expand-task", handler);
+  }, []);
 
   // ── Granular state helpers (avoid full reload after mutations) ──
 
@@ -436,16 +446,16 @@ export default function ProjectDetailPage() {
       // Sync subtask completion in background
       syncSubtaskCompletion(supabase, userId, subtaskId, value as number);
 
-      const parent = tasks.find((t) => t.id === parentId);
-      if (parent?.subtasks) {
-        const subs = parent.subtasks.map((s) => s.id === subtaskId ? { ...s, progress: value as number } : s);
-        const avg = Math.round(subs.reduce((s, st) => s + st.progress, 0) / subs.length);
-        // Optimistic parent update
-        updateTaskLocal(parentId, { progress: avg });
-        // Background DB calls
+      // Use functional setState to recalculate from LATEST state, not stale closure
+      setTasks(prev => prev.map(t => {
+        if (t.id !== parentId) return t;
+        const subs = (t.subtasks || []).map(s => s.id === subtaskId ? { ...s, progress: value as number } : s);
+        const avg = subs.length > 0 ? Math.round(subs.reduce((sum, st) => sum + st.progress, 0) / subs.length) : 0;
+        // Background DB update for parent
         supabase.from("project_tasks").update({ progress: avg }).eq("id", parentId);
         syncTaskCompletion(supabase, userId, parentId, avg);
-      }
+        return { ...t, progress: avg, subtasks: subs };
+      }));
     }
   };
 
@@ -635,7 +645,7 @@ export default function ProjectDetailPage() {
         subtask_id: isSubtask ? subtaskId : null,
         project_title: project?.title || "", task_name: taskName,
       });
-      supabase.from(table).update({ monitoring: true }).eq("id", id);
+      await supabase.from(table).update({ monitoring: true }).eq("id", id);
       if (isSubtask) {
         const parentTask = tasks.find(t => t.subtasks?.some(s => s.id === id));
         if (parentTask) updateSubtaskLocal(parentTask.id, id, { monitoring: true });
@@ -764,18 +774,6 @@ export default function ProjectDetailPage() {
               <span className="flex items-center gap-1"><Pencil size={12} /> Edit description</span>
             </button>
             <button
-              onClick={async () => {
-                const supabase = createClient();
-                await supabase.from("projects").update({ archived_at: new Date().toISOString() }).eq("id", projectId);
-                router.push("/projects");
-                window.dispatchEvent(new Event("projects-changed"));
-                toast("Project archived", "success");
-              }}
-              className="text-xs text-txt3 hover:text-amber transition-colors"
-            >
-              <span className="flex items-center gap-1"><Archive size={12} /> Archive</span>
-            </button>
-            <button
               onClick={() => setConfirmDeleteOpen(true)}
               className="text-xs text-txt3 hover:text-danger transition-colors"
             >
@@ -856,6 +854,14 @@ export default function ProjectDetailPage() {
         <ProgressBar value={overallProgress} showLabel label="Overall Progress" height={10} />
       </div>
 
+      {/* Add task — at top */}
+      <button
+        onClick={() => openEditModal(null, "task")}
+        className="w-full bg-surface border border-dashed border-border2 rounded-lg px-4 py-2.5 text-sm text-txt3 hover:border-violet hover:text-violet transition-colors mb-3"
+      >
+        ＋ Add Task
+      </button>
+
       {/* Task list */}
       <div className="space-y-2 mb-4">
         {tasks.map((task, idx) => (
@@ -901,36 +907,74 @@ export default function ProjectDetailPage() {
           setShowArchived(true);
         }}
           className="text-xs text-txt3 hover:text-txt transition-colors flex items-center gap-1.5">
-          {showArchived ? "▾ Hide archived" : "▸ Show archived tasks"}
-          {!showArchived && archivedCount > 0 && <span className="text-[10px] font-mono">({archivedCount})</span>}
+          <Archive size={12} />
+          {showArchived ? "Hide archived" : "Show archived tasks"}
+          {archivedCount > 0 && <span className="text-[10px] font-mono bg-surface3 px-1.5 py-0.5 rounded">({archivedCount})</span>}
         </button>
-        {showArchived && archivedTasks.length > 0 && (
-          <div className="mt-2 space-y-1.5 opacity-60">
-            {archivedTasks.map(task => (
-              <div key={task.id} className="flex items-center gap-2 bg-surface border border-border rounded-lg px-3 py-2 text-xs">
-                <span className="text-txt3 line-through flex-1 truncate">{task.name}</span>
-                <span className="text-[10px] text-txt3 font-mono">{formatSeconds(task.elapsed_seconds)}</span>
-                <button onClick={async () => {
-                  const supabase = createClient();
-                  await supabase.from("project_tasks").update({ archived_at: null }).eq("id", task.id);
-                  setArchivedTasks(prev => prev.filter(t => t.id !== task.id));
-                  setArchivedCount(c => c - 1);
-                  loadProject();
-                  toast("Task restored", "success");
-                }} className="text-[10px] text-violet2 hover:text-violet">Restore</button>
+
+        {showArchived && (
+          <div className="mt-3 border border-border rounded-xl bg-surface/50 overflow-hidden">
+            <div className="px-4 py-2.5 border-b border-border bg-surface2/30 flex items-center justify-between">
+              <span className="text-xs font-medium text-txt2">Archived Tasks</span>
+              <span className="text-[10px] text-txt3">{archivedTasks.length} task{archivedTasks.length !== 1 ? "s" : ""}</span>
+            </div>
+
+            {archivedTasks.length === 0 ? (
+              <div className="px-4 py-8 text-center text-txt3 text-xs">No archived tasks in this project</div>
+            ) : (
+              <div className="divide-y divide-border">
+                {archivedTasks.map(task => (
+                  <div key={task.id} className="px-4 py-3">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-sm text-txt2 flex-1">{task.name}</span>
+                      <button onClick={async () => {
+                        const supabase = createClient();
+                        await supabase.from("project_tasks").update({ archived_at: null }).eq("id", task.id);
+                        setArchivedTasks(prev => prev.filter(t => t.id !== task.id));
+                        setArchivedCount(c => c - 1);
+                        loadProject();
+                        toast("Task restored", "success");
+                      }} className="text-xs text-violet2 hover:text-violet px-2 py-1 rounded hover:bg-violet/10 transition-colors">
+                        Restore
+                      </button>
+                      <button onClick={async () => {
+                        if (!confirm("Permanently delete this task?")) return;
+                        const supabase = createClient();
+                        await supabase.from("project_tasks").delete().eq("id", task.id);
+                        setArchivedTasks(prev => prev.filter(t => t.id !== task.id));
+                        setArchivedCount(c => c - 1);
+                        toast("Task deleted", "info");
+                      }} className="text-xs text-txt3 hover:text-danger px-2 py-1 rounded hover:bg-danger/10 transition-colors">
+                        Delete
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 text-[10px] text-txt3">
+                      {task.est_minutes > 0 && <span>{Math.floor(task.est_minutes / 60)}h{task.est_minutes % 60 > 0 ? ` ${task.est_minutes % 60}m` : ""}</span>}
+                      {task.elapsed_seconds > 0 && <span>Tracked: {formatSeconds(task.elapsed_seconds)}</span>}
+                      {task.deadline && <span>Deadline: {task.deadline}</span>}
+                      {task.date_key && <span>Date: {task.date_key}</span>}
+                      <span>{task.progress}% done</span>
+                      {task.archived_at && <span>Archived {new Date(task.archived_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>}
+                    </div>
+                    {task.subtasks && task.subtasks.length > 0 && (
+                      <div className="mt-2 ml-3 space-y-1">
+                        {task.subtasks.map(sub => (
+                          <div key={sub.id} className="flex items-center gap-2 text-[10px] text-txt3">
+                            <span className={sub.progress >= 100 ? "line-through opacity-50" : ""}>{sub.progress >= 100 ? "✓" : "○"}</span>
+                            <span className={cn("flex-1 truncate", sub.progress >= 100 && "line-through opacity-50")}>{sub.name}</span>
+                            {sub.est_minutes > 0 && <span>{sub.est_minutes}m</span>}
+                            {sub.elapsed_seconds > 0 && <span>{formatSeconds(sub.elapsed_seconds)}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>
-
-      {/* Add task */}
-      <button
-        onClick={() => openEditModal(null, "task")}
-        className="w-full bg-surface border border-dashed border-border2 rounded-lg px-4 py-3 text-sm text-txt3 hover:border-red-acc hover:text-red-acc transition-colors"
-      >
-        ＋ Add Task
-      </button>
 
       {/* Task/Subtask Modal */}
       <TaskFormModal

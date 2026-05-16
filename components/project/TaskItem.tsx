@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ProjectTask, Subtask } from "@/lib/types";
 import { formatSeconds, formatMinutes, progressColor, cn } from "@/lib/utils";
 import { ProgressBar } from "@/components/ProgressBar";
@@ -56,15 +57,27 @@ export function TaskItem({
 }: TaskItemProps) {
   const isActive = activeTaskId === task.id;
   const isDone = task.progress >= 100;
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+
+  const openMenuAt = (e: React.MouseEvent, id: string, setter: (v: string | null) => void, otherSetter: (v: string | null) => void) => {
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const menuH = 200; // approximate max menu height
+    const top = rect.bottom + menuH > window.innerHeight ? rect.top - menuH : rect.bottom + 4;
+    setMenuPos({ top: Math.max(8, top), left: Math.min(rect.right - 160, window.innerWidth - 170) });
+    setter(setter === setMenuOpen ? (menuOpen === id ? null : id) : (subMenuOpen === id ? null : id));
+    otherSetter(null);
+  };
 
   return (
     <div draggable onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
       <div className={cn(
-        "bg-surface border rounded-lg transition-all card-float overflow-visible",
-        isActive ? "border-green-acc shadow-lg shadow-green-acc/10" :
-          task.monitoring ? "border-amber shadow-sm shadow-amber/10" : "border-border",
+        "bg-surface border-2 rounded-lg transition-colors card-float overflow-visible",
         isDone && "opacity-60"
-      )}>
+      )} style={{
+        borderColor: isActive ? "#4caf50" : task.monitoring ? "#f59e0b" : "var(--border)",
+        boxShadow: isActive ? "0 4px 12px rgba(76,175,80,0.1)" : task.monitoring ? "0 2px 8px rgba(245,158,11,0.15)" : undefined,
+      }}>
         {/* Row 1: drag + play + name */}
         <div className="flex items-center gap-2 px-3 py-2.5">
           <span className="cursor-grab text-txt3 hover:text-txt select-none">⠿</span>
@@ -140,10 +153,11 @@ export function TaskItem({
 
           {/* Menu */}
           <div className="relative">
-            <button onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === task.id ? null : task.id); setSubMenuOpen(null); }}
+            <button onClick={(e) => openMenuAt(e, task.id, setMenuOpen, setSubMenuOpen)}
               className="w-6 h-6 flex items-center justify-center rounded hover:bg-surface2 text-txt3">⋯</button>
-            {menuOpen === task.id && (
-              <div className="absolute right-0 top-full mt-1 bg-surface2 border border-border rounded-lg shadow-xl py-1 w-40 z-20">
+            {menuOpen === task.id && menuPos && (
+              <div className="fixed bg-surface2 border border-border rounded-lg shadow-xl py-1 w-40 z-[100]"
+                style={{ top: menuPos.top, left: menuPos.left }}>
                 <button onClick={() => { actions.openEditModal(task, "task"); setMenuOpen(null); }}
                   className="w-full text-left px-3 py-1.5 text-sm text-txt2 hover:bg-surface3">Edit</button>
                 {(task.subtasks?.length || 0) < 10 && (
@@ -175,9 +189,9 @@ export function TaskItem({
                 className={cn(
                   "flex flex-wrap items-center gap-2 px-3 py-2 border-b border-border/50 last:border-b-0 text-xs",
                   activeTaskId === `sub:${sub.id}` && "bg-green-acc/5",
-                  sub.monitoring && "border-l-2 border-l-amber",
                   dragSubIdx === subIdx && dragSubParent === task.id && "opacity-50"
                 )}
+                style={sub.monitoring ? { borderLeft: "3px solid #f59e0b", paddingLeft: "9px" } : undefined}
               >
                 <span className="cursor-grab text-txt3 opacity-30 hover:opacity-100 select-none text-[10px]">⠿</span>
                 <input
@@ -221,10 +235,11 @@ export function TaskItem({
                   onRemoved={async () => { const s = createClient(); await s.from("subtasks").update({ file_url: null, file_name: null }).eq("id", sub.id); actions.updateSubtaskLocal(task.id, sub.id, { file_url: null, file_name: null }); }}
                 />
                 <div className="relative">
-                  <button onClick={(e) => { e.stopPropagation(); setSubMenuOpen(subMenuOpen === sub.id ? null : sub.id); setMenuOpen(null); }}
+                  <button onClick={(e) => openMenuAt(e, sub.id, setSubMenuOpen, setMenuOpen)}
                     className="w-6 h-6 flex items-center justify-center rounded hover:bg-surface3 text-txt3 text-[10px]">⋯</button>
-                  {subMenuOpen === sub.id && (
-                    <div className="absolute right-0 top-full mt-1 bg-surface2 border border-border rounded-lg shadow-xl py-1 w-40 z-20">
+                  {subMenuOpen === sub.id && menuPos && (
+                    <div className="fixed bg-surface2 border border-border rounded-lg shadow-xl py-1 w-40 z-[100]"
+                      style={{ top: menuPos.top, left: menuPos.left }}>
                       <button onClick={() => { actions.openEditModal(sub, "subtask", task.id); setSubMenuOpen(null); }}
                         className="w-full text-left px-3 py-1.5 text-xs text-txt2 hover:bg-surface3">Edit</button>
                       <button onClick={() => { actions.duplicateSubtask(sub, task.id); setSubMenuOpen(null); }}

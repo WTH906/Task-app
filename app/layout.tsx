@@ -20,7 +20,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <script dangerouslySetInnerHTML={{ __html: `
-          (function(){try{var t=localStorage.getItem('comfy-theme');if(t&&t!=='purple')document.documentElement.setAttribute('data-theme',t)}catch(e){}})();
+          (function(){try{var t=localStorage.getItem('comfy-theme');if(t&&t!=='purple'){document.documentElement.setAttribute('data-theme',t);if(t==='frost'||t==='cloud'){document.documentElement.classList.remove('dark');document.documentElement.style.colorScheme='light'}}}catch(e){}})();
         ` }} />
       </head>
       <body className="bg-bg text-txt font-body min-h-screen">

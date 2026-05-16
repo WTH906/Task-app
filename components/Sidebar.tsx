@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
@@ -25,6 +25,8 @@ export function Sidebar({ user }: { user: User }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [dragProjectIdx, setDragProjectIdx] = useState<number | null>(null);
   const [projectSort, setProjectSort] = useState<"custom" | "alpha" | "deadline">("custom");
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [open, setOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -36,6 +38,10 @@ export function Sidebar({ user }: { user: User }) {
   const THEMES = [
     { id: "purple", label: "Purple", dot: "#9217BF" },
     { id: "ocean", label: "Ocean", dot: "#43B8FA" },
+    { id: "emerald", label: "Emerald", dot: "#34d399" },
+    { id: "ember", label: "Ember", dot: "#f0a050" },
+    { id: "frost", label: "Frost ☀", dot: "#2563eb" },
+    { id: "cloud", label: "Cloud ☀", dot: "#7c3aed" },
   ] as const;
 
   const [theme, setTheme] = useState("purple");
@@ -45,6 +51,9 @@ export function Sidebar({ user }: { user: User }) {
     const saved = localStorage.getItem("comfy-theme") || "purple";
     setTheme(saved);
     document.documentElement.setAttribute("data-theme", saved === "purple" ? "" : saved);
+    if (saved === "dawn" || saved === "frost") {
+      document.documentElement.classList.remove("dark");
+    }
   }, []);
 
   const cycleTheme = () => {
@@ -53,6 +62,15 @@ export function Sidebar({ user }: { user: User }) {
     setTheme(next.id);
     localStorage.setItem("comfy-theme", next.id);
     document.documentElement.setAttribute("data-theme", next.id === "purple" ? "" : next.id);
+    // Toggle light/dark mode
+    const isLight = next.id === "frost" || next.id === "cloud";
+    if (isLight) {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.style.colorScheme = "light";
+    } else {
+      document.documentElement.classList.add("dark");
+      document.documentElement.style.colorScheme = "dark";
+    }
   };
 
   // Load monthly routine toggle from localStorage
@@ -141,22 +159,46 @@ export function Sidebar({ user }: { user: User }) {
     router.push("/login");
   };
 
-  const handleNewProject = async () => {
-    const title = prompt("Project name:");
-    if (!title?.trim()) return;
+  const handleNewProject = () => {
+    setNewProjectName("");
+    setNewProjectOpen(true);
+  };
+
+  const createProject = async (title: string) => {
+    if (!title.trim()) return;
     const supabase = createClient();
     const { data } = await supabase.from("projects")
       .insert({ user_id: user.id, title: title.trim(), sort_order: projects.length })
       .select().single();
     if (data) { window.dispatchEvent(new Event("projects-changed")); router.push(`/projects/${data.id}`); }
+    setNewProjectOpen(false);
   };
 
   const createFromTemplate = async (template: Template) => {
-    const title = prompt("Project name:", template.name);
-    if (!title?.trim()) return;
+    setNewProjectName(template.name);
+    setNewProjectOpen(true);
+    // Store template for use after modal submit
+    pendingTemplateRef.current = template;
+  };
+
+  const pendingTemplateRef = useRef<Template | null>(null);
+
+  const handleProjectModalSubmit = async () => {
+    const title = newProjectName.trim();
+    if (!title) return;
+    const template = pendingTemplateRef.current;
+    pendingTemplateRef.current = null;
+    setNewProjectOpen(false);
+
+    if (!template) {
+      await createProject(title);
+      return;
+    }
+
+    // Create from template
     const supabase = createClient();
     const { data: proj } = await supabase.from("projects")
-      .insert({ user_id: user.id, title: title.trim(), sort_order: projects.length })
+      .insert({ user_id: user.id, title, sort_order: projects.length })
       .select().single();
     if (!proj) return;
 
@@ -252,8 +294,8 @@ export function Sidebar({ user }: { user: User }) {
                 className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
                   active ? "" : "text-txt2 hover:bg-surface2 hover:text-txt")}
                 style={active ? {
-                  backgroundColor: item.accent === "violet" ? "rgba(124,111,255,0.15)" : "rgba(224,85,85,0.15)",
-                  color: item.accent === "violet" ? "#a594ff" : "#e05555",
+                  backgroundColor: "color-mix(in srgb, var(--accent) 15%, transparent)",
+                  color: "var(--accent2)",
                 } : undefined}>
                 <span className="w-5 h-5 flex items-center justify-center shrink-0">{item.icon}</span>
                 <span className="flex-1">{item.label}</span>
@@ -366,6 +408,30 @@ export function Sidebar({ user }: { user: User }) {
       <ImportModal open={importOpen} onClose={() => setImportOpen(false)} userId={user.id}
         onComplete={() => { fetchProjects(); window.dispatchEvent(new Event("projects-changed")); }} />
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
+
+      {/* New Project Modal */}
+      {newProjectOpen && (
+        <>
+          <div className="glass-backdrop" onClick={() => { setNewProjectOpen(false); pendingTemplateRef.current = null; }} />
+          <div className="glass-panel fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[200] w-full max-w-sm rounded-2xl p-6">
+            <h3 className="text-lg font-semibold text-bright mb-4">New Project</h3>
+            <input
+              autoFocus
+              value={newProjectName}
+              onChange={(e) => setNewProjectName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleProjectModalSubmit(); if (e.key === "Escape") { setNewProjectOpen(false); pendingTemplateRef.current = null; } }}
+              placeholder="Project name"
+              className="w-full glass-field px-4 py-3 text-txt text-sm mb-4"
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => { setNewProjectOpen(false); pendingTemplateRef.current = null; }}
+                className="px-4 py-2 text-sm text-txt3 hover:text-txt transition-colors">Cancel</button>
+              <button onClick={handleProjectModalSubmit} disabled={!newProjectName.trim()}
+                className="px-4 py-2 text-sm bg-violet text-white rounded-lg hover:bg-violet-dim disabled:opacity-40 transition-colors">Create</button>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }
