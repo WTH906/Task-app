@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
-import { formatSeconds } from "@/lib/utils";
+import { formatSeconds, todayKey } from "@/lib/utils";
 import { Play, Square } from "lucide-react";
 
 interface WorkClockProps {
@@ -65,7 +65,7 @@ export function WorkClock({ userId }: WorkClockProps) {
   const clockOut = useCallback(async () => {
     if (!startedAt) return;
     const duration = Math.round((Date.now() - startedAt) / 1000);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayKey();
     const supabase = createClient();
 
     setStartedAt(null);

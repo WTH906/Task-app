@@ -23,7 +23,12 @@ function getWeekRange(offset: number) {
   monday.setHours(0, 0, 0, 0);
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  const fmt = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const dy = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${dy}`;
+  };
   const label = `${monday.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} — ${sunday.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
   return { start: fmt(monday), end: fmt(sunday), label };
 }

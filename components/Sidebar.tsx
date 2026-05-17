@@ -430,8 +430,15 @@ export function Sidebar({ user }: { user: User }) {
       {/* New Project Modal */}
       {newProjectOpen && (
         <>
-          <div className="glass-backdrop" onClick={() => { setNewProjectOpen(false); pendingTemplateRef.current = null; }} />
-          <div className="glass-panel fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[200] w-full max-w-sm rounded-2xl p-6">
+          <div className="fixed inset-0 z-[199]" style={{ background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+            onClick={() => { setNewProjectOpen(false); pendingTemplateRef.current = null; }} />
+          <div className="fixed z-[200] w-[90vw] max-w-sm rounded-2xl p-6"
+            style={{
+              top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+              background: "color-mix(in srgb, var(--surface) 95%, transparent)",
+              border: "1px solid var(--border)",
+              boxShadow: "0 24px 48px rgba(0,0,0,0.4)",
+            }}>
             <h3 className="text-lg font-semibold text-bright mb-4">New Project</h3>
             <input
               autoFocus
@@ -439,13 +446,13 @@ export function Sidebar({ user }: { user: User }) {
               onChange={(e) => setNewProjectName(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") handleProjectModalSubmit(); if (e.key === "Escape") { setNewProjectOpen(false); pendingTemplateRef.current = null; } }}
               placeholder="Project name"
-              className="w-full glass-field px-4 py-3 text-txt text-sm mb-4"
+              className="w-full bg-surface2 border border-border rounded-lg px-4 py-3 text-txt text-sm mb-4 focus:outline-none focus:border-violet"
             />
             <div className="flex justify-end gap-2">
               <button onClick={() => { setNewProjectOpen(false); pendingTemplateRef.current = null; }}
                 className="px-4 py-2 text-sm text-txt3 hover:text-txt transition-colors">Cancel</button>
               <button onClick={handleProjectModalSubmit} disabled={!newProjectName.trim()}
-                className="px-4 py-2 text-sm bg-violet text-white rounded-lg hover:bg-violet-dim disabled:opacity-40 transition-colors">Create</button>
+                className="px-4 py-2 text-sm bg-violet text-white rounded-lg hover:opacity-90 disabled:opacity-40 transition-colors">Create</button>
             </div>
           </div>
         </>

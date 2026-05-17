@@ -131,22 +131,32 @@ export default function WeekPage() {
       return;
     }
 
-    // Sync to project in background — just update the specific task/subtask progress
-    // Don't recalculate parent averages here (project page handles that on load)
+    // Sync to project in background — chained sequentially to avoid race conditions
     if (task.project_task_id) {
       const newProgress = newDone ? 100 : 0;
+      const ptId = task.project_task_id;
 
       if (task.subtask_id) {
-        // Just update the subtask progress, nothing else
-        supabase.from("subtasks").update({ progress: newProgress }).eq("id", task.subtask_id);
+        // Subtask: update it, then recalculate parent from DB
+        supabase.from("subtasks").update({ progress: newProgress }).eq("id", task.subtask_id)
+          .then(() => supabase.from("subtasks").select("progress").eq("task_id", ptId))
+          .then(({ data: allSubs }) => {
+            if (allSubs && allSubs.length > 0) {
+              const avg = Math.round(allSubs.reduce((s: number, st: { progress: number }) => s + st.progress, 0) / allSubs.length);
+              supabase.from("project_tasks").update({ progress: avg }).eq("id", ptId);
+            }
+          });
       } else {
-        // Main task: check if it has subtasks
-        supabase.from("subtasks").select("id").eq("task_id", task.project_task_id).limit(1).then(({ data: subs }) => {
+        // Main task: check for subtasks first
+        supabase.from("subtasks").select("id").eq("task_id", ptId).limit(1).then(({ data: subs }) => {
           if (!subs || subs.length === 0) {
-            // No subtasks — safe to update progress directly
-            supabase.from("project_tasks").update({ progress: newProgress }).eq("id", task.project_task_id);
+            // No subtasks — update progress directly
+            supabase.from("project_tasks").update({ progress: newProgress }).eq("id", ptId);
+          } else {
+            // Has subtasks — update all subtasks then recalculate parent
+            supabase.from("subtasks").update({ progress: newProgress }).eq("task_id", ptId)
+              .then(() => supabase.from("project_tasks").update({ progress: newProgress }).eq("id", ptId));
           }
-          // With subtasks: don't touch parent progress, it'll recalculate on project page load
         });
       }
     }

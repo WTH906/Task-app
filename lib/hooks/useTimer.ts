@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { ProjectTask, Subtask } from "@/lib/types";
-import { playAlarm, formatSeconds } from "@/lib/utils";
+import { playAlarm, formatSeconds, todayKey } from "@/lib/utils";
 import { logActivity } from "@/lib/activity";
 
 interface UseTimerOptions {
@@ -129,7 +129,7 @@ export function useTimer({ userId, projectId, tasks, onElapsedChange, onTaskUpda
     const { isSub, id, task, sub } = resolveTimer(activeTaskId);
 
     // Save elapsed + clear started_at + log session
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayKey();
     if (isSub) {
       await supabase.from("subtasks").update({ elapsed_seconds: finalElapsed, timer_started_at: null }).eq("id", id);
       if (sessionTime > 5 && sub) {

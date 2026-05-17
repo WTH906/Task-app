@@ -96,3 +96,8 @@ export function getWeekKey(d: Date = new Date()): string {
 export function getMonthKey(d: Date = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
+
+/** Get today's date as YYYY-MM-DD in local timezone (avoids UTC shift from toISOString) */
+export function todayKey(): string {
+  return formatDate(new Date());
+}

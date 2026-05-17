@@ -74,64 +74,64 @@ html {
 
 /* ─── Theme: Emerald (dark green) ─────────────────────────────── */
 [data-theme="emerald"] {
-  --bg: #060f0a;
-  --surface: #0a1a10;
-  --surface2: #0f2418;
-  --surface3: #153020;
-  --border: #1a4028;
-  --border2: #255a38;
-  --txt: #e0ffe8;
-  --txt2: #88c8a0;
-  --txt3: #608878;
+  --bg: #080c0a;
+  --surface: #101612;
+  --surface2: #161e1a;
+  --surface3: #1e2822;
+  --border: #283830;
+  --border2: #384a40;
+  --txt: #e8f0ea;
+  --txt2: #98b0a0;
+  --txt3: #708878;
   --bright: #f0fff4;
   --accent: #10b981;
   --accent2: #34d399;
   --accent-dim: #059669;
-  --muted-acc: #3a8068;
-  --muted-acc2: #50a080;
+  --muted-acc: #507868;
+  --muted-acc2: #609880;
 
   --glass-accent: #34d399;
-  --glass-surface: #0a1a14;
-  --glass-bg: #060f0a;
-  --glass-text: #e0ffe8;
+  --glass-surface: #101a14;
+  --glass-bg: #080c0a;
+  --glass-text: #e8f0ea;
 
-  --blotch1: rgba(16,185,129,0.25);
-  --blotch2: rgba(5,150,105,0.3);
-  --blotch3: rgba(10,160,110,0.2);
-  --blotch4: rgba(8,140,100,0.3);
-  --blotch5: rgba(12,170,120,0.25);
-  --blotch6: rgba(6,145,95,0.25);
+  --blotch1: rgba(16,185,129,0.12);
+  --blotch2: rgba(5,150,105,0.14);
+  --blotch3: rgba(10,160,110,0.10);
+  --blotch4: rgba(8,140,100,0.13);
+  --blotch5: rgba(12,170,120,0.11);
+  --blotch6: rgba(6,145,95,0.10);
 }
 
 /* ─── Theme: Ember (dark warm) ────────────────────────────────── */
 [data-theme="ember"] {
-  --bg: #120c06;
-  --surface: #1a1208;
-  --surface2: #24190e;
-  --surface3: #302214;
-  --border: #40301a;
-  --border2: #5a4228;
-  --txt: #fff0e0;
-  --txt2: #c8a878;
-  --txt3: #a08060;
+  --bg: #0c0a08;
+  --surface: #141210;
+  --surface2: #1c1a16;
+  --surface3: #26231e;
+  --border: #383428;
+  --border2: #4a4438;
+  --txt: #f0ebe0;
+  --txt2: #b8a888;
+  --txt3: #908068;
   --bright: #fff8f0;
   --accent: #e67e22;
   --accent2: #f0a050;
   --accent-dim: #c06018;
-  --muted-acc: #907050;
-  --muted-acc2: #b08868;
+  --muted-acc: #806850;
+  --muted-acc2: #a08868;
 
   --glass-accent: #f0a050;
-  --glass-surface: #1a1408;
-  --glass-bg: #120c06;
-  --glass-text: #fff0e0;
+  --glass-surface: #161410;
+  --glass-bg: #0c0a08;
+  --glass-text: #f0ebe0;
 
-  --blotch1: rgba(230,126,34,0.25);
-  --blotch2: rgba(200,100,20,0.3);
-  --blotch3: rgba(210,110,25,0.2);
-  --blotch4: rgba(190,90,15,0.3);
-  --blotch5: rgba(220,115,30,0.25);
-  --blotch6: rgba(195,95,18,0.25);
+  --blotch1: rgba(230,126,34,0.10);
+  --blotch2: rgba(200,100,20,0.12);
+  --blotch3: rgba(210,110,25,0.08);
+  --blotch4: rgba(190,90,15,0.12);
+  --blotch5: rgba(220,115,30,0.10);
+  --blotch6: rgba(195,95,18,0.09);
 }
 
 /* ─── Theme: Frost (light blue) ───────────────────────────────── */

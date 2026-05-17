@@ -1,4 +1,5 @@
 import { SupabaseClient } from "@supabase/supabase-js";
+import { todayKey } from "./utils";
 
 /**
  * Sync a project task to the weekly planner.
@@ -32,7 +33,9 @@ export async function syncProjectTaskToWeek(
     // Generate dates: base date + recurring occurrences
     const dates = [calendarDate];
     if (recurrence) {
-      const base = new Date(calendarDate + "T00:00:00");
+      // Use T12:00:00 (noon) to avoid timezone boundary issues
+      // (midnight in UTC+2 = previous day in UTC, causing off-by-one)
+      const base = new Date(calendarDate + "T12:00:00");
       const count = recurrence === "daily" ? 6 : recurrence === "weekly" ? 3 : recurrence === "monthly" ? 2 : 0;
       for (let i = 1; i <= count; i++) {
         const d = new Date(base);
@@ -40,7 +43,11 @@ export async function syncProjectTaskToWeek(
         else if (recurrence === "weekly") d.setDate(d.getDate() + i * 7);
         else if (recurrence === "monthly") d.setMonth(d.getMonth() + i);
         else if (recurrence === "yearly") d.setFullYear(d.getFullYear() + i);
-        dates.push(d.toISOString().slice(0, 10));
+        // Use local date parts instead of toISOString to avoid UTC shift
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        dates.push(`${y}-${m}-${day}`);
       }
     }
 
@@ -162,7 +169,7 @@ export async function syncTaskCompletion(
 ): Promise<{ error?: string }> {
   try {
     const isDone = progress >= 100;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayKey();
 
     if (isDone) {
       // Only mark today's and past calendar entries as done
