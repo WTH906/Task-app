@@ -263,13 +263,31 @@ export function Sidebar({ user }: { user: User }) {
                   className="flex items-center gap-2 px-3 py-2 text-xs text-txt2 hover:bg-surface3 transition-colors w-full">
                   <PieChart size={13} /> Stats & Activity
                 </Link>
-                <button onClick={(e) => { e.stopPropagation(); cycleTheme(); }}
-                  className="flex items-center gap-2 px-3 py-2 text-xs text-txt2 hover:bg-surface3 transition-colors w-full">
-                  <Palette size={13} />
-                  <span className="flex-1 text-left">Theme</span>
-                  <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: THEMES.find(t => t.id === theme)?.dot }} />
-                  <span className="text-[10px] text-txt3">{THEMES.find(t => t.id === theme)?.label}</span>
-                </button>
+                <div className="border-t border-border my-1" />
+                <div className="px-3 py-1">
+                  <span className="text-[10px] text-txt3 uppercase tracking-wider">Theme</span>
+                </div>
+                {THEMES.map(t => (
+                  <button key={t.id} onClick={(e) => {
+                    e.stopPropagation();
+                    setTheme(t.id);
+                    localStorage.setItem("comfy-theme", t.id);
+                    document.documentElement.setAttribute("data-theme", t.id === "purple" ? "" : t.id);
+                    const isLight = t.id === "frost" || t.id === "cloud";
+                    if (isLight) {
+                      document.documentElement.classList.remove("dark");
+                      document.documentElement.style.colorScheme = "light";
+                    } else {
+                      document.documentElement.classList.add("dark");
+                      document.documentElement.style.colorScheme = "dark";
+                    }
+                  }}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs text-txt2 hover:bg-surface3 transition-colors w-full">
+                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: t.dot }} />
+                    <span className="flex-1 text-left">{t.label}</span>
+                    {theme === t.id && <span className="text-[10px] text-violet2">✓</span>}
+                  </button>
+                ))}
                 <div className="border-t border-border my-1" />
                 <button onClick={handleSignOut}
                   className="flex items-center gap-2 px-3 py-2 text-xs text-txt3 hover:text-danger hover:bg-surface3 transition-colors w-full">
