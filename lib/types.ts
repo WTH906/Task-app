@@ -103,7 +103,8 @@ export interface Contact {
   id: string; user_id: string; name: string;
   email: string; phone: string; address: string;
   alt_phone: string; alt_email: string; notes: string;
-  company_number: string; sort_order: number; created_at: string;
+  company_number: string; website: string; social_handle: string;
+  company_position: string; sort_order: number; created_at: string;
   tags?: ContactTag[];
 }
 

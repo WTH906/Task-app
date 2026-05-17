@@ -141,6 +141,15 @@ export default function MonthlyRoutinePage() {
               <p className={cn("text-sm", task.checked && "line-through text-txt3 opacity-60")}>{task.text}</p>
               {task.est_minutes > 0 && <p className="text-[10px] text-txt3 font-mono">{formatMinutes(task.est_minutes)}</p>}
             </div>
+            {(task.date_from || task.date_to) && (
+              <span className="text-xs text-violet2 bg-violet/10 px-2 py-0.5 rounded-md font-medium shrink-0">
+                {task.date_from && task.date_to
+                  ? `${task.date_from}${task.date_from > 3 && task.date_from < 21 ? "th" : task.date_from % 10 === 1 ? "st" : task.date_from % 10 === 2 ? "nd" : task.date_from % 10 === 3 ? "rd" : "th"} – ${task.date_to}${task.date_to > 3 && task.date_to < 21 ? "th" : task.date_to % 10 === 1 ? "st" : task.date_to % 10 === 2 ? "nd" : task.date_to % 10 === 3 ? "rd" : "th"}`
+                  : task.date_from
+                  ? `From the ${task.date_from}${task.date_from > 3 && task.date_from < 21 ? "th" : task.date_from % 10 === 1 ? "st" : task.date_from % 10 === 2 ? "nd" : task.date_from % 10 === 3 ? "rd" : "th"}`
+                  : `Until the ${task.date_to}${task.date_to! > 3 && task.date_to! < 21 ? "th" : task.date_to! % 10 === 1 ? "st" : task.date_to! % 10 === 2 ? "nd" : task.date_to! % 10 === 3 ? "rd" : "th"}`}
+              </span>
+            )}
             <div className="relative">
               <button onClick={() => { setEditingTask(task); setFormText(task.text); setFormEst(task.est_minutes); setFormDateFrom(task.date_from); setFormDateTo(task.date_to); setModalOpen(true); }}
                 className="text-xs text-txt3 opacity-0 group-hover:opacity-100 hover:text-violet2 transition-all px-1">Edit</button>

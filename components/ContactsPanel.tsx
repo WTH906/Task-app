@@ -121,6 +121,9 @@ function ContactForm({ open, onClose, userId, tags, initial, onSaved }: {
   const [altEmail, setAltEmail] = useState("");
   const [notes, setNotes] = useState("");
   const [companyNumber, setCompanyNumber] = useState("");
+  const [website, setWebsite] = useState("");
+  const [socialHandle, setSocialHandle] = useState("");
+  const [companyPosition, setCompanyPosition] = useState("");
   const [showMore, setShowMore] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -131,10 +134,12 @@ function ContactForm({ open, onClose, userId, tags, initial, onSaved }: {
       setSelectedTags(initial.tags?.map(t => t.id) || []);
       setAddress(initial.address); setAltPhone(initial.alt_phone);
       setAltEmail(initial.alt_email); setNotes(initial.notes); setCompanyNumber(initial.company_number);
-      setShowMore(!!(initial.address || initial.alt_phone || initial.alt_email || initial.notes || initial.company_number));
+      setWebsite(initial.website || ""); setSocialHandle(initial.social_handle || ""); setCompanyPosition(initial.company_position || "");
+      setShowMore(!!(initial.address || initial.alt_phone || initial.alt_email || initial.notes || initial.company_number || initial.website || initial.social_handle || initial.company_position));
     } else {
       setName(""); setEmail(""); setPhone(""); setSelectedTags([]);
-      setAddress(""); setAltPhone(""); setAltEmail(""); setNotes(""); setCompanyNumber(""); setShowMore(false);
+      setAddress(""); setAltPhone(""); setAltEmail(""); setNotes(""); setCompanyNumber("");
+      setWebsite(""); setSocialHandle(""); setCompanyPosition(""); setShowMore(false);
     }
   }, [open, initial]);
 
@@ -144,7 +149,7 @@ function ContactForm({ open, onClose, userId, tags, initial, onSaved }: {
     if (!name.trim() || saving) return;
     setSaving(true);
     const supabase = createClient();
-    const row = { user_id: userId, name: name.trim(), email: email.trim(), phone: phone.trim(), address: address.trim(), alt_phone: altPhone.trim(), alt_email: altEmail.trim(), notes: notes.trim(), company_number: companyNumber.trim() };
+    const row = { user_id: userId, name: name.trim(), email: email.trim(), phone: phone.trim(), address: address.trim(), alt_phone: altPhone.trim(), alt_email: altEmail.trim(), notes: notes.trim(), company_number: companyNumber.trim(), website: website.trim(), social_handle: socialHandle.trim(), company_position: companyPosition.trim() };
 
     let contactId: string;
     if (initial) {
@@ -202,6 +207,9 @@ function ContactForm({ open, onClose, userId, tags, initial, onSaved }: {
         </button>
         {showMore && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-border/50">
+            <F label="Company / Position" value={companyPosition} onChange={setCompanyPosition} placeholder="Manager at Acme Corp" />
+            <F label="Website" value={website} onChange={setWebsite} placeholder="https://example.com" />
+            <F label="Social handle" value={socialHandle} onChange={setSocialHandle} placeholder="@handle (X, LinkedIn...)" />
             <F label="Address" value={address} onChange={setAddress} placeholder="123 Main St" />
             <F label="Company number" value={companyNumber} onChange={setCompanyNumber} placeholder="IČO / VAT" />
             <F label="Other phone" value={altPhone} onChange={setAltPhone} />
@@ -258,6 +266,30 @@ function DetailsModal({ open, onClose, contact, onCopy }: { open: boolean; onClo
           </div>
           {tags.length > 0 && <div className="flex flex-wrap gap-1.5 mb-4">{tags.map(t => <TagBadge key={t.id} tag={t} />)}</div>}
           <div className="border-t border-border/30 pt-4">
+            {contact.company_position && (
+              <div className="mb-3">
+                <span className="text-[10px] text-txt3 uppercase tracking-wider">Position</span>
+                <p className="text-sm text-txt mt-0.5">{contact.company_position}</p>
+              </div>
+            )}
+            {contact.website && (
+              <div className="mb-3">
+                <span className="text-[10px] text-txt3 uppercase tracking-wider">Website</span>
+                <p className="text-sm mt-0.5">
+                  <a href={contact.website.startsWith("http") ? contact.website : `https://${contact.website}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="text-violet2 hover:text-violet underline underline-offset-2">
+                    {contact.website}
+                  </a>
+                </p>
+              </div>
+            )}
+            {contact.social_handle && (
+              <div className="mb-3">
+                <span className="text-[10px] text-txt3 uppercase tracking-wider">Social</span>
+                <p className="text-sm text-txt mt-0.5">{contact.social_handle}</p>
+              </div>
+            )}
             <Row label="Address" value={contact.address} copyable />
             <Row label="Company number" value={contact.company_number} copyable />
             <Row label="Other phone" value={contact.alt_phone} copyable />
@@ -292,7 +324,7 @@ export function ContactsPanel({ open, onClose, userId }: { open: boolean; onClos
     const supabase = createClient();
     const [{ data: c }, { data: t }, { data: links }] = await Promise.all([
       supabase.from("contacts").select("*").eq("user_id", userId).order("sort_order"),
-      supabase.from("contact_tags").select("*").eq("user_id", userId).order("sort_order"),
+      supabase.from("contact_tags").select("*").eq("user_id", userId).order("name"),
       supabase.from("contact_tag_links").select("contact_id, tag_id"),
     ]);
 
