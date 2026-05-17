@@ -33,6 +33,7 @@ export function Sidebar({ user }: { user: User }) {
   const [templateOpen, setTemplateOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [monthlyEnabled, setMonthlyEnabled] = useState(false);
+  const [yearlyEnabled, setYearlyEnabled] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   const THEMES = [
@@ -76,9 +77,12 @@ export function Sidebar({ user }: { user: User }) {
   // Load monthly routine toggle from localStorage
   useEffect(() => {
     setMonthlyEnabled(localStorage.getItem("comfy-monthly-routine") === "true");
+    setYearlyEnabled(localStorage.getItem("comfy-yearly-routine") === "true");
     const handler = () => setMonthlyEnabled(localStorage.getItem("comfy-monthly-routine") === "true");
+    const yHandler = () => setYearlyEnabled(localStorage.getItem("comfy-yearly-routine") === "true");
     window.addEventListener("monthly-routine-changed", handler);
-    return () => window.removeEventListener("monthly-routine-changed", handler);
+    window.addEventListener("yearly-routine-changed", yHandler);
+    return () => { window.removeEventListener("monthly-routine-changed", handler); window.removeEventListener("yearly-routine-changed", yHandler); };
   }, []);
 
   // Close user menu on outside click
@@ -146,6 +150,7 @@ export function Sidebar({ user }: { user: User }) {
     { href: "/routine", icon: <ListChecks size={18} />, label: "Daily Routine", accent: "red-acc", key: "R" },
     { href: "/weekly-routine", icon: <RefreshCw size={18} />, label: "Weekly Routine", accent: "violet", key: "E" },
     ...(monthlyEnabled ? [{ href: "/monthly-routine", icon: <CalendarRange size={18} />, label: "Monthly Routine", accent: "violet", key: "Y" }] : []),
+    ...(yearlyEnabled ? [{ href: "/yearly-routine", icon: <CalendarRange size={18} />, label: "Yearly Routine", accent: "violet", key: "" }] : []),
     { href: "/week", icon: <CalendarDays size={18} />, label: "Calendar", accent: "violet", key: "W" },
     { href: "/tasks", icon: <ClipboardList size={18} />, label: "Task List", accent: "violet", key: "Q" },
     { href: "/roadmap", icon: <Map size={18} />, label: "Roadmap", accent: "violet", key: "M" },

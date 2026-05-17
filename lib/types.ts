@@ -119,3 +119,10 @@ export interface MonitoredTask {
   notes: string; status: "waiting" | "resolved";
   added_at: string;
 }
+
+export interface YearlyRoutineTask {
+  id: string; user_id: string; text: string;
+  est_minutes: number; sort_order: number; created_at: string;
+  month_from: number | null; month_to: number | null;
+  checked?: boolean;
+}

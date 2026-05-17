@@ -116,10 +116,22 @@ export default function MonthlyRoutinePage() {
           </h1>
           <p className="text-sm text-txt2 mt-0.5">{monthName} · {daysLeft} days left</p>
         </div>
-        <button onClick={() => { setEditingTask(null); setFormText(""); setFormEst(0); setFormDateFrom(null); setFormDateTo(null); setModalOpen(true); }}
-          className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-white transition-colors">
-          ＋ Add Task
-        </button>
+        <div className="flex items-center gap-2">
+          {typeof window !== "undefined" && localStorage.getItem("comfy-yearly-routine") !== "true" && (
+            <button onClick={() => {
+              localStorage.setItem("comfy-yearly-routine", "true");
+              window.dispatchEvent(new Event("yearly-routine-changed"));
+              toast("Yearly routine enabled!", "success");
+            }}
+              className="px-3 py-1.5 rounded-lg text-xs text-txt3 border border-border hover:border-violet hover:text-violet transition-colors">
+              Need a yearly routine?
+            </button>
+          )}
+          <button onClick={() => { setEditingTask(null); setFormText(""); setFormEst(0); setFormDateFrom(null); setFormDateTo(null); setModalOpen(true); }}
+            className="px-4 py-2 rounded-lg text-sm bg-violet hover:opacity-90 text-white transition-colors">
+            ＋ Add Task
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-4 mb-4 text-xs text-txt3">
