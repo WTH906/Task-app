@@ -365,8 +365,8 @@ export function ContactsPanel({ open, onClose, userId }: { open: boolean; onClos
         className="fixed top-0 right-0 bottom-0 z-50 flex flex-col border-l transition-transform duration-300 ease-in-out w-full sm:w-[440px]"
         style={{
           transform: open ? "translateX(0)" : "translateX(100%)",
-          background: "#16152a",
-          borderColor: "#2e2d3d",
+          background: "var(--surface)",
+          borderColor: "var(--border)",
         }}
       >
         {/* Header */}
@@ -398,7 +398,7 @@ export function ContactsPanel({ open, onClose, userId }: { open: boolean; onClos
             <div className="flex flex-wrap gap-1.5">
               <button onClick={() => setFilterTag(null)}
                 className="text-[10px] px-2 py-0.5 rounded-full font-medium transition-colors"
-                style={{ border: `1px solid ${!filterTag ? "#7c6ec4" : "#2e2d3d"}`, background: !filterTag ? "rgba(124,110,196,0.13)" : "transparent", color: !filterTag ? "#7c6ec4" : "#5c5a7a" }}>
+                style={{ border: `1px solid ${!filterTag ? "var(--accent)" : "var(--border)"}`, background: !filterTag ? "color-mix(in srgb, var(--accent) 13%, transparent)" : "transparent", color: !filterTag ? "var(--accent2)" : "var(--txt3)" }}>
                 All ({contacts.length})
               </button>
               {tags.map(tag => (
@@ -431,7 +431,7 @@ export function ContactsPanel({ open, onClose, userId }: { open: boolean; onClos
                   <span className="text-sm font-semibold text-bright flex-1 truncate">{contact.name}</span>
                   <button onClick={() => setDetailContact(contact)} title="Details"
                     className="w-7 h-7 rounded-md flex items-center justify-center text-xs shrink-0 transition-colors"
-                    style={{ background: hasDetails ? "rgba(124,110,196,0.13)" : "transparent", color: hasDetails ? "#7c6ec4" : "#3e3d5a" }}>
+                    style={{ background: hasDetails ? "color-mix(in srgb, var(--accent) 13%, transparent)" : "transparent", color: hasDetails ? "var(--accent2)" : "var(--txt3)" }}>
                     ⓘ
                   </button>
                   <div className="relative">
