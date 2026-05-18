@@ -11,6 +11,7 @@ import { ImportModal } from "./ImportModal";
 import { SearchModal } from "./SearchModal";
 import { WorkClock } from "./WorkClock";
 import { ActiveTimerBadge } from "./ActiveTimerBadge";
+import { useToast } from "./Toast";
 import { fetchProjects as fetchProjectsQuery, fetchTemplates as fetchTemplatesQuery } from "@/lib/queries";
 import {
   LayoutDashboard, ListChecks, RefreshCw, CalendarDays, ClipboardList,
@@ -25,10 +26,12 @@ export function Sidebar({ user }: { user: User }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [dragProjectIdx, setDragProjectIdx] = useState<number | null>(null);
   const [projectSort, setProjectSort] = useState<"custom" | "alpha" | "deadline">("custom");
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [open, setOpen] = useState(false);
+  const { toast } = useToast();
   const [importOpen, setImportOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -378,22 +381,56 @@ export function Sidebar({ user }: { user: User }) {
                 draggable
                 onClick={() => { router.push(`/projects/${p.id}`); setOpen(false); }}
                 onDragStart={() => setDragProjectIdx(idx)}
-                onDragOver={(e) => { e.preventDefault(); if (dragProjectIdx !== null && dragProjectIdx !== idx) {
-                  setProjects(prev => {
-                    const copy = [...prev];
-                    const [item] = copy.splice(dragProjectIdx!, 1);
-                    copy.splice(idx, 0, item);
-                    return copy;
-                  });
-                  setDragProjectIdx(idx);
-                }}}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  // Check if it's a task being dragged (from project page)
+                  if (e.dataTransfer.types.includes("task-id")) {
+                    setDropTargetId(p.id);
+                    e.dataTransfer.dropEffect = "move";
+                    return;
+                  }
+                  // Otherwise it's project reorder
+                  if (dragProjectIdx !== null && dragProjectIdx !== idx) {
+                    setProjects(prev => {
+                      const copy = [...prev];
+                      const [item] = copy.splice(dragProjectIdx!, 1);
+                      copy.splice(idx, 0, item);
+                      return copy;
+                    });
+                    setDragProjectIdx(idx);
+                  }
+                }}
+                onDragLeave={() => setDropTargetId(null)}
+                onDrop={async (e) => {
+                  e.preventDefault();
+                  setDropTargetId(null);
+                  const taskId = e.dataTransfer.getData("task-id");
+                  const taskName = e.dataTransfer.getData("task-name");
+                  if (taskId && taskId.length > 10) {
+                    // Move task to this project
+                    const supabase = createClient();
+                    await supabase.from("project_tasks").update({ project_id: p.id }).eq("id", taskId);
+                    // Update linked week_tasks
+                    supabase.from("week_tasks").update({ project_id: p.id }).eq("project_task_id", taskId);
+                    // Also move subtasks' week entries
+                    supabase.from("subtasks").select("id").eq("task_id", taskId).then(({ data: subs }) => {
+                      for (const s of subs || []) {
+                        supabase.from("week_tasks").update({ project_id: p.id }).eq("subtask_id", s.id);
+                      }
+                    });
+                    window.dispatchEvent(new CustomEvent("task-moved", { detail: { taskId, targetProject: p.title } }));
+                    toast(`"${taskName}" moved to ${p.title}`, "success");
+                  }
+                }}
                 onDragEnd={() => {
                   setDragProjectIdx(null);
+                  setDropTargetId(null);
                   const supabase = createClient();
                   projects.forEach((proj, i) => supabase.from("projects").update({ sort_order: i }).eq("id", proj.id));
                 }}
                 className={cn("flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors truncate cursor-grab select-none",
-                  active ? "" : "text-txt2 hover:bg-surface2 hover:text-txt")}
+                  active ? "" : "text-txt2 hover:bg-surface2 hover:text-txt",
+                  dropTargetId === p.id && "ring-2 ring-violet")}
                 style={active ? { backgroundColor: `${p.color || "#e05555"}20`, color: p.color || "#e05555" } : undefined}>
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color || "#e05555" }} />
                 <span className="truncate">{p.title}</span>

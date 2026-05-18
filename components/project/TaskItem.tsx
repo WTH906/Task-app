@@ -70,7 +70,12 @@ export function TaskItem({
   };
 
   return (
-    <div draggable onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
+    <div draggable onDragStart={(e) => {
+      e.dataTransfer.setData("task-id", task.id);
+      e.dataTransfer.setData("task-name", task.name);
+      e.dataTransfer.effectAllowed = "move";
+      onDragStart();
+    }} onDragOver={onDragOver} onDragEnd={onDragEnd}>
       <div className={cn(
         "bg-surface border-2 rounded-lg transition-colors card-float overflow-visible",
         isDone && "opacity-60"

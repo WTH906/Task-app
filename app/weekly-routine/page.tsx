@@ -186,17 +186,19 @@ export default function WeeklyRoutinePage() {
             {daysLeft > 0 ? ` · ${daysLeft} day${daysLeft > 1 ? "s" : ""} left` : " · Last day!"}
           </p>
         </div>
-        {!monthlyEnabled ? (
-          <button onClick={enableMonthly}
-            className="px-3 py-1.5 rounded-lg text-xs border border-dashed border-violet/30 text-violet2 hover:bg-violet/10 transition-colors shrink-0">
-            Need a monthly planner?
-          </button>
-        ) : (
-          <button onClick={disableMonthly}
-            className="px-3 py-1.5 rounded-lg text-xs border border-border text-txt3 hover:text-danger hover:border-danger/30 transition-colors shrink-0">
-            Hide monthly routine
-          </button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {!monthlyEnabled ? (
+            <button onClick={enableMonthly}
+              className="px-3 py-1.5 rounded-lg text-xs border border-border text-txt3 hover:border-violet hover:text-violet transition-colors">
+              Need a monthly planner?
+            </button>
+          ) : (
+            <button onClick={disableMonthly}
+              className="px-3 py-1.5 rounded-lg text-xs border border-border text-txt3 hover:text-danger hover:border-danger/30 transition-colors">
+              Hide monthly routine
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-4 mb-4 text-sm">
@@ -218,6 +220,11 @@ export default function WeeklyRoutinePage() {
         </div>
         <ProgressBar value={pct} height={10} />
       </div>
+
+      <button onClick={openAdd}
+        className="w-full border border-dashed border-border2 rounded-lg px-4 py-2.5 text-sm text-txt3 hover:border-violet hover:text-violet transition-colors mb-3">
+        ＋ Add Task
+      </button>
 
       <div className="space-y-2 mb-4">
         {tasks.map((task, idx) => (
@@ -266,11 +273,6 @@ export default function WeeklyRoutinePage() {
           </div>
         )}
       </div>
-
-      <button onClick={openAdd}
-        className="w-full bg-surface border border-dashed border-border2 rounded-lg px-4 py-3 text-sm text-txt3 hover:border-violet hover:text-violet2 transition-colors">
-        ＋ Add Weekly Task
-      </button>
 
       <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditingTask(null); }}
         title={editingTask ? "Edit Weekly Task" : "Add Weekly Task"}>

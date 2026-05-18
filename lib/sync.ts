@@ -37,12 +37,26 @@ export async function syncProjectTaskToWeek(
       // (midnight in UTC+2 = previous day in UTC, causing off-by-one)
       const base = new Date(calendarDate + "T12:00:00");
       const count = recurrence === "daily" ? 6 : recurrence === "weekly" ? 3 : recurrence === "monthly" ? 2 : 0;
+      const baseDay = base.getDate();
       for (let i = 1; i <= count; i++) {
         const d = new Date(base);
-        if (recurrence === "daily") d.setDate(d.getDate() + i);
-        else if (recurrence === "weekly") d.setDate(d.getDate() + i * 7);
-        else if (recurrence === "monthly") d.setMonth(d.getMonth() + i);
-        else if (recurrence === "yearly") d.setFullYear(d.getFullYear() + i);
+        if (recurrence === "daily") {
+          d.setDate(d.getDate() + i);
+        } else if (recurrence === "weekly") {
+          d.setDate(d.getDate() + i * 7);
+        } else if (recurrence === "monthly") {
+          // Clamp to last day of target month (e.g. Jan 31 + 1mo = Feb 28, not Mar 3)
+          d.setDate(1);
+          d.setMonth(base.getMonth() + i);
+          const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+          d.setDate(Math.min(baseDay, lastDay));
+        } else if (recurrence === "yearly") {
+          d.setDate(1);
+          d.setFullYear(base.getFullYear() + i);
+          d.setMonth(base.getMonth());
+          const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+          d.setDate(Math.min(baseDay, lastDay));
+        }
         // Use local date parts instead of toISOString to avoid UTC shift
         const y = d.getFullYear();
         const m = String(d.getMonth() + 1).padStart(2, "0");

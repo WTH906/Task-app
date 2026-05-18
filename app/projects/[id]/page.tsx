@@ -132,9 +132,14 @@ export default function ProjectDetailPage() {
       const taskId = (e as CustomEvent).detail;
       if (taskId) setExpandedTasks(prev => new Set(prev).add(taskId));
     };
+    const moveHandler = () => loadProject();
     window.addEventListener("expand-task", handler);
-    return () => window.removeEventListener("expand-task", handler);
-  }, []);
+    window.addEventListener("task-moved", moveHandler);
+    return () => {
+      window.removeEventListener("expand-task", handler);
+      window.removeEventListener("task-moved", moveHandler);
+    };
+  }, [loadProject]);
 
   // ── Granular state helpers (avoid full reload after mutations) ──
 

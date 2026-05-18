@@ -145,9 +145,13 @@ export default function YearlyRoutinePage() {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
-      <p className="text-xs text-violet2 mb-1">{currentYear}</p>
-      <h1 className="text-3xl font-title text-bright mb-1">Yearly Routine</h1>
-      <p className="text-txt2 text-sm mb-6">Tasks to complete this year</p>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <p className="text-xs text-violet2 mb-1">{currentYear}</p>
+          <h1 className="text-3xl font-title text-bright mb-1">Yearly Routine</h1>
+          <p className="text-txt2 text-sm">Tasks to complete this year</p>
+        </div>
+      </div>
 
       <div className="flex gap-6 text-sm text-txt2 mb-3">
         <span>Estimated: <strong className="text-bright">{formatMinutes(totalEst)}</strong></span>
@@ -161,6 +165,11 @@ export default function YearlyRoutinePage() {
         </div>
         <ProgressBar value={pct} height={8} />
       </div>
+
+      <button onClick={openAdd}
+        className="w-full border border-dashed border-border2 rounded-lg px-4 py-2.5 text-sm text-txt3 hover:border-violet hover:text-violet transition-colors mb-3">
+        ＋ Add Task
+      </button>
 
       {/* Task list */}
       <div className="space-y-2 mb-4">
@@ -213,12 +222,6 @@ export default function YearlyRoutinePage() {
           </div>
         )}
       </div>
-
-      {/* Add button */}
-      <button onClick={openAdd}
-        className="w-full border border-dashed border-border2 rounded-lg px-4 py-3 text-sm text-txt3 hover:border-violet hover:text-violet transition-colors flex items-center justify-center gap-2">
-        <Plus size={16} /> Add Yearly Task
-      </button>
 
       {/* Modal */}
       <Modal open={modalOpen} onClose={closeModal} title={editingTask ? "Edit Yearly Task" : "Add Yearly Task"}>

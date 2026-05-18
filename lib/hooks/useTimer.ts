@@ -106,16 +106,18 @@ export function useTimer({ userId, projectId, tasks, onElapsedChange, onTaskUpda
       if (t) baseElapsed = t.elapsed_seconds;
     }
 
-    // Save started_at to DB
-    if (isSub) {
-      await supabase.from("subtasks").update({ timer_started_at: now.toISOString() }).eq("id", id);
-    } else {
-      await supabase.from("project_tasks").update({ timer_started_at: now.toISOString() }).eq("id", id);
-    }
-
+    // Set state IMMEDIATELY so UI responds on first click
     startedAtRef.current = now.getTime();
     baseElapsedRef.current = baseElapsed;
     setActiveTaskId(timerId);
+
+    // Save started_at to DB in background
+    if (isSub) {
+      supabase.from("subtasks").update({ timer_started_at: now.toISOString() }).eq("id", id);
+    } else {
+      supabase.from("project_tasks").update({ timer_started_at: now.toISOString() }).eq("id", id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTaskId, tasks, resolveTimer]);
 
   // Stop timer
@@ -128,10 +130,14 @@ export function useTimer({ userId, projectId, tasks, onElapsedChange, onTaskUpda
     const sessionTime = finalElapsed - Math.round(baseElapsedRef.current);
     const { isSub, id, task, sub } = resolveTimer(activeTaskId);
 
-    // Save elapsed + clear started_at + log session
+    // Clear state IMMEDIATELY so UI responds on first click
+    onElapsedChange(activeTaskId, finalElapsed);
+    setActiveTaskId(null);
+
+    // Save to DB in background
     const today = todayKey();
     if (isSub) {
-      await supabase.from("subtasks").update({ elapsed_seconds: finalElapsed, timer_started_at: null }).eq("id", id);
+      supabase.from("subtasks").update({ elapsed_seconds: finalElapsed, timer_started_at: null }).eq("id", id);
       if (sessionTime > 5 && sub) {
         logActivity(supabase, userId, projectId, "Timer stopped", `↳ ${sub.name} — ${formatSeconds(sessionTime)} tracked`);
         supabase.from("time_logs").insert({
@@ -140,7 +146,7 @@ export function useTimer({ userId, projectId, tasks, onElapsedChange, onTaskUpda
         });
       }
     } else {
-      await supabase.from("project_tasks").update({ elapsed_seconds: finalElapsed, timer_started_at: null }).eq("id", id);
+      supabase.from("project_tasks").update({ elapsed_seconds: finalElapsed, timer_started_at: null }).eq("id", id);
       if (sessionTime > 5 && task) {
         logActivity(supabase, userId, projectId, "Timer stopped", `${task.name} — ${formatSeconds(sessionTime)} tracked`);
         supabase.from("time_logs").insert({
@@ -149,9 +155,6 @@ export function useTimer({ userId, projectId, tasks, onElapsedChange, onTaskUpda
         });
       }
     }
-
-    onElapsedChange(activeTaskId, finalElapsed);
-    setActiveTaskId(null);
   }, [activeTaskId, resolveTimer, userId, projectId, onElapsedChange]);
 
   const toggleTimer = useCallback((timerId: string) => {

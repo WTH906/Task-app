@@ -13,6 +13,7 @@ interface RunningTimer {
   taskName: string;
   startedAt: number; // epoch ms
   baseElapsed: number;
+  parentTaskId: string | null; // set when timer is on a subtask
 }
 
 export function ActiveTimerBadge({ userId }: { userId: string }) {
@@ -36,13 +37,16 @@ export function ActiveTimerBadge({ userId }: { userId: string }) {
       if (runningTask?.timer_started_at) {
         const { data: proj } = await supabase
           .from("projects").select("title, color").eq("id", runningTask.project_id).single();
+        // Use max of saved elapsed vs computed from timer_started_at, start local counter from NOW
+        const sinceStart = Math.round((Date.now() - new Date(runningTask.timer_started_at).getTime()) / 1000);
         setTimer({
           projectId: runningTask.project_id,
           projectTitle: proj?.title || "Project",
           projectColor: proj?.color || "var(--accent)",
           taskName: runningTask.name,
-          startedAt: new Date(runningTask.timer_started_at).getTime(),
-          baseElapsed: runningTask.elapsed_seconds || 0,
+          startedAt: Date.now(),
+          baseElapsed: Math.max(runningTask.elapsed_seconds || 0, sinceStart),
+          parentTaskId: null,
         });
         return;
       }
@@ -63,13 +67,15 @@ export function ActiveTimerBadge({ userId }: { userId: string }) {
         const { data: proj } = pid
           ? await supabase.from("projects").select("title, color").eq("id", pid).single()
           : { data: null };
+        const sinceStart = Math.round((Date.now() - new Date(runningSub.timer_started_at).getTime()) / 1000);
         setTimer({
           projectId: pid || "",
           projectTitle: proj?.title || "Project",
           projectColor: proj?.color || "var(--accent)",
           taskName: `↳ ${runningSub.name}`,
-          startedAt: new Date(runningSub.timer_started_at).getTime(),
-          baseElapsed: runningSub.elapsed_seconds || 0,
+          startedAt: Date.now(),
+          baseElapsed: Math.max(runningSub.elapsed_seconds || 0, sinceStart),
+          parentTaskId: runningSub.task_id,
         });
         return;
       }
@@ -109,6 +115,11 @@ export function ActiveTimerBadge({ userId }: { userId: string }) {
   return (
     <Link
       href={`/projects/${timer.projectId}`}
+      onClick={() => {
+        if (timer.parentTaskId) {
+          window.dispatchEvent(new CustomEvent("expand-task", { detail: timer.parentTaskId }));
+        }
+      }}
       className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-xs transition-colors hover:bg-surface2"
       style={{ color: timer.projectColor }}
     >

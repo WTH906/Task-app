@@ -12,6 +12,22 @@ import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 import { fetchMonthlyRoutineWithChecks } from "@/lib/queries";
 import { CalendarDays } from "lucide-react";
 
+function YearlyToggle() {
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => { setEnabled(localStorage.getItem("comfy-yearly-routine") === "true"); }, []);
+  return (
+    <button onClick={() => {
+      const next = !enabled;
+      localStorage.setItem("comfy-yearly-routine", next ? "true" : "false");
+      window.dispatchEvent(new Event("yearly-routine-changed"));
+      setEnabled(next);
+    }}
+      className="px-3 py-1.5 rounded-lg text-xs text-txt3 border border-border hover:border-violet hover:text-violet transition-colors">
+      {enabled ? "Hide yearly routine" : "Need a yearly routine?"}
+    </button>
+  );
+}
+
 export default function MonthlyRoutinePage() {
   const { toast } = useToast();
   const { userId, loading: authLoading } = useCurrentUser();
@@ -117,20 +133,7 @@ export default function MonthlyRoutinePage() {
           <p className="text-sm text-txt2 mt-0.5">{monthName} · {daysLeft} days left</p>
         </div>
         <div className="flex items-center gap-2">
-          {typeof window !== "undefined" && localStorage.getItem("comfy-yearly-routine") !== "true" && (
-            <button onClick={() => {
-              localStorage.setItem("comfy-yearly-routine", "true");
-              window.dispatchEvent(new Event("yearly-routine-changed"));
-              toast("Yearly routine enabled!", "success");
-            }}
-              className="px-3 py-1.5 rounded-lg text-xs text-txt3 border border-border hover:border-violet hover:text-violet transition-colors">
-              Need a yearly routine?
-            </button>
-          )}
-          <button onClick={() => { setEditingTask(null); setFormText(""); setFormEst(0); setFormDateFrom(null); setFormDateTo(null); setModalOpen(true); }}
-            className="px-4 py-2 rounded-lg text-sm bg-violet hover:opacity-90 text-white transition-colors">
-            ＋ Add Task
-          </button>
+          <YearlyToggle />
         </div>
       </div>
 
@@ -140,7 +143,12 @@ export default function MonthlyRoutinePage() {
       </div>
       <ProgressBar value={pct} height={10} showLabel />
 
-      <div className="mt-6 space-y-2">
+      <button onClick={() => { setEditingTask(null); setFormText(""); setFormEst(0); setFormDateFrom(null); setFormDateTo(null); setModalOpen(true); }}
+        className="w-full border border-dashed border-border2 rounded-lg px-4 py-2.5 text-sm text-txt3 hover:border-violet hover:text-violet transition-colors mb-3">
+        ＋ Add Task
+      </button>
+
+      <div className="mt-2 space-y-2">
         {tasks.map((task, idx) => (
           <div key={task.id} draggable onDragStart={() => handleDragStart(idx)}
             onDragOver={(e) => handleDragOver(e, idx)} onDragEnd={handleDragEnd}
