@@ -18,6 +18,7 @@ import { useToast } from "@/components/Toast";
 import { reorderRows, reorderSubtasks, cleanupActivityLog } from "@/lib/db-helpers";
 import { Save, Upload, Calendar, Pencil, Trash2, AlertTriangle, Archive } from "lucide-react";
 import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
+import { ConfirmModal } from "@/components/ConfirmModal";
 import { TaskFormModal } from "@/components/project/TaskFormModal";
 import { TaskItem, TaskActions } from "@/components/project/TaskItem";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
@@ -61,6 +62,7 @@ export default function ProjectDetailPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [archivedTasks, setArchivedTasks] = useState<ProjectTask[]>([]);
   const [archivedCount, setArchivedCount] = useState(0);
+  const [confirmAction, setConfirmAction] = useState<{ message: string; action: () => void } | null>(null);
   const loadIdRef = useRef(0);
 
   // Timer hook — DB-backed started_at, drift-proof
@@ -301,32 +303,31 @@ export default function ProjectDetailPage() {
     ]);
   };
 
-  const removeSubtask = async (subtaskId: string, parentId: string) => {
-    if (!confirm("Remove this subtask?")) return;
-
-    // Optimistic: remove from UI immediately and recalc parent
-    removeSubtaskLocal(parentId, subtaskId);
-    const parent = tasks.find((t) => t.id === parentId);
-    const remaining = (parent?.subtasks || []).filter((s) => s.id !== subtaskId);
-
-    const supabase = createClient();
-
-    if (remaining.length > 0) {
-      const avg = Math.round(remaining.reduce((s, st) => s + st.progress, 0) / remaining.length);
-      const totalEst = remaining.reduce((s, st) => s + st.est_minutes, 0);
-      updateTaskLocal(parentId, { progress: avg, est_minutes: totalEst });
-      // Background DB calls in parallel
-      Promise.all([
-        supabase.from("subtasks").delete().eq("id", subtaskId),
-        supabase.from("project_tasks").update({ progress: avg, est_minutes: totalEst }).eq("id", parentId),
-      ]);
-    } else {
-      updateTaskLocal(parentId, { est_minutes: 0 });
-      Promise.all([
-        supabase.from("subtasks").delete().eq("id", subtaskId),
-        supabase.from("project_tasks").update({ est_minutes: 0 }).eq("id", parentId),
-      ]);
-    }
+  const removeSubtask = (subtaskId: string, parentId: string) => {
+    setConfirmAction({
+      message: "Remove this subtask?",
+      action: () => {
+        removeSubtaskLocal(parentId, subtaskId);
+        const parent = tasks.find((t) => t.id === parentId);
+        const remaining = (parent?.subtasks || []).filter((s) => s.id !== subtaskId);
+        const supabase = createClient();
+        if (remaining.length > 0) {
+          const avg = Math.round(remaining.reduce((s, st) => s + st.progress, 0) / remaining.length);
+          const totalEst = remaining.reduce((s, st) => s + st.est_minutes, 0);
+          updateTaskLocal(parentId, { progress: avg, est_minutes: totalEst });
+          Promise.all([
+            supabase.from("subtasks").delete().eq("id", subtaskId),
+            supabase.from("project_tasks").update({ progress: avg, est_minutes: totalEst }).eq("id", parentId),
+          ]);
+        } else {
+          updateTaskLocal(parentId, { est_minutes: 0 });
+          Promise.all([
+            supabase.from("subtasks").delete().eq("id", subtaskId),
+            supabase.from("project_tasks").update({ est_minutes: 0 }).eq("id", parentId),
+          ]);
+        }
+      },
+    });
   };
 
   // Subtask drag-drop reorder
@@ -942,13 +943,17 @@ export default function ProjectDetailPage() {
                       }} className="text-xs text-violet2 hover:text-violet px-2 py-1 rounded hover:bg-violet/10 transition-colors">
                         Restore
                       </button>
-                      <button onClick={async () => {
-                        if (!confirm("Permanently delete this task?")) return;
-                        const supabase = createClient();
-                        await supabase.from("project_tasks").delete().eq("id", task.id);
-                        setArchivedTasks(prev => prev.filter(t => t.id !== task.id));
-                        setArchivedCount(c => c - 1);
-                        toast("Task deleted", "info");
+                      <button onClick={() => {
+                        setConfirmAction({
+                          message: `Permanently delete "${task.name}"?`,
+                          action: async () => {
+                            const supabase = createClient();
+                            await supabase.from("project_tasks").delete().eq("id", task.id);
+                            setArchivedTasks(prev => prev.filter(t => t.id !== task.id));
+                            setArchivedCount(c => c - 1);
+                            toast("Task deleted", "info");
+                          },
+                        });
                       }} className="text-xs text-txt3 hover:text-danger px-2 py-1 rounded hover:bg-danger/10 transition-colors">
                         Delete
                       </button>
@@ -1079,6 +1084,15 @@ export default function ProjectDetailPage() {
         confirmText={project.title}
         description="This will remove the project from all views. The data is preserved and can be recovered if needed."
         loading={saving}
+      />
+
+      <ConfirmModal
+        open={!!confirmAction}
+        message={confirmAction?.message || ""}
+        danger
+        confirmLabel="Remove"
+        onConfirm={() => { confirmAction?.action(); }}
+        onClose={() => setConfirmAction(null)}
       />
     </div>
   );

@@ -29,6 +29,7 @@ export default function WeekPage() {
   const [quickTasks, setQuickTasks] = useState<QuickTask[]>([]);
   const [now, setNow] = useState(new Date());
   const [modalDate, setModalDate] = useState<string | null>(null);
+  const [rescheduleId, setRescheduleId] = useState<string | null>(null);
   const [newTaskText, setNewTaskText] = useState("");
   const [editingTheme, setEditingTheme] = useState<string | null>(null);
   const [themeDraft, setThemeDraft] = useState("");
@@ -246,6 +247,38 @@ export default function WeekPage() {
     });
   };
 
+  const rescheduleTask = async (task: WeekTask, newDate: string) => {
+    if (!userId || !newDate || newDate === task.date_key) return;
+    const supabase = createClient();
+
+    // Mark old entry as rescheduled (keeps stats accountability)
+    await supabase.from("week_tasks").update({ rescheduled_to: newDate }).eq("id", task.id);
+
+    // Create new entry on the target date
+    const { data: maxOrder } = await supabase
+      .from("week_tasks").select("sort_order")
+      .eq("user_id", userId).eq("date_key", newDate)
+      .order("sort_order", { ascending: false }).limit(1).maybeSingle();
+
+    await supabase.from("week_tasks").insert({
+      user_id: userId, date_key: newDate, text: task.text,
+      done: false, project_id: task.project_id,
+      project_task_id: task.project_task_id, subtask_id: task.subtask_id,
+      sort_order: (maxOrder?.sort_order ?? -1) + 1,
+    });
+
+    // Also update the project task's date_key if linked
+    if (task.project_task_id && !task.subtask_id) {
+      supabase.from("project_tasks").update({ date_key: newDate }).eq("id", task.project_task_id);
+    } else if (task.subtask_id) {
+      supabase.from("subtasks").update({ date_key: newDate }).eq("id", task.subtask_id);
+    }
+
+    setRescheduleId(null);
+    toast("Task rescheduled to " + newDate, "success");
+    loadData();
+  };
+
   const saveTheme = async (dateKey: string, value: string) => {
     const supabase = createClient();
     const existing = dayMeta[dateKey];
@@ -277,8 +310,10 @@ export default function WeekPage() {
 
   // Stats
   const allTasks = Object.values(tasks).flat();
-  const doneCount = allTasks.filter((t) => t.done).length;
-  const totalCount = allTasks.length;
+  const activeTasks = allTasks.filter(t => !t.rescheduled_to);
+  const rescheduledTotal = allTasks.filter(t => t.rescheduled_to).length;
+  const doneCount = activeTasks.filter((t) => t.done).length;
+  const totalCount = activeTasks.length;
 
   // Per-project tag breakdown with colors
   const tagStats: Record<string, { done: number; total: number; color: string }> = {};
@@ -372,6 +407,7 @@ export default function WeekPage() {
         <div className="flex items-center gap-3 text-sm">
           <span className="text-txt3">Week:</span>
           <span className="text-bright font-mono">{doneCount}/{totalCount}</span>
+          {rescheduledTotal > 0 && <span className="text-xs text-amber font-mono ml-2">{rescheduledTotal} rescheduled</span>}
           {totalCount > 0 && (
             <div className="w-32 h-2 bg-surface3 rounded-full overflow-hidden">
               <div className="h-full rounded-full bg-violet transition-all" style={{ width: `${(doneCount / totalCount) * 100}%` }} />
@@ -408,7 +444,8 @@ export default function WeekPage() {
             const dayNum = date.getDay();
             const color = DAY_COLORS[dayNum];
             const isToday = dateKey === today;
-            const dayTasks = tasks[dateKey] || [];
+            const dayTasks = (tasks[dateKey] || []).filter(t => !t.rescheduled_to);
+            const rescheduledCount = (tasks[dateKey] || []).filter(t => t.rescheduled_to).length;
             const doneTasks = dayTasks.filter((t) => t.done).length;
             const theme = dayMeta[dateKey]?.title || templates[dayNum] || "";
             const isEditingThis = editingTheme === dateKey;
@@ -469,7 +506,8 @@ export default function WeekPage() {
                     );
                   })}
                 </div>
-                <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-end">
+                <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-end gap-2">
+                  {rescheduledCount > 0 && <span className="text-[9px] text-amber font-mono">{rescheduledCount}↷</span>}
                   {dayTasks.length > 0 && <span className="text-[10px] text-txt3 font-mono">{doneTasks}/{dayTasks.length}</span>}
                 </div>
               </div>
@@ -660,13 +698,17 @@ export default function WeekPage() {
               {modalTasks.map((t) => {
                 const tagColor = getTagColor(t.text);
                 const taskColor = getTaskColor(t);
+                const isRescheduled = !!t.rescheduled_to;
                 return (
-                  <div key={t.id} className={cn("flex items-center gap-3 bg-surface border border-border rounded-lg px-3 py-2.5 group", t.done && "opacity-60")}>
+                  <div key={t.id} className={cn("flex items-center gap-3 bg-surface border border-border rounded-lg px-3 py-2.5 group",
+                    t.done && "opacity-60",
+                    isRescheduled && "opacity-40 border-dashed")}>
                     <input type="checkbox" checked={t.done} onChange={() => toggleTaskDone(t)}
+                      disabled={isRescheduled}
                       className="w-4 h-4 shrink-0" style={{ accentColor: taskColor || modalColor }} />
                     <div className="flex-1 min-w-0">
-                      <span className={cn("text-sm", t.done && "line-through text-txt3 opacity-60")}
-                        style={!tagColor && taskColor && !t.done ? { color: taskColor } : undefined}>
+                      <span className={cn("text-sm", (t.done || isRescheduled) && "line-through text-txt3 opacity-60")}
+                        style={!tagColor && taskColor && !t.done && !isRescheduled ? { color: taskColor } : undefined}>
                         {tagColor && (
                           <span className="font-medium text-xs px-1.5 py-0.5 rounded mr-1.5 cursor-pointer hover:underline"
                             style={{ color: tagColor, backgroundColor: `${tagColor}15` }}
@@ -676,13 +718,29 @@ export default function WeekPage() {
                         )}
                         {t.text.replace(/^\[.*?\]\s*/, "")}
                       </span>
+                      {isRescheduled && (
+                        <span className="text-[10px] text-amber block mt-0.5">→ rescheduled to {t.rescheduled_to}</span>
+                      )}
                     </div>
-                    {t.project_id && (
-                      <button onClick={() => router.push(`/projects/${t.project_id}`)}
-                        className="text-txt3 hover:text-violet2 opacity-0 group-hover:opacity-100 transition-all text-xs shrink-0" title="Go to project">→</button>
+                    {!isRescheduled && (
+                      <>
+                        {t.project_id && (
+                          <button onClick={() => router.push(`/projects/${t.project_id}`)}
+                            className="text-txt3 hover:text-violet2 opacity-0 group-hover:opacity-100 transition-all text-xs shrink-0" title="Go to project">→</button>
+                        )}
+                        {rescheduleId === t.id ? (
+                          <input type="date" autoFocus
+                            className="text-xs bg-surface2 border border-border rounded px-2 py-1 text-txt"
+                            onChange={(e) => { if (e.target.value) rescheduleTask(t, e.target.value); }}
+                            onBlur={() => setRescheduleId(null)} />
+                        ) : (
+                          <button onClick={() => setRescheduleId(t.id)}
+                            className="text-txt3 hover:text-amber opacity-0 group-hover:opacity-100 transition-all text-[10px] shrink-0" title="Reschedule">📅</button>
+                        )}
+                        <button onClick={() => deleteTask(t.id)}
+                          className="text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 transition-all text-sm shrink-0">✕</button>
+                      </>
                     )}
-                    <button onClick={() => deleteTask(t.id)}
-                      className="text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 transition-all text-sm shrink-0">✕</button>
                   </div>
                 );
               })}

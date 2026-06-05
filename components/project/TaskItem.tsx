@@ -231,8 +231,8 @@ export function TaskItem({
                 ) : (sub.deadline || sub.date_key) ? (
                   <span className="text-[10px] text-green-acc font-mono">✓</span>
                 ) : null}
-                <div className="flex-1 min-w-[80px]">
-                  <InlineEdit value={sub.notes} onSave={(v) => actions.updateSubtaskField(sub.id, task.id, "notes", v)} placeholder="Notes..." className="text-xs text-txt3" />
+                <div className="flex-1 min-w-[60px] max-w-[200px] overflow-hidden">
+                  <InlineEdit value={sub.notes} onSave={(v) => actions.updateSubtaskField(sub.id, task.id, "notes", v)} placeholder="Notes..." className="text-xs text-txt3 truncate" />
                 </div>
                 <FileAttachment
                   fileUrl={sub.file_url} fileName={sub.file_name} userId={userId} entityId={sub.id}

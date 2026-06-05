@@ -48,7 +48,7 @@ export interface WeekTask {
   id: string; user_id: string; date_key: string;
   text: string; done: boolean; project_id: string | null;
   project_task_id: string | null; subtask_id: string | null;
-  sort_order: number;
+  sort_order: number; rescheduled_to: string | null;
   created_at: string;
 }
 
