@@ -1,0 +1,782 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  color-scheme: dark;
+}
+
+/* ─── Theme variables ─────────────────────────────────────────── */
+:root {
+  --bg: #231c4a;
+  --surface: #322a56;
+  --surface2: #3c3462;
+  --surface3: #4c4272;
+  --border: #483e68;
+  --border2: #5e5482;
+  --txt: #e6e0f6;
+  --txt2: #b0a8cc;
+  --txt3: #9488b4;
+  --bright: #f8f2ff;
+  --accent: #cebcff;
+  --accent2: #e0d4ff;
+  --accent-dim: #9a8ad0;
+  --accent-warm: #e8c0ff;
+  --muted-acc: #7a6a98;
+  --muted-acc2: #9888b0;
+  --sidebar-bg: var(--surface);
+
+  /* Warm Craft radii */
+  --radius-warm: 14px 14px 6px 6px;
+  --radius-warm-sm: 10px 10px 4px 4px;
+
+  /* Body gradient blotches */
+  --blotch1: rgba(100,60,180,0.35);
+  --blotch2: rgba(80,45,150,0.4);
+  --blotch3: rgba(120,70,200,0.3);
+  --blotch4: rgba(70,40,130,0.4);
+  --blotch5: rgba(110,50,190,0.35);
+  --blotch6: rgba(90,55,170,0.35);
+
+  /* Glass (lilac + B2 Velvet) */
+  --glass-accent: #dc88f4;
+  --glass-surface: #463872;
+  --glass-text: #ddd8ee;
+  --glass-bg: #231c4a;
+}
+
+/* ─── Ocean theme ─────────────────────────────────────────────── */
+[data-theme="ocean"] {
+  --bg: #0f2038;
+  --surface: #1a3050;
+  --surface2: #243a5a;
+  --surface3: #2e4868;
+  --border: #3c5878;
+  --border2: #4e6a8c;
+  --txt: #e0f0ff;
+  --txt2: #88a8c8;
+  --txt3: #6088a8;
+  --bright: #f0f8ff;
+  --accent: #43B8FA;
+  --accent2: #70ccff;
+  --accent-dim: #2090d0;
+  --accent-warm: #64d0f0;
+  --muted-acc: #3a7090;
+  --muted-acc2: #5090b0;
+  --sidebar-bg: var(--surface);
+
+  --glass-accent: #43B8FA;
+  --glass-surface: #1a3858;
+  --glass-bg: #0f2038;
+  --glass-text: #e0f0ff;
+
+  --blotch1: rgba(20,100,200,0.3);
+  --blotch2: rgba(10,70,160,0.35);
+  --blotch3: rgba(30,110,210,0.25);
+  --blotch4: rgba(10,60,140,0.35);
+  --blotch5: rgba(25,90,190,0.3);
+  --blotch6: rgba(15,80,170,0.3);
+}
+
+/* ─── Theme: Emerald (dark green) — overridden below ─────────── */
+
+/* ─── Theme: Ember (dark warm) ────────────────────────────────── */
+[data-theme="ember"] {
+  --bg: #201810;
+  --surface: #302820;
+  --surface2: #3a3228;
+  --surface3: #483e32;
+  --border: #584e3e;
+  --border2: #6a6050;
+  --txt: #f0ebe0;
+  --txt2: #b8a888;
+  --txt3: #908068;
+  --bright: #fff8f0;
+  --accent: #f0a050;
+  --accent2: #f8c070;
+  --accent-dim: #c07828;
+  --accent-warm: #f8c068;
+  --muted-acc: #806850;
+  --muted-acc2: #a08868;
+
+  --glass-accent: #f0a050;
+  --glass-surface: #302820;
+  --glass-bg: #201810;
+  --glass-text: #f0ebe0;
+
+  --blotch1: rgba(230,126,34,0.25);
+  --blotch2: rgba(200,100,20,0.3);
+  --blotch3: rgba(210,110,25,0.2);
+  --blotch4: rgba(190,90,15,0.3);
+  --blotch5: rgba(220,115,30,0.25);
+  --blotch6: rgba(195,95,18,0.25);
+}
+
+/* ─── Theme: Frost (light blue) — overridden below ──────────── */
+
+/* ─── Theme: Cloud (light neutral) ────────────────────────────── */
+[data-theme="cloud"] {
+  color-scheme: light;
+  --bg: #f5f3ee;
+  --surface: #fdfcfa;
+  --surface2: #eae8e2;
+  --surface3: #dddad2;
+  --border: #c8c4ba;
+  --border2: #b0aca2;
+  --txt: #2a2a28;
+  --txt2: #5a5a55;
+  --txt3: #8a8a82;
+  --bright: #1a1a18;
+  --accent: #6d28d9;
+  --accent2: #7c3aed;
+  --accent-dim: #5b21b6;
+  --accent-warm: #b090e0;
+  --muted-acc: #8070a0;
+  --muted-acc2: #6858a0;
+
+  --glass-accent: #7c3aed;
+  --glass-surface: #eae8e2;
+  --glass-bg: #f5f3ee;
+  --glass-text: #2a2a28;
+
+  --blotch1: rgba(109,40,217,0.05);
+  --blotch2: rgba(91,33,182,0.06);
+  --blotch3: rgba(124,58,237,0.04);
+  --blotch4: rgba(109,40,217,0.06);
+  --blotch5: rgba(91,33,182,0.05);
+  --blotch6: rgba(124,58,237,0.04);
+}
+
+/* ─── Theme: Emerald (dark) ────────────────────────────────────── */
+[data-theme="emerald"] {
+  --bg: #0a1e14;
+  --surface: #163028;
+  --surface2: #203a32;
+  --surface3: #2a4840;
+  --border: #3a5a4e;
+  --border2: #4c6e60;
+  --txt: #e0f5ea;
+  --txt2: #88c0a0;
+  --txt3: #608878;
+  --bright: #f0fff5;
+  --accent: #34d399;
+  --accent2: #5ee8b4;
+  --accent-dim: #10b981;
+  --accent-warm: #78e8b0;
+  --muted-acc: #3a7860;
+  --muted-acc2: #509878;
+
+  --glass-accent: #34d399;
+  --glass-surface: #163028;
+  --glass-bg: #0a1e14;
+  --glass-text: #e0f5ea;
+
+  --blotch1: rgba(16,185,129,0.28);
+  --blotch2: rgba(5,150,105,0.32);
+  --blotch3: rgba(20,160,110,0.24);
+  --blotch4: rgba(10,130,90,0.32);
+  --blotch5: rgba(15,170,115,0.28);
+  --blotch6: rgba(8,145,100,0.28);
+}
+
+/* ─── Theme: Rose (dark) ──────────────────────────────────────── */
+[data-theme="rose"] {
+  --bg: #241420;
+  --surface: #342430;
+  --surface2: #3e2e3a;
+  --surface3: #4c3a48;
+  --border: #5e4a58;
+  --border2: #725e6c;
+  --txt: #f5e6f0;
+  --txt2: #c098b0;
+  --txt3: #907080;
+  --bright: #fff0f8;
+  --accent: #f472b6;
+  --accent2: #f8a0cc;
+  --accent-dim: #d04888;
+  --accent-warm: #ffa0c8;
+  --muted-acc: #8a5070;
+  --muted-acc2: #a87090;
+
+  --glass-accent: #f472b6;
+  --glass-surface: #342430;
+  --glass-bg: #241420;
+  --glass-text: #f5e6f0;
+
+  --blotch1: rgba(232,69,139,0.28);
+  --blotch2: rgba(190,24,93,0.32);
+  --blotch3: rgba(200,50,120,0.24);
+  --blotch4: rgba(170,35,95,0.32);
+  --blotch5: rgba(220,60,130,0.28);
+  --blotch6: rgba(180,40,100,0.28);
+}
+
+/* ─── Theme: Dawn (light) ─────────────────────────────────────── */
+[data-theme="dawn"] {
+  color-scheme: light;
+  --bg: #f8f4ec;
+  --surface: #f2ece2;
+  --surface2: #e8e0d4;
+  --surface3: #ddd4c6;
+  --border: #ccc2b0;
+  --border2: #b8ae98;
+  --txt: #2a2520;
+  --txt2: #6b6055;
+  --txt3: #8a8070;
+  --bright: #1a1510;
+  --accent: #d07818;
+  --accent2: #e89030;
+  --accent-dim: #b06010;
+  --accent-warm: #f0a040;
+  --muted-acc: #9a8a70;
+  --muted-acc2: #7a6a50;
+
+  --glass-accent: #e89030;
+  --glass-surface: #ede4d4;
+  --glass-bg: #f8f4ec;
+  --glass-text: #2a2520;
+
+  --blotch1: rgba(208,120,24,0.08);
+  --blotch2: rgba(180,90,20,0.06);
+  --blotch3: rgba(220,140,40,0.07);
+  --blotch4: rgba(190,100,18,0.06);
+  --blotch5: rgba(230,150,50,0.07);
+  --blotch6: rgba(200,110,30,0.06);
+}
+
+/* ─── Theme: Frost (light) ────────────────────────────────────── */
+[data-theme="frost"] {
+  color-scheme: light;
+  --bg: #f2f5fa;
+  --surface: #eaeff6;
+  --surface2: #e0e6f0;
+  --surface3: #d4dce8;
+  --border: #bcc8d8;
+  --border2: #a4b2c8;
+  --txt: #1a2030;
+  --txt2: #556070;
+  --txt3: #728090;
+  --bright: #0a1020;
+  --accent: #3b82f6;
+  --accent2: #60a5fa;
+  --accent-dim: #2563eb;
+  --accent-warm: #a0c8ff;
+  --muted-acc: #7088a0;
+  --muted-acc2: #5070a0;
+
+  --glass-accent: #60a5fa;
+  --glass-surface: #e6ecf4;
+  --glass-bg: #f2f5fa;
+  --glass-text: #1a2030;
+
+  --blotch1: rgba(59,130,246,0.06);
+  --blotch2: rgba(37,99,235,0.05);
+  --blotch3: rgba(96,165,250,0.06);
+  --blotch4: rgba(59,130,246,0.05);
+  --blotch5: rgba(37,99,235,0.06);
+  --blotch6: rgba(96,165,250,0.05);
+}
+
+body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse 700px 500px at 10% 20%, var(--blotch1) 0%, transparent 55%),
+    radial-gradient(ellipse 600px 450px at 85% 65%, var(--blotch2) 0%, transparent 50%),
+    radial-gradient(ellipse 500px 350px at 50% 50%, var(--blotch3) 0%, transparent 45%),
+    radial-gradient(ellipse 650px 400px at 75% 10%, var(--blotch4) 0%, transparent 55%),
+    radial-gradient(ellipse 550px 400px at 20% 80%, var(--blotch5) 0%, transparent 50%),
+    radial-gradient(ellipse 400px 300px at 60% 80%, var(--blotch6) 0%, transparent 48%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  color: var(--txt);
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+}
+
+/* Subtle noise overlay — breaks flat digital feel */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.018;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border2);
+}
+
+/* Light theme adjustments */
+[data-theme="dawn"] .card-float,
+[data-theme="frost"] .card-float {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.06);
+}
+[data-theme="dawn"] .card-float:hover,
+[data-theme="frost"] .card-float:hover {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1), 0 8px 20px rgba(0,0,0,0.08);
+}
+[data-theme="dawn"] body::before,
+[data-theme="frost"] body::before {
+  opacity: 0.03;
+}
+
+/* Checkbox styling */
+input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+/* Strikethrough */
+.task-done {
+  text-decoration: line-through;
+  opacity: 0.5;
+  color: var(--txt3) !important;
+}
+
+/* Clickable elements */
+button, [role="button"], a, label[for], select, summary {
+  cursor: pointer;
+}
+
+/* Focus ring */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--glass-accent) 40%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Modal backdrop */
+/* Floating card shadow — used on dashboard, project, and list cards */
+.card-float {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.25),
+    0 8px 24px rgba(0, 0, 0, 0.2);
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.card-float:hover {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.3),
+    0 12px 32px rgba(0, 0, 0, 0.25);
+  border-color: var(--border2);
+}
+
+.card-float:active {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 4px 12px rgba(0, 0, 0, 0.2);
+  transition-duration: 50ms;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Glass dialog (Liquid-Glass-style)
+   Uses color-mix() so the accent tint auto-adapts if --glass-accent changes.
+   Only ONE element owns backdrop-filter — the panel itself.
+   ───────────────────────────────────────────────────────────────── */
+
+/* Backdrop: dim scrim with subtle blur for depth. */
+.glass-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(0, 0, 0, 0.42);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+/* The panel — layered build:
+   1. accent-tinted background (low alpha, picks up --glass-accent)
+   2. backdrop-filter: blur + saturate (the "liquid" feel)
+   3. ::before rim highlight (top edge gleam)
+   4. ::after bottom inner glow (material weight)
+   5. isolation: isolate (clips pseudo-elements on Safari) */
+.glass-panel {
+  position: relative;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  isolation: isolate;
+
+  /* Fallback for browsers without backdrop-filter */
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--glass-accent) 22%, var(--glass-surface)) 0%,
+      var(--glass-surface) 100%);
+  border: 1px solid color-mix(in srgb, var(--glass-text) 18%, transparent);
+  box-shadow:
+    0 24px 48px -16px rgba(0, 0, 0, 0.45),
+    0 4px 12px -2px rgba(0, 0, 0, 0.18);
+}
+
+@supports (backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px)) {
+  .glass-panel {
+    background:
+      linear-gradient(135deg,
+        color-mix(in srgb, var(--glass-accent) 22%, transparent) 0%,
+        color-mix(in srgb, var(--glass-accent) 12%, transparent) 100%),
+      color-mix(in srgb, var(--glass-surface) 14%, transparent);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+    backdrop-filter: blur(32px) saturate(180%);
+    border: 1px solid color-mix(in srgb, var(--glass-text) 18%, transparent);
+  }
+}
+
+/* Top rim highlight — edge-of-glass gleam */
+.glass-panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent,
+    color-mix(in srgb, var(--glass-text) 30%, transparent) 50%,
+    transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Bottom inner glow — gives material weight */
+.glass-panel::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 35%;
+  background: linear-gradient(to top,
+    color-mix(in srgb, var(--glass-accent) 6%, transparent),
+    transparent);
+  pointer-events: none;
+  z-index: 0;
+  border-radius: 0 0 16px 16px;
+}
+
+/* Form fields inside glass — translucent, not opaque */
+.glass-field {
+  width: 100%;
+  border-radius: 10px;
+  color: var(--glass-text);
+  outline: none;
+  transition: border-color 150ms, background 150ms, box-shadow 150ms;
+
+  /* Fallback */
+  background: color-mix(in srgb, var(--glass-surface) 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--glass-text) 12%, transparent);
+}
+@supports (backdrop-filter: blur(8px)) {
+  .glass-field {
+    background: color-mix(in srgb, var(--glass-bg) 50%, transparent);
+    border: 1px solid color-mix(in srgb, var(--glass-text) 14%, transparent);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+  }
+}
+.glass-field:focus {
+  border-color: var(--glass-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--glass-accent) 22%, transparent);
+}
+.glass-field::placeholder {
+  color: color-mix(in srgb, var(--glass-text) 35%, transparent);
+}
+
+/* Popover / context-menu glass — lighter than glass-panel */
+.glass-popover {
+  border-radius: var(--radius-warm-sm);
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--glass-accent) 16%, var(--glass-surface)) 0%,
+      var(--glass-surface) 100%);
+  border: 1px solid color-mix(in srgb, var(--glass-text) 14%, transparent);
+  box-shadow:
+    0 12px 32px -8px rgba(0, 0, 0, 0.4),
+    0 2px 8px -2px rgba(0, 0, 0, 0.15);
+}
+@supports (backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px)) {
+  .glass-popover {
+    background:
+      linear-gradient(135deg,
+        color-mix(in srgb, var(--glass-accent) 18%, transparent) 0%,
+        color-mix(in srgb, var(--glass-accent) 8%, transparent) 100%),
+      color-mix(in srgb, var(--glass-surface) 12%, transparent);
+    -webkit-backdrop-filter: blur(24px) saturate(170%);
+    backdrop-filter: blur(24px) saturate(170%);
+  }
+}
+
+/* Header divider — same plate of glass, not a separate bar */
+.glass-header {
+  border-bottom: 1px solid color-mix(in srgb, var(--glass-text) 8%, transparent);
+}
+
+/* Color pickers inside glass */
+.glass-panel input[type="color"] {
+  border: 1px solid color-mix(in srgb, var(--glass-text) 12%, transparent);
+  background: color-mix(in srgb, var(--glass-bg) 50%, transparent);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* Legacy class kept for backward compat — maps to glass-backdrop */
+.modal-backdrop {
+  background: rgba(0, 0, 0, 0.42);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* Smooth transitions */
+.transition-colors {
+  transition: background-color 150ms, color 150ms, border-color 150ms;
+}
+
+/* Active timer pulse */
+@keyframes timer-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+.timer-active {
+  animation: timer-pulse 2s ease-in-out infinite;
+}
+
+/* Page transition fade */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slide-up 350ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ─── Opacity utility overrides for CSS-variable colors ───────── */
+/* Tailwind can't decompose CSS variables for opacity modifiers,
+   so we provide explicit color-mix() utilities for the ~25 usages */
+.bg-surface\/90    { background-color: color-mix(in srgb, var(--surface) 90%, transparent) !important; }
+.bg-surface2\/20   { background-color: color-mix(in srgb, var(--surface2) 20%, transparent) !important; }
+.bg-surface2\/30   { background-color: color-mix(in srgb, var(--surface2) 30%, transparent) !important; }
+.bg-surface2\/50   { background-color: color-mix(in srgb, var(--surface2) 50%, transparent) !important; }
+.bg-violet\/5      { background-color: color-mix(in srgb, var(--accent) 5%, transparent) !important; }
+.bg-violet\/10     { background-color: color-mix(in srgb, var(--accent) 10%, transparent) !important; }
+.bg-violet\/20     { background-color: color-mix(in srgb, var(--accent) 20%, transparent) !important; }
+.bg-violet\/30     { background-color: color-mix(in srgb, var(--accent) 30%, transparent) !important; }
+.bg-muted-acc\/30  { background-color: color-mix(in srgb, var(--muted-acc) 30%, transparent) !important; }
+.bg-muted-acc\/40  { background-color: color-mix(in srgb, var(--muted-acc) 40%, transparent) !important; }
+.border-border\/20 { border-color: color-mix(in srgb, var(--border) 20%, transparent) !important; }
+.border-border\/30 { border-color: color-mix(in srgb, var(--border) 30%, transparent) !important; }
+.border-border\/50 { border-color: color-mix(in srgb, var(--border) 50%, transparent) !important; }
+.border-violet\/10 { border-color: color-mix(in srgb, var(--accent) 10%, transparent) !important; }
+.border-violet\/30 { border-color: color-mix(in srgb, var(--accent) 30%, transparent) !important; }
+.border-violet\/50 { border-color: color-mix(in srgb, var(--accent) 50%, transparent) !important; }
+.border-violet\/60 { border-color: color-mix(in srgb, var(--accent) 60%, transparent) !important; }
+.shadow-violet\/10 { --tw-shadow-color: color-mix(in srgb, var(--accent) 10%, transparent); }
+.hover\:bg-violet\/5:hover  { background-color: color-mix(in srgb, var(--accent) 5%, transparent) !important; }
+.hover\:border-violet\/50:hover { border-color: color-mix(in srgb, var(--accent) 50%, transparent) !important; }
+
+/* ─── Light theme adjustments ─────────────────────────────────── */
+[data-theme="frost"] .card-float,
+[data-theme="cloud"] .card-float,
+[data-theme="dawn"] .card-float {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.06);
+}
+[data-theme="frost"] .card-float:hover,
+[data-theme="cloud"] .card-float:hover,
+[data-theme="dawn"] .card-float:hover {
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1), 0 8px 20px rgba(0,0,0,0.08);
+}
+[data-theme="frost"] body::before,
+[data-theme="cloud"] body::before,
+[data-theme="dawn"] body::before {
+  opacity: 0.03;
+}
+@supports (backdrop-filter: blur(20px)) or (-webkit-backdrop-filter: blur(20px)) {
+  [data-theme="frost"] .glass-panel,
+  [data-theme="cloud"] .glass-panel,
+  [data-theme="dawn"] .glass-panel {
+    background:
+      linear-gradient(135deg,
+        color-mix(in srgb, var(--glass-accent) 14%, transparent) 0%,
+        color-mix(in srgb, var(--glass-accent) 8%, transparent) 100%),
+      color-mix(in srgb, var(--glass-surface) 75%, transparent);
+    border: 1px solid color-mix(in srgb, var(--glass-text) 12%, transparent);
+  }
+}
+[data-theme="frost"] .glass-field,
+[data-theme="cloud"] .glass-field,
+[data-theme="dawn"] .glass-field {
+  background: color-mix(in srgb, var(--glass-bg) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--glass-text) 14%, transparent);
+}
+
+/* ------------------------------------------------------------------
+   Subtask notes
+   Previously a single truncated line (~3 words visible). Wrap onto up
+   to three lines so a short note is readable without opening the row,
+   while still bounding how tall a subtask can grow.
+   ------------------------------------------------------------------ */
+.note-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.35;
+  white-space: normal;
+}
+
+
+/* ------------------------------------------------------------------
+   App shell: collapsible sidebar + full-width content
+   ------------------------------------------------------------------
+   `--sidebar-w` is the single source of truth for how much room the
+   sidebar occupies. The sidebar keeps its own fixed width and slides
+   out of view when collapsed; this variable only tells everything else
+   how far to inset, so the two can never disagree.
+
+   It is set on <html> before first paint by the inline script in
+   app/layout.tsx, which is what stops the content jumping sideways on
+   every page load for anyone who keeps the sidebar closed.
+
+   Both rules live in @layer components on purpose. Anything emitted
+   AFTER `@tailwind utilities` beats a utility class of equal
+   specificity, so a plain `.page-shell { padding: 1rem }` here would
+   silently kill a `pb-32` on the same element. In the components layer
+   utilities win, which is what a caller expects.
+   ------------------------------------------------------------------ */
+:root {
+  --sidebar-w: 15rem; /* = w-60 */
+}
+
+@layer components {
+  .app-main {
+    margin-left: 0;
+    transition: margin-left 200ms ease;
+  }
+
+  @media (min-width: 768px) {
+    .app-main {
+      margin-left: var(--sidebar-w);
+    }
+  }
+
+  /* ----------------------------------------------------------------
+     Page shell
+
+     Every page used to be a fixed column (`max-w-4xl mx-auto` and
+     friends), so on a wide monitor most of the window was empty margin
+     while the calendar and project tables scrolled sideways inside a
+     narrow strip.
+
+     Pages fill the space they are given now. `--page-max` caps that
+     only where an unbounded line length would actually hurt: long-form
+     prose, and single-column checkbox lists whose left and right ends
+     would otherwise be a screen apart.
+     ---------------------------------------------------------------- */
+  .page-shell {
+    width: 100%;
+    max-width: var(--page-max, none);
+    margin-inline: auto;
+    padding: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .page-shell {
+      padding: 2rem;
+    }
+  }
+
+  /* Prose and narrow forms: readable measure, still centred. */
+  .page-shell--readable {
+    --page-max: 56rem;
+  }
+
+  /* Single-column lists — the routine pages. Roomy, not unbounded:
+     stretching a checkbox row to 2500px puts its label and its minutes
+     at opposite ends of the desk. Delete this class from a page's
+     className to make it fill edge to edge. */
+  .page-shell--list {
+    --page-max: 72rem;
+  }
+}
+
+/* Respect a reduced-motion preference for the slide. */
+@media (prefers-reduced-motion: reduce) {
+  .app-main {
+    transition: none;
+  }
+}
+
+/* ------------------------------------------------------------------
+   No sidebar flash for collapsed users.
+
+   The inline script in app/layout.tsx sets data-sidebar before first
+   paint, but the aside's `md:-translate-x-full` comes from React state,
+   which can only be correct after hydration. Without this rule someone
+   who keeps the panel closed sees it painted at full width on top of
+   already-flush content, then slide away, on every single page load.
+
+   Scoped to md+ because below that the panel is the mobile drawer and
+   its own `open` state owns the transform.
+   ------------------------------------------------------------------ */
+@media (min-width: 768px) {
+  html[data-sidebar="collapsed"] aside {
+    transform: translateX(-100%);
+
+    /* This also takes the panel out of the tab order and the accessibility
+       tree. Translating it away only moves it visually — every control
+       inside would still be focusable, so a keyboard user would tab through
+       about thirty invisible buttons before reaching the page.
+
+       Doing it here rather than with React's `inert` prop is deliberate:
+       this project is on React 18, which doesn't know `inert`. It drops the
+       attribute (so the fix wouldn't work) and warns on every render, which
+       Next's dev overlay surfaces as an error.
+
+       The 200ms visibility delay lets the slide finish before the panel
+       disappears, so it animates out rather than blinking. On the way back
+       this rule stops matching entirely, so it is visible again immediately
+       and only the transform animates. */
+    visibility: hidden;
+    transition: transform 200ms ease, visibility 0s linear 200ms;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-sidebar="collapsed"] aside {
+    transition: none;
+  }
+}

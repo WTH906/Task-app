@@ -1,0 +1,63 @@
+name: CI
+
+# Runs on every push and pull request. All three checks already pass on the
+# current tree, so a red build means something you just did broke it — which
+# is the entire point.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # A new push to the same branch cancels the previous run.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # `npm ci` installs exactly what package-lock.json pins — the same tree
+      # every time, unlike `npm install` which may quietly resolve differently.
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Existing known issues are held in eslint-suppressions.json, so this
+      # only fails on problems introduced by the commit being tested. The
+      # rule that matters — no-floating-promises with checkThenables — is a
+      # hard error for any new code.
+      - name: Lint
+        run: npm run lint:ci
+
+      # Supabase env vars are only read at runtime; the build doesn't need
+      # real credentials. Placeholders keep `createServerClient` happy if a
+      # future change reads them during prerender.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+
+      # Visibility, not a gate: prints how much of the suppressed backlog is
+      # left so it doesn't quietly become permanent.
+      - name: Suppressed backlog
+        if: always()
+        run: |
+          if [ -f eslint-suppressions.json ]; then
+            node -e "const d=require('./eslint-suppressions.json');
+              const n=Object.values(d).flatMap(f=>Object.values(f)).reduce((a,b)=>a+b.count,0);
+              console.log(\`::notice::\${n} lint violations still suppressed across \${Object.keys(d).length} files\`);"
+          fi

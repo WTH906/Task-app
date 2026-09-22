@@ -1,0 +1,142 @@
+export interface RoutineTask {
+  id: string; user_id: string; text: string;
+  est_minutes: number; sort_order: number;
+  created_at: string; checked?: boolean;
+}
+
+export interface Project {
+  id: string; user_id: string; title: string;
+  description: string; elapsed_seconds: number;
+  active_task_id: string | null; alarm_fired?: boolean;
+  sort_order: number; created_at: string;
+  color: string;
+  deadline: string | null;
+  start_date: string | null;
+  archived_at: string | null;
+}
+
+export interface ProjectTask {
+  id: string; project_id: string; user_id: string;
+  name: string; est_minutes: number; deadline: string | null;
+  date_key: string | null;
+  progress: number; notes: string; elapsed_seconds: number;
+  sort_order: number; created_at: string; subtasks?: Subtask[];
+  file_url: string | null; file_name: string | null;
+  archived_at: string | null;
+  alarm_fired_at: string | null;
+  timer_started_at: string | null;
+  monitoring: boolean;
+  /** null | daily | weekly | monthly | yearly — see migration v18 */
+  recurrence: string | null;
+}
+
+export interface Subtask {
+  id: string; task_id: string; user_id: string;
+  name: string; est_minutes: number; deadline: string | null;
+  date_key: string | null;
+  progress: number; notes: string; sort_order: number;
+  created_at: string; elapsed_seconds: number;
+  file_url: string | null; file_name: string | null;
+  timer_started_at: string | null;
+  monitoring: boolean;
+  archived_at: string | null;
+  recurrence: string | null;
+}
+
+export interface Template {
+  id: string; user_id: string; name: string;
+  task_data: Partial<ProjectTask>[]; created_at: string;
+}
+
+export interface WeekTask {
+  id: string; user_id: string; date_key: string;
+  text: string; done: boolean; project_id: string | null;
+  project_task_id: string | null; subtask_id: string | null;
+  sort_order: number; rescheduled_to: string | null;
+  created_at: string;
+  /**
+   * Time block, in minutes from local midnight — see migration v24 and
+   * lib/schedule.ts. Both null (unscheduled) or both set; the database
+   * enforces the pair. `sort_order` still orders the unscheduled ones.
+   */
+  start_minute: number | null;
+  end_minute: number | null;
+  routine_task_id: string | null;
+  routine_type: string | null;
+}
+
+export interface WeekDay {
+  id: string; user_id: string; date_key: string;
+  title: string; notes: string;
+}
+
+export interface WeekTemplate {
+  id: string; user_id: string; weekday: number; title: string;
+}
+
+export interface Deadline {
+  id: string; user_id: string; label: string;
+  target_datetime: string; created_at: string;
+  recurrence: string | null;
+}
+
+export interface ActivityLog {
+  id: string; user_id: string; project_id: string | null;
+  action: string; detail: string; created_at: string;
+}
+
+export interface WeeklyRoutineTask {
+  id: string; user_id: string; text: string;
+  est_minutes: number; sort_order: number; created_at: string;
+  day_of_week: number | null;
+  checked?: boolean;
+}
+
+export interface MonthlyRoutineTask {
+  id: string; user_id: string; text: string;
+  est_minutes: number; sort_order: number; created_at: string;
+  date_from: number | null; date_to: number | null;
+  checked?: boolean;
+}
+
+export interface QuickTask {
+  id: string; user_id: string; name: string;
+  priority: number; notes: string;
+  date_key: string | null; deadline: string | null;
+  recurrence: string | null;
+  sort_order: number; created_at: string;
+}
+
+export interface ContactTag {
+  id: string; user_id: string; name: string;
+  color: string; sort_order: number; created_at: string;
+}
+
+export interface Contact {
+  id: string; user_id: string; name: string;
+  email: string; phone: string; address: string;
+  alt_phone: string; alt_email: string; notes: string;
+  company_number: string; website: string; social_handle: string;
+  company_position: string; sort_order: number; created_at: string;
+  tags?: ContactTag[];
+}
+
+export interface ContactTagLink {
+  contact_id: string; tag_id: string;
+}
+
+export interface MonitoredTask {
+  id: string; user_id: string;
+  project_id: string | null; task_id: string | null; subtask_id: string | null;
+  project_title: string; task_name: string;
+  notes: string; status: "waiting" | "resolved";
+  added_at: string;
+}
+
+export interface YearlyRoutineTask {
+  id: string; user_id: string; text: string;
+  est_minutes: number; sort_order: number; created_at: string;
+  month_from: number | null; month_to: number | null;
+  day_from: number | null;
+  checked?: boolean;
+}
