@@ -11,20 +11,46 @@ import { cleanDeadline, detectFileType } from "@/lib/import-helpers";
 import { reorderRows } from "@/lib/db-helpers";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 import { fetchProjects, fetchTemplates } from "@/lib/queries";
-import { ClipboardCopy, Download } from "lucide-react";
+import { ClipboardCopy, Download, MoreHorizontal } from "lucide-react";
+
+type ProjectStats = { total: number; done: number; progress: number };
 
 export default function ProjectsPage() {
   const { userId } = useCurrentUser();
   const [projects, setProjects] = useState<Project[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [stats, setStats] = useState<Record<string, ProjectStats>>({});
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [importLog, setImportLog] = useState<string[]>([]);
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [secondaryOpen, setSecondaryOpen] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
   useEffect(() => { document.title = "Comfy Board — Projects"; }, []);
+
+  const loadStats = async (supabase: ReturnType<typeof createClient>, projectIds: string[]) => {
+    if (projectIds.length === 0) { setStats({}); return; }
+    const { data: taskRows } = await supabase
+      .from("project_tasks")
+      .select("project_id, progress")
+      .in("project_id", projectIds)
+      .is("archived_at", null)
+      .is("recurrence", null);
+    const grouped: Record<string, ProjectStats> = {};
+    for (const id of projectIds) grouped[id] = { total: 0, done: 0, progress: 0 };
+    for (const t of (taskRows || []) as { project_id: string; progress: number }[]) {
+      const s = grouped[t.project_id];
+      if (!s) continue;
+      s.total++;
+      if (t.progress >= 100) s.done++;
+    }
+    for (const s of Object.values(grouped)) {
+      s.progress = s.total > 0 ? Math.round(s.done / s.total * 100) : 0;
+    }
+    setStats(grouped);
+  };
 
   useEffect(() => {
     if (!userId) return;
@@ -36,6 +62,7 @@ export default function ProjectsPage() {
       ]);
       setProjects(projs);
       setTemplates(tmpls);
+      await loadStats(supabase, projs.map((p) => p.id));
     };
     load();
   }, [userId]);
@@ -51,6 +78,7 @@ export default function ProjectsPage() {
     ]);
     setProjects(projs);
     setTemplates(tmpls);
+    await loadStats(supabase, projs.map((p) => p.id));
     notifySidebar();
   };
 
@@ -462,47 +490,96 @@ export default function ProjectsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="font-title text-2xl text-bright">Projects</h1>
-          <p className="text-sm text-txt2 mt-1">{projects.length} projects · drag to reorder</p>
+          <p className="text-sm text-txt2 mt-1">{projects.length} project{projects.length !== 1 ? "s" : ""} · drag to reorder</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button onClick={() => setTemplateModalOpen(true)}
-            className="px-3 py-2 rounded-lg text-sm bg-surface border border-border text-txt2 hover:text-violet2 hover:border-violet/30 transition-colors flex items-center gap-1.5">
-            <ClipboardCopy size={14} /> Templates
-          </button>
-          <label className="px-3 py-2 rounded-lg text-sm bg-surface border border-border text-txt2 hover:text-green-acc hover:border-green-acc/30 transition-colors cursor-pointer inline-flex items-center gap-1.5">
-            <Download size={14} /> Import
-            <input ref={importRef} type="file" accept=".json,.csv" multiple onChange={handleImport} className="hidden" />
-          </label>
           <button onClick={createProject}
             className="px-4 py-2 rounded-lg text-sm bg-red-acc hover:bg-red-dark text-white transition-colors">
             ＋ New Project
           </button>
+          <div className="relative">
+            <button
+              onClick={() => setSecondaryOpen((v) => !v)}
+              title="More actions"
+              className="w-9 h-9 rounded-lg flex items-center justify-center bg-surface border border-border text-txt3 hover:text-txt hover:border-border2 transition-colors"
+            >
+              <MoreHorizontal size={16} />
+            </button>
+            {secondaryOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setSecondaryOpen(false)} />
+                <div className="absolute right-0 top-full mt-1 z-20 bg-surface border border-border rounded-lg shadow-lg py-1 min-w-[160px]">
+                  <button
+                    onClick={() => { setSecondaryOpen(false); setTemplateModalOpen(true); }}
+                    className="w-full text-left px-3 py-2 text-sm text-txt2 hover:bg-surface2 hover:text-txt transition-colors flex items-center gap-2"
+                  >
+                    <ClipboardCopy size={13} /> Templates
+                  </button>
+                  <label className="w-full text-left px-3 py-2 text-sm text-txt2 hover:bg-surface2 hover:text-txt transition-colors flex items-center gap-2 cursor-pointer">
+                    <Download size={13} /> Import
+                    <input ref={importRef} type="file" accept=".json,.csv" multiple onChange={(e) => { setSecondaryOpen(false); handleImport(e); }} className="hidden" />
+                  </label>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {projects.map((p, idx) => (
-          <div key={p.id} draggable
-            onDragStart={() => handleDragStart(idx)}
-            onDragOver={(e) => handleDragOver(e, idx)}
-            onDragEnd={handleDragEnd}
-            onClick={() => router.push(`/projects/${p.id}`)}
-            className={cn(
-              "bg-surface border border-border rounded-xl p-4 text-left hover:border-border2 transition-all group cursor-pointer card-float",
-              dragIdx === idx && "opacity-50 scale-[0.98]"
-            )}>
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <span className="cursor-grab text-txt3 opacity-0 group-hover:opacity-100 transition-opacity select-none shrink-0">⠿</span>
-                <h3 className="text-bright font-medium group-hover:text-red-acc transition-colors truncate">{p.title}</h3>
+        {projects.map((p, idx) => {
+          const s = stats[p.id] || { total: 0, done: 0, progress: 0 };
+          const deadlineDays = p.deadline
+            ? Math.ceil((new Date(p.deadline + "T23:59:00").getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+            : null;
+
+          return (
+            <div key={p.id} draggable
+              onDragStart={() => handleDragStart(idx)}
+              onDragOver={(e) => handleDragOver(e, idx)}
+              onDragEnd={handleDragEnd}
+              onClick={() => router.push(`/projects/${p.id}`)}
+              className={cn(
+                "bg-surface border border-border rounded-xl p-4 text-left hover:border-border2 transition-all group cursor-pointer card-float overflow-hidden",
+                dragIdx === idx && "opacity-50 scale-[0.98]"
+              )}
+              style={{ borderLeftWidth: 3, borderLeftColor: p.color || "var(--red-acc)" }}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <span className="cursor-grab text-txt3 opacity-0 group-hover:opacity-100 transition-opacity select-none shrink-0">⠿</span>
+                  <h3 className="text-bright font-medium group-hover:text-red-acc transition-colors truncate">{p.title}</h3>
+                </div>
+                <button onClick={(e) => deleteProject(e, p.id, p.title)}
+                  className="text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 transition-all text-sm shrink-0">✕</button>
               </div>
-              <button onClick={(e) => deleteProject(e, p.id, p.title)}
-                className="text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 transition-all text-sm shrink-0">✕</button>
+
+              <div className="mt-2.5 ml-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                <span className="text-txt2">
+                  <span className="font-mono text-bright">{s.done}</span>
+                  <span className="text-txt3">/{s.total} tasks</span>
+                </span>
+
+                {deadlineDays !== null && (
+                  <span className={cn(
+                    "font-mono",
+                    deadlineDays < 0 ? "text-txt3" : deadlineDays <= 3 ? "text-danger" : deadlineDays <= 7 ? "text-amber" : "text-green-acc"
+                  )}>
+                    {deadlineDays < 0 ? `${Math.abs(deadlineDays)}d overdue` : deadlineDays === 0 ? "Due today" : `${deadlineDays}d left`}
+                  </span>
+                )}
+
+                {s.total > 0 && (
+                  <span className="text-txt3 font-mono">{s.progress}%</span>
+                )}
+              </div>
+
+              <div className="mt-2.5 ml-6">
+                <ProgressBar value={s.progress} height={4} />
+              </div>
             </div>
-            {p.description && <p className="text-sm text-txt3 mt-1 line-clamp-2 ml-6">{p.description}</p>}
-            <div className="mt-3 ml-6"><ProgressBar value={0} height={4} /></div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {projects.length === 0 && (
