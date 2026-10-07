@@ -9,13 +9,13 @@ import {
   isRecurrence, currentPeriodKey, fetchTaskChecks, setTaskCheck,
   reconcileRecurringMirror, type TaskCheckMap,
 } from "@/lib/recurrence";
-import { ScheduleModal, type ScheduleTarget } from "@/components/ScheduleModal";
+import dynamic from "next/dynamic";
+import { type ScheduleTarget } from "@/components/ScheduleModal";
 import { type Block, describeBlock } from "@/lib/schedule";
 import { onTaskChanged } from "@/lib/task-events";
 import { useTimer } from "@/lib/hooks/useTimer";
 import { ProgressBar } from "@/components/ProgressBar";
 import { InlineEdit } from "@/components/InlineEdit";
-import { CalendarPicker } from "@/components/CalendarPicker";
 import { Modal } from "@/components/Modal";
 import {
   syncProjectTaskToWeek, syncSubtaskToWeek, removeWeekTasksForProjectTask,
@@ -23,18 +23,22 @@ import {
   syncSubtaskRename, recalcParentFromSubtasks, removeTaskMirrors, deadlineTimestamp,
   rescheduleWeekTask,
 } from "@/lib/sync";
-import { GCalSyncModal } from "@/components/GCalButton";
-import { ColorPicker } from "@/components/ColorPicker";
 import { logActivity } from "@/lib/activity";
 import { useToast } from "@/components/Toast";
 import { reorderRows, reorderSubtasks, cleanupActivityLog, fireAndForget } from "@/lib/db-helpers";
-import { Save, Upload, Calendar, Pencil, Trash2, AlertTriangle, Archive } from "lucide-react";
-import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
-import { ConfirmModal } from "@/components/ConfirmModal";
-import { TaskFormModal } from "@/components/project/TaskFormModal";
+import { Save, Upload, Calendar, Pencil, Trash2, AlertTriangle, Archive, List, LayoutGrid } from "lucide-react";
 import { TaskItem, TaskActions } from "@/components/project/TaskItem";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 import { fetchProjectById, fetchProjectTasksWithSubs } from "@/lib/queries";
+
+const ScheduleModal = dynamic(() => import("@/components/ScheduleModal").then(m => ({ default: m.ScheduleModal })), { ssr: false });
+const CalendarPicker = dynamic(() => import("@/components/CalendarPicker").then(m => ({ default: m.CalendarPicker })), { ssr: false });
+const GCalSyncModal = dynamic(() => import("@/components/GCalButton").then(m => ({ default: m.GCalSyncModal })), { ssr: false });
+const ColorPicker = dynamic(() => import("@/components/ColorPicker").then(m => ({ default: m.ColorPicker })), { ssr: false });
+const ConfirmDeleteModal = dynamic(() => import("@/components/ConfirmDeleteModal").then(m => ({ default: m.ConfirmDeleteModal })), { ssr: false });
+const ConfirmModal = dynamic(() => import("@/components/ConfirmModal").then(m => ({ default: m.ConfirmModal })), { ssr: false });
+const TaskFormModal = dynamic(() => import("@/components/project/TaskFormModal").then(m => ({ default: m.TaskFormModal })), { ssr: false });
+const KanbanBoard = dynamic(() => import("@/components/project/KanbanBoard").then(m => ({ default: m.KanbanBoard })), { ssr: false });
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -85,6 +89,7 @@ export default function ProjectDetailPage() {
   const [archivedSubs, setArchivedSubs] = useState<(Subtask & { project_tasks: { id: string; name: string } })[]>([]);
   const [archivedCount, setArchivedCount] = useState(0);
   const [confirmAction, setConfirmAction] = useState<{ message: string; action: () => void } | null>(null);
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const loadIdRef = useRef(0);
 
   // Timer hook — DB-backed started_at, drift-proof
@@ -123,13 +128,13 @@ export default function ProjectDetailPage() {
     try {
       const supabase = createClient();
 
-      const proj = await fetchProjectById(supabase, projectId);
+      const [proj, tasksWithSubs] = await Promise.all([
+        fetchProjectById(supabase, projectId),
+        fetchProjectTasksWithSubs(supabase, projectId),
+      ]);
       if (!proj) { router.push("/projects"); return; }
       if (loadIdRef.current !== thisLoad) return;
       setProject(proj);
-
-      const tasksWithSubs = await fetchProjectTasksWithSubs(supabase, projectId);
-      if (loadIdRef.current !== thisLoad) return;
       setTasks(tasksWithSubs);
 
       // Per-period completions for the repeating tasks only. One extra query,
@@ -1176,6 +1181,32 @@ export default function ProjectDetailPage() {
               className="w-7 h-7 rounded-md flex items-center justify-center text-txt3 hover:text-amber hover:bg-amber/10 transition-colors">
               <Calendar size={13} />
             </button>
+
+            <div className="w-px h-4 bg-border mx-1" />
+
+            {/* View toggle */}
+            <div className="flex items-center bg-surface2/40 rounded-lg p-0.5">
+              <button
+                onClick={() => setViewMode("list")}
+                title="List view"
+                className={cn(
+                  "w-7 h-7 rounded-md flex items-center justify-center transition-colors",
+                  viewMode === "list" ? "bg-surface text-bright shadow-sm" : "text-txt3 hover:text-txt"
+                )}
+              >
+                <List size={13} />
+              </button>
+              <button
+                onClick={() => setViewMode("kanban")}
+                title="Kanban view"
+                className={cn(
+                  "w-7 h-7 rounded-md flex items-center justify-center transition-colors",
+                  viewMode === "kanban" ? "bg-surface text-bright shadow-sm" : "text-txt3 hover:text-txt"
+                )}
+              >
+                <LayoutGrid size={13} />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1242,39 +1273,66 @@ export default function ProjectDetailPage() {
         ＋ Add Task
       </button>
 
-      {/* Task list */}
-      <div className="space-y-2 mb-4">
-        {tasks.map((task, idx) => (
-          <TaskItem
-            key={task.id}
-            task={task}
-            project={{ id: projectId, title: project.title }}
-            idx={idx}
-            activeTaskId={activeTaskId}
+      {viewMode === "kanban" ? (
+        <div className="mb-4">
+          <KanbanBoard
+            tasks={tasks}
+            projectTitle={project.title}
             elapsed={elapsed}
-            isExpanded={expandedTasks.has(task.id)}
-            menuOpen={menuOpen}
-            setMenuOpen={setMenuOpen}
-            subMenuOpen={subMenuOpen}
-            setSubMenuOpen={setSubMenuOpen}
-            dragSubIdx={dragSubIdx}
-            dragSubParent={dragSubParent}
-            userId={userId}
-            checkedPeriods={taskChecks[task.id]}
-            actions={taskActions}
-            onDragStart={() => handleDragStart(idx)}
-            onDragOver={(e) => handleDragOver(e, idx)}
-            onDragEnd={handleDragEnd}
+            onTaskClick={(task) => {
+              setExpandedTasks((prev) => {
+                const next = new Set(prev);
+                if (next.has(task.id)) next.delete(task.id);
+                else next.add(task.id);
+                return next;
+              });
+              setViewMode("list");
+            }}
+            onProgressChange={(taskId, progress) => {
+              taskActions.updateTaskField(taskId, "progress", progress);
+            }}
+            onSubtaskToggle={(subtaskId, parentId, progress) => {
+              taskActions.updateSubtaskField(subtaskId, parentId, "progress", progress);
+            }}
           />
-        ))}
+        </div>
+      ) : (
+        <>
+          {/* Task list */}
+          <div className="space-y-2 mb-4">
+            {tasks.map((task, idx) => (
+              <TaskItem
+                key={task.id}
+                task={task}
+                project={{ id: projectId, title: project.title }}
+                idx={idx}
+                activeTaskId={activeTaskId}
+                elapsed={elapsed}
+                isExpanded={expandedTasks.has(task.id)}
+                menuOpen={menuOpen}
+                setMenuOpen={setMenuOpen}
+                subMenuOpen={subMenuOpen}
+                setSubMenuOpen={setSubMenuOpen}
+                dragSubIdx={dragSubIdx}
+                dragSubParent={dragSubParent}
+                userId={userId}
+                checkedPeriods={taskChecks[task.id]}
+                actions={taskActions}
+                onDragStart={() => handleDragStart(idx)}
+                onDragOver={(e) => handleDragOver(e, idx)}
+                onDragEnd={handleDragEnd}
+              />
+            ))}
 
-        {tasks.length === 0 && (
-          <div className="text-center py-12 text-txt3">
-            <p className="text-lg mb-2">No tasks yet</p>
-            <p className="text-sm">Add tasks to track your project progress</p>
+            {tasks.length === 0 && (
+              <div className="text-center py-12 text-txt3">
+                <p className="text-lg mb-2">No tasks yet</p>
+                <p className="text-sm">Add tasks to track your project progress</p>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       {/* Archived tasks */}
       <div className="mb-4">

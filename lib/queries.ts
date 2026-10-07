@@ -58,7 +58,7 @@ export async function fetchProjects(
 ): Promise<Project[]> {
   const { data, error } = await supabase
     .from("projects")
-    .select("*")
+    .select("id, user_id, title, color, sort_order, deadline, created_at, archived_at")
     .eq("user_id", userId)
     .is("archived_at", null)
     .order("sort_order");
@@ -279,7 +279,7 @@ export async function fetchWeekTasksGrouped(
 
   const { data, error } = await supabase
     .from("week_tasks")
-    .select("*")
+    .select("id, user_id, date_key, text, done, project_id, project_task_id, subtask_id, sort_order, rescheduled_to, start_minute, end_minute, routine_task_id, routine_type")
     .eq("user_id", userId)
     .in("date_key", dateKeys)
     .order("sort_order");
@@ -300,7 +300,7 @@ export async function fetchWeekTasksForDate(
 ): Promise<WeekTask[]> {
   const { data, error } = await supabase
     .from("week_tasks")
-    .select("*")
+    .select("id, user_id, date_key, text, done, project_id, project_task_id, subtask_id, sort_order, rescheduled_to, start_minute, end_minute, routine_task_id, routine_type")
     .eq("user_id", userId)
     .eq("date_key", dateKey)
     .order("sort_order");
@@ -463,7 +463,7 @@ export async function fetchQuickTasks(
 ): Promise<QuickTask[]> {
   const { data, error } = await supabase
     .from("quick_tasks")
-    .select("*")
+    .select("id, user_id, name, priority, notes, date_key, deadline, recurrence, sort_order")
     .eq("user_id", userId)
     .order("sort_order");
   if (error) { logQueryError("fetchQuickTasks", error); return []; }

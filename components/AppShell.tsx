@@ -4,14 +4,16 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js";
+import dynamic from "next/dynamic";
 import { Sidebar } from "./Sidebar";
-import { ContactsPanel } from "./ContactsPanel";
-import { MonitoringPanel } from "./MonitoringPanel";
 import { ToastProvider, useToast } from "./Toast";
-import { QuickCapture } from "./QuickCapture";
-import { OnboardingModal } from "./OnboardingModal";
 import { SettingsProvider } from "@/lib/hooks/useSettings";
 import { CurrentUserContext } from "@/lib/hooks/useCurrentUser";
+
+const ContactsPanel = dynamic(() => import("./ContactsPanel").then(m => ({ default: m.ContactsPanel })), { ssr: false });
+const MonitoringPanel = dynamic(() => import("./MonitoringPanel").then(m => ({ default: m.MonitoringPanel })), { ssr: false });
+const QuickCapture = dynamic(() => import("./QuickCapture").then(m => ({ default: m.QuickCapture })), { ssr: false });
+const OnboardingModal = dynamic(() => import("./OnboardingModal").then(m => ({ default: m.OnboardingModal })), { ssr: false });
 
 function QueryErrorListener() {
   const { toast } = useToast();
@@ -33,6 +35,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [monitoringOpen, setMonitoringOpen] = useState(false);
   const pathname = usePathname();
   const isLogin = pathname === "/login";
+  const isLanding = pathname === "/landing";
 
   useEffect(() => {
     const supabase = createClient();
@@ -63,6 +66,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   if (loading) {
+    if (isLogin || isLanding) {
+      return <>{children}</>;
+    }
     return (
       <div className="min-h-screen flex">
         <div className="w-[15rem] shrink-0 bg-surface/60 border-r border-border/40 p-4 hidden md:flex flex-col gap-3">
@@ -85,7 +91,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (isLogin || !user) {
+  if (isLogin || isLanding || !user) {
     return <ToastProvider><QueryErrorListener />{children}</ToastProvider>;
   }
 

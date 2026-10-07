@@ -13,8 +13,10 @@ import { fetchWeekTasksGrouped, fetchWeekDayMeta, fetchWeekTemplates, fetchProje
 import { useToast } from "@/components/Toast";
 import { CalendarDays, List, Clock, RefreshCw } from "lucide-react";
 import { useSettings } from "@/lib/hooks/useSettings";
+import dynamic from "next/dynamic";
 import { Modal } from "@/components/Modal";
-import { DayGridPanel } from "@/components/DayGridPanel";
+
+const DayGridPanel = dynamic(() => import("@/components/DayGridPanel").then(m => ({ default: m.DayGridPanel })), { ssr: false });
 import { injectRoutineTasksForDay } from "@/lib/routine-scheduler";
 
 

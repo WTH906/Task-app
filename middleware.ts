@@ -32,14 +32,15 @@ export async function middleware(request: NextRequest) {
 
     const isLoginPage = request.nextUrl.pathname === "/login";
     const isAuthCallback = request.nextUrl.pathname.startsWith("/auth/");
+    const isLanding = request.nextUrl.pathname === "/landing";
 
-    if (!user && !isLoginPage && !isAuthCallback) {
+    if (!user && !isLoginPage && !isAuthCallback && !isLanding) {
       const url = request.nextUrl.clone();
-      url.pathname = "/login";
+      url.pathname = "/landing";
       return NextResponse.redirect(url);
     }
 
-    if (user && isLoginPage) {
+    if (user && (isLoginPage || isLanding)) {
       const url = request.nextUrl.clone();
       url.pathname = "/";
       return NextResponse.redirect(url);
@@ -47,11 +48,12 @@ export async function middleware(request: NextRequest) {
   } catch {
     const isLoginPage = request.nextUrl.pathname === "/login";
     const isAuthCallback = request.nextUrl.pathname.startsWith("/auth/");
-    if (isLoginPage || isAuthCallback) {
+    const isLanding = request.nextUrl.pathname === "/landing";
+    if (isLoginPage || isAuthCallback || isLanding) {
       return supabaseResponse;
     }
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = "/landing";
     return NextResponse.redirect(url);
   }
 
