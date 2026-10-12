@@ -12,6 +12,7 @@ import { reorderRows } from "@/lib/db-helpers";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 import { fetchProjects, fetchTemplates } from "@/lib/queries";
 import { ArrowUpDown, ClipboardCopy, Download, MoreHorizontal } from "lucide-react";
+import { useLocale } from "@/lib/i18n/useLocale";
 
 type ProjectStats = { total: number; done: number; progress: number };
 type SortMode = "manual" | "alpha-asc" | "alpha-desc" | "progress-asc" | "progress-desc";
@@ -30,6 +31,7 @@ export default function ProjectsPage() {
   const [sortOpen, setSortOpen] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const { t } = useLocale();
 
   useEffect(() => { document.title = "Comfy Board — Projects"; }, []);
 
@@ -500,11 +502,11 @@ export default function ProjectsPage() {
   };
 
   const SORT_OPTIONS: { key: SortMode; label: string }[] = [
-    { key: "manual", label: "Manual order" },
-    { key: "alpha-asc", label: "A → Z" },
-    { key: "alpha-desc", label: "Z → A" },
-    { key: "progress-asc", label: "Unfinished first" },
-    { key: "progress-desc", label: "Finished first" },
+    { key: "manual", label: t("projects.sortManual") },
+    { key: "alpha-asc", label: t("projects.sortAZ") },
+    { key: "alpha-desc", label: t("projects.sortZA") },
+    { key: "progress-asc", label: t("projects.sortUnfinished") },
+    { key: "progress-desc", label: t("projects.sortFinished") },
   ];
 
   const sortedProjects = sortMode === "manual" ? projects : [...projects].sort((a, b) => {
@@ -520,13 +522,13 @@ export default function ProjectsPage() {
     <div className="page-shell">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
-          <h1 className="font-title text-2xl text-bright">Projects</h1>
-          <p className="text-sm text-txt2 mt-1">{projects.length} project{projects.length !== 1 ? "s" : ""}{sortMode === "manual" ? " · drag to reorder" : ""}</p>
+          <h1 className="font-title text-2xl text-bright">{t("projects.title")}</h1>
+          <p className="text-sm text-txt2 mt-1">{projects.length} {t("projects.project")}{sortMode === "manual" ? ` · ${t("projects.dragToReorder")}` : ""}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={createProject}
             className="px-4 py-2 rounded-lg text-sm bg-red-acc hover:bg-red-dark text-white transition-colors">
-            ＋ New Project
+            ＋ {t("projects.newProject")}
           </button>
           <div className="relative">
             <button
@@ -581,10 +583,10 @@ export default function ProjectsPage() {
                     onClick={() => { setSecondaryOpen(false); setTemplateModalOpen(true); }}
                     className="w-full text-left px-3 py-2 text-sm text-txt2 hover:bg-surface2 hover:text-txt transition-colors flex items-center gap-2"
                   >
-                    <ClipboardCopy size={13} /> Templates
+                    <ClipboardCopy size={13} /> {t("projects.templates")}
                   </button>
                   <label className="w-full text-left px-3 py-2 text-sm text-txt2 hover:bg-surface2 hover:text-txt transition-colors flex items-center gap-2 cursor-pointer">
-                    <Download size={13} /> Import
+                    <Download size={13} /> {t("projects.import")}
                     <input ref={importRef} type="file" accept=".json,.csv" multiple onChange={(e) => { setSecondaryOpen(false); handleImport(e).catch(() => {}); }} className="hidden" />
                   </label>
                 </div>
@@ -642,7 +644,7 @@ export default function ProjectsPage() {
               <div className="mt-2.5 ml-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
                 <span className="text-txt2">
                   <span className="font-mono text-bright">{s.done}</span>
-                  <span className="text-txt3">/{s.total} tasks</span>
+                  <span className="text-txt3">/{s.total} {t("common.tasks")}</span>
                 </span>
 
                 {deadlineDays !== null && (
@@ -650,7 +652,7 @@ export default function ProjectsPage() {
                     "font-mono",
                     deadlineDays < 0 ? "text-txt3" : deadlineDays <= 3 ? "text-danger" : deadlineDays <= 7 ? "text-amber" : "text-green-acc"
                   )}>
-                    {deadlineDays < 0 ? `${Math.abs(deadlineDays)}d overdue` : deadlineDays === 0 ? "Due today" : `${deadlineDays}d left`}
+                    {deadlineDays < 0 ? `${Math.abs(deadlineDays)}d ${t("projects.overdue")}` : deadlineDays === 0 ? t("projects.dueToday") : `${deadlineDays}d ${t("projects.left")}`}
                   </span>
                 )}
 
@@ -669,12 +671,12 @@ export default function ProjectsPage() {
 
       {projects.length === 0 && (
         <div className="text-center py-16 text-txt3">
-          <p className="text-lg mb-2">No projects yet</p>
-          <p className="text-sm mb-4">Create a project, import from JSON, or load a template</p>
+          <p className="text-lg mb-2">{t("projects.empty")}</p>
+          <p className="text-sm mb-4">{t("projects.emptyHint")}</p>
           <div className="flex flex-wrap justify-center gap-2">
-            <button onClick={createProject} className="px-4 py-2 rounded-lg text-sm bg-red-acc hover:bg-red-dark text-white">Create Project</button>
+            <button onClick={createProject} className="px-4 py-2 rounded-lg text-sm bg-red-acc hover:bg-red-dark text-white">{t("common.create")} {t("projects.title")}</button>
             <label className="px-4 py-2 rounded-lg text-sm bg-surface border border-border text-txt2 hover:text-green-acc cursor-pointer inline-flex items-center gap-1.5">
-              <Download size={14} /> Import JSON
+              <Download size={14} /> {t("projects.import")} JSON
               <input type="file" accept=".json,.csv" multiple onChange={handleImport} className="hidden" />
             </label>
           </div>
@@ -682,7 +684,7 @@ export default function ProjectsPage() {
       )}
 
       {/* Import Results Modal */}
-      <Modal open={importModalOpen} onClose={() => setImportModalOpen(false)} title="Import Results" maxWidth="max-w-lg">
+      <Modal open={importModalOpen} onClose={() => setImportModalOpen(false)} title={t("projects.importResults")} maxWidth="max-w-lg">
         <div className="space-y-1 font-mono text-xs whitespace-pre-wrap bg-bg rounded-lg p-4 max-h-80 overflow-y-auto">
           {importLog.map((line, i) => (
             <p key={i} className={
@@ -695,29 +697,29 @@ export default function ProjectsPage() {
           ))}
         </div>
         <div className="flex justify-end mt-4">
-          <button onClick={() => setImportModalOpen(false)} className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent">Done</button>
+          <button onClick={() => setImportModalOpen(false)} className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent">{t("common.done")}</button>
         </div>
       </Modal>
 
       {/* Templates Modal */}
-      <Modal open={templateModalOpen} onClose={() => setTemplateModalOpen(false)} title="Project Templates" maxWidth="max-w-lg">
+      <Modal open={templateModalOpen} onClose={() => setTemplateModalOpen(false)} title={t("projects.projectTemplates")} maxWidth="max-w-lg">
         <div className="space-y-2">
           {templates.length === 0 && (
             <p className="text-sm text-txt3 text-center py-6">
-              No templates yet. Open a project and click &quot;Template&quot; to save one,<br/>or import a template JSON file.
+              {t("projects.noTemplates")}
             </p>
           )}
-          {templates.map((t) => {
-            const taskCount = Array.isArray(t.task_data) ? t.task_data.length : 0;
+          {templates.map((tmpl) => {
+            const taskCount = Array.isArray(tmpl.task_data) ? tmpl.task_data.length : 0;
             return (
-              <div key={t.id} className="flex items-center justify-between bg-surface border border-border rounded-lg px-4 py-3 group">
+              <div key={tmpl.id} className="flex items-center justify-between bg-surface border border-border rounded-lg px-4 py-3 group">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm text-bright font-medium truncate">{t.name}</h3>
-                  <p className="text-xs text-txt3">{taskCount} task{taskCount !== 1 ? "s" : ""}</p>
+                  <h3 className="text-sm text-bright font-medium truncate">{tmpl.name}</h3>
+                  <p className="text-xs text-txt3">{taskCount} {t("common.tasks")}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => loadTemplate(t)} className="px-3 py-1.5 rounded-lg text-xs bg-violet/10 text-violet2 hover:bg-violet/20">Use</button>
-                  <button type="button" onClick={() => deleteTemplate(t.id)} aria-label="Delete template" className="text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all text-sm">✕</button>
+                  <button onClick={() => loadTemplate(tmpl)} className="px-3 py-1.5 rounded-lg text-xs bg-violet/10 text-violet2 hover:bg-violet/20">{t("common.use")}</button>
+                  <button type="button" onClick={() => deleteTemplate(tmpl.id)} aria-label={t("common.delete")} className="text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all text-sm">✕</button>
                 </div>
               </div>
             );

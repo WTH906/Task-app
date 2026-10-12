@@ -7,8 +7,10 @@ import { fireAndForget } from "@/lib/db-helpers";
 import { MonitoredTask } from "@/lib/types";
 import { useToast } from "@/components/Toast";
 import { X, CheckCircle, Clock, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import { useLocale } from "@/lib/i18n/useLocale";
 
 export function MonitoringPanel({ open, onClose, userId }: { open: boolean; onClose: () => void; userId: string }) {
+  const { t } = useLocale();
   const [items, setItems] = useState<MonitoredTask[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -65,7 +67,7 @@ export function MonitoringPanel({ open, onClose, userId }: { open: boolean; onCl
     } else if (item?.task_id) {
       await supabase.from("project_tasks").update({ monitoring: false }).eq("id", item.task_id);
     }
-    toast("Resolved", "success");
+    toast(t("monitoring.resolved"), "success");
   };
 
   // Debounced so typing a note is one write on pause, not one per keystroke.
@@ -91,7 +93,7 @@ export function MonitoringPanel({ open, onClose, userId }: { open: boolean; onCl
   const byProject: Record<string, { title: string; items: MonitoredTask[] }> = {};
   for (const item of items) {
     const key = item.project_id || "_none";
-    if (!byProject[key]) byProject[key] = { title: item.project_title || "No project", items: [] };
+    if (!byProject[key]) byProject[key] = { title: item.project_title || t("monitoring.noProject"), items: [] };
     byProject[key].items.push(item);
   }
 
@@ -116,7 +118,7 @@ export function MonitoringPanel({ open, onClose, userId }: { open: boolean; onCl
       >
         <div className="flex items-center gap-3 px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--border)" }}>
           <Clock size={16} className="text-amber" />
-          <h2 className="font-title text-lg text-bright flex-1">Monitoring</h2>
+          <h2 className="font-title text-lg text-bright flex-1">{t("monitoring.title")}</h2>
           <span className="text-xs text-txt3 font-mono">{items.length}</span>
           <button type="button" onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-txt3 hover:text-txt">
             <X size={18} />
@@ -125,12 +127,12 @@ export function MonitoringPanel({ open, onClose, userId }: { open: boolean; onCl
 
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="text-center py-16 text-txt3 text-xs" role="status">Loading...</div>
+            <div className="text-center py-16 text-txt3 text-xs" role="status">{t("common.loading")}</div>
           ) : items.length === 0 ? (
             <div className="text-center py-16 text-txt3">
               <p className="text-2xl mb-2">✓</p>
-              <p className="text-sm">Nothing on standby</p>
-              <p className="text-[10px] mt-1">Use the ⋯ menu on any task → "Monitor" to track it here</p>
+              <p className="text-sm">{t("monitoring.empty")}</p>
+              <p className="text-[10px] mt-1">{t("monitoring.emptyHint")}</p>
             </div>
           ) : (
             <div className="py-2">
@@ -154,12 +156,12 @@ export function MonitoringPanel({ open, onClose, userId }: { open: boolean; onCl
                         </button>
                       </div>
                       <div className="text-[10px] text-txt3 mt-1">
-                        Added {new Date(item.added_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                        {t("monitoring.added", { date: new Date(item.added_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) })}
                       </div>
                       <textarea
                         value={item.notes}
                         onChange={(e) => updateNotes(item.id, e.target.value)}
-                        placeholder="Why is this on standby..."
+                        placeholder={t("monitoring.reason")}
                         className="w-full mt-1.5 bg-surface3 border border-border rounded px-2 py-1 text-[11px] text-txt placeholder-txt3 resize-none focus:outline-none focus:border-violet h-12"
                       />
                     </div>

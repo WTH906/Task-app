@@ -19,6 +19,7 @@ import {
 } from "@/lib/queries";
 import Link from "next/link";
 import { ListChecks, CalendarDays, RefreshCw, CalendarRange, BarChart3, Timer, AlertTriangle, Folder, Activity, ClipboardList, Settings, Trash2 } from "lucide-react";
+import { useLocale, dateLocale } from "@/lib/i18n/useLocale";
 
 
 /**
@@ -57,6 +58,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { has } = useSettings();
+  const { t, locale } = useLocale();
   // Read through a ref inside the load effect so toggling a feature doesn't
   // re-trigger a full dashboard fetch.
   const hasRef = useRef(has);
@@ -314,15 +316,15 @@ export default function DashboardPage() {
   const todayDone = todayTasks.filter((t) => t.done).length;
   const todayTotal = todayTasks.length;
 
-  const dateStr = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-  const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+  const dateStr = now.toLocaleDateString(dateLocale(locale), { weekday: "long", month: "long", day: "numeric" });
+  const timeStr = now.toLocaleTimeString(dateLocale(locale), { hour: "2-digit", minute: "2-digit" });
 
   const getDeadlineText = (target: string) => {
     const diff = new Date(target).getTime() - now.getTime();
-    if (diff <= 0) return "Passed";
+    if (diff <= 0) return t("dashboard.passed");
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    if (days > 0) return `${days}d ${hours}h`;
+    if (days > 0) return t("dashboard.daysHours", { d: days, h: hours });
     const min = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
     return `${hours}h ${min}m`;
   };
@@ -330,12 +332,12 @@ export default function DashboardPage() {
   const formatTimeAgo = (ts: string) => {
     const diff = now.getTime() - new Date(ts).getTime();
     const min = Math.floor(diff / 60000);
-    if (min < 1) return "just now";
-    if (min < 60) return `${min}m ago`;
+    if (min < 1) return t("dashboard.justNow");
+    if (min < 60) return t("dashboard.minutesAgo", { n: min });
     const hours = Math.floor(min / 60);
-    if (hours < 24) return `${hours}h ago`;
+    if (hours < 24) return t("dashboard.hoursAgo", { n: hours });
     const days = Math.floor(hours / 24);
-    return `${days}d ago`;
+    return t("dashboard.daysAgo", { n: days });
   };
 
   const wKey = getWeekKey(new Date());
@@ -390,7 +392,7 @@ export default function DashboardPage() {
         content = (
           <div className="bg-surface border border-border rounded-xl p-4 hover:border-border2 transition-colors card-float">
             <div className="flex items-center justify-between mb-3">
-              <Link href="/routine" className="text-sm font-medium text-txt2 hover:text-red-acc transition-colors flex items-center gap-1.5"><ListChecks size={15} /> Daily Routine</Link>
+              <Link href="/routine" className="text-sm font-medium text-txt2 hover:text-red-acc transition-colors flex items-center gap-1.5"><ListChecks size={15} /> {t("dashboard.dailyRoutine")}</Link>
               <span className="text-xs font-mono text-red-acc">{routineChecked}/{routineTotal}</span>
             </div>
             <ProgressBar value={routinePct} height={8} />
@@ -403,10 +405,8 @@ export default function DashboardPage() {
               ))}
               {routineTotal > 6 && <Link href="/routine" className="text-[10px] text-txt3 hover:text-red-acc">+{routineTotal - 6} more →</Link>}
               {routineTotal === 0 && (
-                <EmptyState action="Set up your daily routine" href="/routine">
-                  The handful of things you do every morning. They reset overnight,
-                  so you start each day with a clean list.
-                </EmptyState>
+                <EmptyState action={t("dashboard.addTasks")} href="/routine">
+                  {t("routine.emptyHint")}</EmptyState>
               )}
             </div>
           </div>
@@ -417,7 +417,7 @@ export default function DashboardPage() {
         content = (
           <div className="bg-surface border border-border rounded-xl p-4 hover:border-border2 transition-colors card-float">
             <div className="flex items-center justify-between mb-3">
-              <Link href={`/week/${today}`} className="text-sm font-medium text-txt2 hover:text-violet2 transition-colors flex items-center gap-1.5"><CalendarDays size={15} /> Today&apos;s Tasks</Link>
+              <Link href={`/week/${today}`} className="text-sm font-medium text-txt2 hover:text-violet2 transition-colors flex items-center gap-1.5"><CalendarDays size={15} /> {t("dashboard.todaysTasks")}</Link>
               <span className="text-xs font-mono text-muted-acc2">{todayDone}/{todayTotal}</span>
             </div>
             {todayTotal > 0 ? (
@@ -447,9 +447,8 @@ export default function DashboardPage() {
                 </div>
               </>
             ) : (
-              <EmptyState action="Open the planner" href="/week">
-                Nothing scheduled for today. Give a task a{" "}
-                <span className="text-txt2">Work on</span> date and it lands here.
+              <EmptyState action={t("dashboard.openPlanner")} href="/week">
+                {t("dashboard.noTasks")}
               </EmptyState>
             )}
           </div>
@@ -463,7 +462,7 @@ export default function DashboardPage() {
         content = (
           <div className="bg-surface border border-border rounded-xl p-4 card-float">
             <div className="flex items-center justify-between mb-3">
-              <Link href="/weekly-routine" className="text-sm font-medium text-txt2 hover:text-violet2 transition-colors flex items-center gap-1.5"><RefreshCw size={15} /> Weekly Routine</Link>
+              <Link href="/weekly-routine" className="text-sm font-medium text-txt2 hover:text-violet2 transition-colors flex items-center gap-1.5"><RefreshCw size={15} /> {t("dashboard.weeklyRoutine")}</Link>
               <span className="text-xs font-mono text-violet2">{wrChecked}/{wrTotal}</span>
             </div>
             {wrTotal > 0 ? (
@@ -480,7 +479,7 @@ export default function DashboardPage() {
                 </div>
               </>
             ) : (
-              <p className="text-xs text-txt3 mt-2">No weekly routine set up · <Link href="/weekly-routine" className="text-violet2 hover:underline">Add tasks</Link></p>
+              <p className="text-xs text-txt3 mt-2">{t("dashboard.noWeeklyRoutine")} · <Link href="/weekly-routine" className="text-violet2 hover:underline">{t("dashboard.addTasks")}</Link></p>
             )}
           </div>
         );
@@ -495,18 +494,18 @@ export default function DashboardPage() {
         const tagStats: Record<string, { done: number; total: number; color: string }> = {};
         const projById: Record<string, { title: string; color: string }> = {};
         for (const p of projects) projById[p.id] = { title: p.title, color: p.color || "#e05555" };
-        for (const t of weekTasks) {
-          const proj = t.project_id ? projById[t.project_id] : undefined;
-          const tag = proj?.title ?? "Untagged";
-          const color = proj?.color ?? "#5c5a7a";
+        for (const wt of weekTasks) {
+          const proj = wt.project_id ? projById[wt.project_id] : undefined;
+          const tag = proj?.title ?? t("dashboard.routines");
+          const color = proj?.color ?? "#8b5cf6";
           if (!tagStats[tag]) tagStats[tag] = { done: 0, total: 0, color };
           tagStats[tag].total++;
-          if (t.done) tagStats[tag].done++;
+          if (wt.done) tagStats[tag].done++;
         }
         content = (
           <Link href="/week" className="bg-surface border border-border rounded-xl p-4 block hover:border-border2 transition-colors group card-float">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-medium text-txt2 group-hover:text-violet2 transition-colors flex items-center gap-1.5"><BarChart3 size={15} /> This Week</h2>
+              <h2 className="text-sm font-medium text-txt2 group-hover:text-violet2 transition-colors flex items-center gap-1.5"><BarChart3 size={15} /> {t("dashboard.thisWeek")}</h2>
               <span className="text-xs font-mono text-violet2">{weekDone}/{weekTotal} · {weekPct}%</span>
             </div>
             <ProgressBar value={weekPct} height={8} />
@@ -531,7 +530,7 @@ export default function DashboardPage() {
         content = (
           <div className="bg-surface border border-border rounded-xl p-4 card-float">
             <div className="flex items-center justify-between mb-3">
-              <Link href="/monthly-routine" className="text-sm font-medium text-txt2 hover:text-violet2 transition-colors flex items-center gap-1.5"><CalendarRange size={15} /> Monthly Routine</Link>
+              <Link href="/monthly-routine" className="text-sm font-medium text-txt2 hover:text-violet2 transition-colors flex items-center gap-1.5"><CalendarRange size={15} /> {t("dashboard.monthlyRoutine")}</Link>
               <span className="text-xs font-mono text-violet2">{mrChecked}/{mrTotal}</span>
             </div>
             <ProgressBar value={mrPct} height={6} />
@@ -552,8 +551,8 @@ export default function DashboardPage() {
         content = (
           <div className="bg-surface border border-border rounded-xl p-4 card-float">
             <div className="flex items-center justify-between mb-3">
-              <Link href="/tasks" className="text-sm font-medium text-txt2 hover:text-violet2 transition-colors flex items-center gap-1.5"><ClipboardList size={15} /> Task List</Link>
-              <span className="text-xs font-mono text-txt3">{quickTasks.length} tasks</span>
+              <Link href="/tasks" className="text-sm font-medium text-txt2 hover:text-violet2 transition-colors flex items-center gap-1.5"><ClipboardList size={15} /> {t("tasks.title")}</Link>
+              <span className="text-xs font-mono text-txt3">{quickTasks.length} {t("common.tasks")}</span>
             </div>
             <div className="space-y-1.5">
               {quickTasks.slice(0, 6).map((t) => (
@@ -565,10 +564,8 @@ export default function DashboardPage() {
               ))}
               {quickTasks.length > 6 && <Link href="/tasks" className="text-[10px] text-txt3 hover:text-violet2">+{quickTasks.length - 6} more →</Link>}
               {quickTasks.length === 0 && (
-                <EmptyState action="Open your task list" href="/tasks">
-                  Your inbox. Press <kbd className="bg-surface3 px-1 py-0.5 rounded">A</kbd> anywhere
-                  to jot something down without deciding where it goes yet.
-                </EmptyState>
+                <EmptyState action={t("dashboard.openTaskList")} href="/tasks">
+                  {t("tasks.emptyHint")}</EmptyState>
               )}
             </div>
           </div>
@@ -580,24 +577,24 @@ export default function DashboardPage() {
         content = (
           <div className="bg-surface border border-danger/30 rounded-xl p-4">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-medium text-danger flex items-center gap-1.5"><AlertTriangle size={15} /> Overdue Tasks</h2>
+              <h2 className="text-sm font-medium text-danger flex items-center gap-1.5"><AlertTriangle size={15} /> {t("week.overdue")}</h2>
               <span className="text-xs text-danger font-mono">{overdueTasks.length} late</span>
             </div>
             <div className="space-y-2">
-              {overdueTasks.map((t) => {
-                const daysLate = Math.ceil((Date.now() - new Date(t.deadline + "T23:59:00").getTime()) / (1000 * 60 * 60 * 24));
+              {overdueTasks.map((ot) => {
+                const daysLate = Math.ceil((Date.now() - new Date(ot.deadline + "T23:59:00").getTime()) / (1000 * 60 * 60 * 24));
                 return (
-                  <div key={t.id} className="flex items-center gap-3 bg-surface2 rounded-lg px-3 py-2 group">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.projectColor }} />
+                  <div key={ot.id} className="flex items-center gap-3 bg-surface2 rounded-lg px-3 py-2 group">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: ot.projectColor }} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium" style={{ color: t.projectColor }}>[{t.projectTitle}]</span>
-                        <span className="text-sm text-bright truncate">{t.name}</span>
+                        <span className="text-xs font-medium" style={{ color: ot.projectColor }}>[{ot.projectTitle}]</span>
+                        <span className="text-sm text-bright truncate">{ot.name}</span>
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] text-danger font-mono">{daysLate}d late</span>
-                        <span className="text-[10px] text-txt3">was due {t.deadline}</span>
-                        <span className="text-[10px] font-mono" style={{ color: progressColor(t.progress) }}>{t.progress}%</span>
+                        <span className="text-[10px] text-danger font-mono">{t("tasks.daysLate", { n: daysLate })}</span>
+                        <span className="text-[10px] text-txt3">was due {ot.deadline}</span>
+                        <span className="text-[10px] font-mono" style={{ color: progressColor(ot.progress) }}>{ot.progress}%</span>
                       </div>
                     </div>
                     <input type="date" className="bg-surface3 border border-border rounded px-2 py-1 text-xs text-txt opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
@@ -605,10 +602,10 @@ export default function DashboardPage() {
                         const newDate = e.target.value;
                         if (!newDate) return;
                         const supabase = (await import("@/lib/supabase")).createClient();
-                        await supabase.from("project_tasks").update({ deadline: newDate }).eq("id", t.id);
-                        setOverdueTasks((prev) => prev.filter((x) => x.id !== t.id));
+                        await supabase.from("project_tasks").update({ deadline: newDate }).eq("id", ot.id);
+                        setOverdueTasks((prev) => prev.filter((x) => x.id !== ot.id));
                       }} />
-                    <Link href={`/projects/${t.project_id}`}
+                    <Link href={`/projects/${ot.project_id}`}
                       className="text-xs text-txt3 hover:text-bright opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">→</Link>
                   </div>
                 );
@@ -622,7 +619,7 @@ export default function DashboardPage() {
         content = (
           <div className="bg-surface border border-border rounded-xl p-4 card-float">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5"><Timer size={15} /> Upcoming Deadlines</h2>
+              <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5"><Timer size={15} /> {t("dashboard.upcomingDeadlines")}</h2>
               <Link href="/deadlines" className="text-[10px] text-txt3 hover:text-violet2 transition-colors">View all →</Link>
             </div>
             <div className="space-y-2">
@@ -636,9 +633,7 @@ export default function DashboardPage() {
               ))}
               {deadlines.length === 0 && (
                 <EmptyState>
-                  Nothing due. Give a task a <span className="text-txt2">Due</span> date
-                  and its countdown appears here.
-                </EmptyState>
+                  {t("dashboard.noDeadlines")}</EmptyState>
               )}
             </div>
           </div>
@@ -649,7 +644,7 @@ export default function DashboardPage() {
         content = (
           <div className="bg-surface border border-border rounded-xl p-4 card-float">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5"><Folder size={15} /> Projects</h2>
+              <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5"><Folder size={15} /> {t("nav.projects")}</h2>
               <Link href="/projects" className="text-[10px] text-txt3 hover:text-red-acc transition-colors">View all →</Link>
             </div>
             <div className="space-y-2">
@@ -678,7 +673,7 @@ export default function DashboardPage() {
         if (activity.length === 0) return null;
         content = (
           <div className="bg-surface border border-border rounded-xl p-4 card-float">
-            <h2 className="text-sm font-medium text-txt2 mb-3 flex items-center gap-1.5"><Activity size={15} /> Recent Activity</h2>
+            <h2 className="text-sm font-medium text-txt2 mb-3 flex items-center gap-1.5"><Activity size={15} /> {t("dashboard.recentActivity")}</h2>
             <div className="space-y-1.5">
               {activity.map((a) => (
                 <div key={a.id} className="flex items-center gap-2 text-xs">
@@ -759,11 +754,11 @@ export default function DashboardPage() {
               <div className="absolute top-full left-0 mt-1 bg-surface border border-border rounded-lg shadow-lg p-1 z-50 whitespace-nowrap">
                 <button onClick={() => { cleanupOrphanedTasks(); setShowOptions(false); }}
                   className="flex items-center gap-2 px-3 py-2 text-xs text-txt2 hover:bg-surface3 rounded w-full text-left">
-                  <Trash2 size={13} /> Clean up orphaned calendar tasks
+                  <Trash2 size={13} /> {t("dashboard.cleanOrphans")}
                 </button>
                 <button onClick={() => { setCardOrder(DEFAULT_CARD_ORDER); localStorage.removeItem("dashboard-card-order"); setShowOptions(false); }}
                   className="flex items-center gap-2 px-3 py-2 text-xs text-txt2 hover:bg-surface3 rounded w-full text-left">
-                  <RefreshCw size={13} /> Reset card layout
+                  <RefreshCw size={13} /> {t("dashboard.resetLayout")}
                 </button>
               </div>
             )}

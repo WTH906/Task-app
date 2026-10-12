@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase";
 import { parseCapture } from "@/lib/capture-parse";
 import { useToast } from "@/components/Toast";
 import { useSettings } from "@/lib/hooks/useSettings";
+import { useLocale } from "@/lib/i18n/useLocale";
 
 /**
  * Quick capture.
@@ -28,6 +29,7 @@ export function QuickCapture({ userId }: { userId: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { has } = useSettings();
+  const { t } = useLocale();
   const enabled = has("quickCapture");
 
   const parsed = useMemo(() => parseCapture(value), [value]);
@@ -99,7 +101,7 @@ export function QuickCapture({ userId }: { userId: string }) {
 
     if (error) {
       setSaving(false);
-      toast("Couldn't save: " + error.message, "error");
+      toast(t("toast.failedToSave", { error: error.message }), "error");
       return;
     }
 
@@ -117,8 +119,8 @@ export function QuickCapture({ userId }: { userId: string }) {
     setOpen(false);
     setValue("");
     window.dispatchEvent(new Event("quick-tasks-changed"));
-    toast(dateKey ? `Captured for ${dateKey}` : "Captured", "success");
-  }, [parsed, saving, userId, toast]);
+    toast(dateKey ? t("capture.capturedFor", { date: dateKey }) : t("capture.captured"), "success");
+  }, [parsed, saving, userId, toast, t]);
 
   if (!enabled || !open) return null;
 
@@ -129,7 +131,7 @@ export function QuickCapture({ userId }: { userId: string }) {
       onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
       role="dialog"
       aria-modal="true"
-      aria-label="Quick capture"
+      aria-label={t("shortcut.capture")}
     >
       <div
         className="w-full max-w-xl rounded-xl border border-border shadow-2xl overflow-hidden"
@@ -144,7 +146,7 @@ export function QuickCapture({ userId }: { userId: string }) {
             onKeyDown={(e) => {
               if (e.key === "Enter") { e.preventDefault(); save(); }
             }}
-            placeholder="What's on your mind?"
+            placeholder={t("capture.placeholder")}
             aria-label="Task"
             className="flex-1 bg-transparent text-txt text-base placeholder-txt3 outline-none"
           />
@@ -153,7 +155,7 @@ export function QuickCapture({ userId }: { userId: string }) {
             disabled={!parsed.name || saving}
             className="px-3 py-1.5 rounded-lg text-xs bg-violet/20 text-violet2 border border-violet/30 hover:bg-violet/30 disabled:opacity-40 transition-colors"
           >
-            {saving ? "Saving…" : "Add"}
+            {saving ? t("capture.saving") : t("common.add")}
           </button>
         </div>
 
@@ -166,10 +168,10 @@ export function QuickCapture({ userId }: { userId: string }) {
             </span>
           ) : (
             <span className="text-txt3 truncate">
-              Try “tomorrow”, “friday”, “in 3 days”, “20/08”, or “p1”
+              {t("capture.hint")}
             </span>
           )}
-          <span className="text-txt3 shrink-0">Goes to your Task list</span>
+          <span className="text-txt3 shrink-0">{t("capture.goesTo")}</span>
         </div>
       </div>
     </div>

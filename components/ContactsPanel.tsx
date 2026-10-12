@@ -6,6 +6,7 @@ import { Contact, ContactTag } from "@/lib/types";
 import { Modal } from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import { X } from "lucide-react";
+import { useLocale } from "@/lib/i18n/useLocale";
 
 const PRESET_COLORS = ["#e05555","#d97706","#16a34a","#2563eb","#7c3aed","#db2777","#0891b2","#65a30d","#ea580c","#6366f1"];
 
@@ -30,6 +31,7 @@ function TagManager({ open, onClose, userId, tags, onSaved }: {
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState("");
   const { toast } = useToast();
+  const { t } = useLocale();
 
   useEffect(() => { if (open) { setLocal(tags); setEditId(null); } }, [open, tags]);
 
@@ -57,20 +59,20 @@ function TagManager({ open, onClose, userId, tags, onSaved }: {
     await supabase.from("contact_tags").delete().eq("id", id);
     setLocal(prev => prev.filter(t => t.id !== id));
     onSaved();
-    toast("Tag deleted", "info");
+    toast(t("contacts.tagDeleted"), "info");
   };
 
   return (
-    <Modal open={open} onClose={onClose} title="Manage Tags">
+    <Modal open={open} onClose={onClose} title={t("contacts.manageTags")}>
       <div className="space-y-4">
         <div className="flex gap-2">
-          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Tag name..."
+          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder={t("contacts.tagName")}
             onKeyDown={e => e.key === "Enter" && addTag()}
             className="flex-1 glass-field px-3 py-2 text-sm text-txt focus:outline-none focus:border-violet" />
           <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)}
             className="w-10 h-10 rounded-lg border border-border bg-surface3 cursor-pointer" />
           <button onClick={addTag} disabled={!newName.trim()}
-            className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent disabled:opacity-40">Add</button>
+            className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent disabled:opacity-40">{t("common.add")}</button>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {PRESET_COLORS.map(c => (
@@ -79,7 +81,7 @@ function TagManager({ open, onClose, userId, tags, onSaved }: {
               style={{ backgroundColor: c, border: `2px solid ${newColor === c ? "white" : "transparent"}`, transform: newColor === c ? "scale(1.1)" : "scale(1)" }} />
           ))}
         </div>
-        {local.length === 0 && <p className="text-sm text-txt3 text-center py-4">No tags yet</p>}
+        {local.length === 0 && <p className="text-sm text-txt3 text-center py-4">{t("contacts.noTags")}</p>}
         <div className="space-y-2">
           {local.map(tag => (
             <div key={tag.id} className="flex items-center gap-2 glass-field px-3 py-2">
@@ -89,15 +91,15 @@ function TagManager({ open, onClose, userId, tags, onSaved }: {
                     className="flex-1 glass-field rounded px-2 py-1 text-sm text-txt focus:outline-none" autoFocus />
                   <input type="color" value={editColor} onChange={e => setEditColor(e.target.value)}
                     className="w-8 h-8 rounded border border-border bg-surface2 cursor-pointer" />
-                  <button onClick={saveEdit} className="text-xs text-green-acc">Save</button>
-                  <button onClick={() => setEditId(null)} className="text-xs text-txt3">Cancel</button>
+                  <button onClick={saveEdit} className="text-xs text-green-acc">{t("common.save")}</button>
+                  <button onClick={() => setEditId(null)} className="text-xs text-txt3">{t("common.cancel")}</button>
                 </>
               ) : (
                 <>
                   <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: tag.color }} />
                   <span className="flex-1 text-sm text-txt">{tag.name}</span>
-                  <button onClick={() => { setEditId(tag.id); setEditName(tag.name); setEditColor(tag.color); }} className="text-xs text-txt3 hover:text-txt">Edit</button>
-                  <button onClick={() => removeTag(tag.id)} className="text-xs text-danger hover:text-red-400">Delete</button>
+                  <button onClick={() => { setEditId(tag.id); setEditName(tag.name); setEditColor(tag.color); }} className="text-xs text-txt3 hover:text-txt">{t("common.edit")}</button>
+                  <button onClick={() => removeTag(tag.id)} className="text-xs text-danger hover:text-red-400">{t("common.delete")}</button>
                 </>
               )}
             </div>
@@ -147,6 +149,7 @@ function ContactForm({ open, onClose, userId, tags, initial, onSaved }: {
   const [companyPosition, setCompanyPosition] = useState("");
   const [showMore, setShowMore] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { t } = useLocale();
 
   useEffect(() => {
     if (!open) return;
@@ -194,21 +197,26 @@ function ContactForm({ open, onClose, userId, tags, initial, onSaved }: {
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={initial ? "Edit Contact" : "Add Contact"} maxWidth="max-w-xl">
+    <Modal open={open} onClose={onClose} title={initial ? t("contacts.editContact") : t("contacts.addContact")} maxWidth="max-w-xl">
       <div className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <F label="Name" value={name} onChange={setName} placeholder="John Doe" required />
-          <F label="Email" value={email} onChange={setEmail} placeholder="john@example.com" type="email" />
-          <F label="Phone" value={phone} onChange={setPhone} placeholder="+33 6 12 34 56 78" />
+          <F label={t("contacts.name")} value={name} onChange={setName} placeholder="John Doe" required />
+          <F label={t("contacts.email")} value={email} onChange={setEmail} placeholder="john@example.com" type="email" />
+          <F label={t("contacts.phone")} value={phone} onChange={setPhone} placeholder="+33 6 12 34 56 78" />
           <div>
-            <label className="block text-xs text-txt3 mb-1.5">Tags</label>
+            <label className="block text-xs text-txt3 mb-1.5">{t("contacts.tags")}</label>
             <div className="flex flex-wrap gap-1.5 min-h-[38px] glass-field px-3 py-2 items-center">
-              {tags.length === 0 && <span className="text-xs text-txt3">No tags — create some first</span>}
+              {tags.length === 0 && <span className="text-xs text-txt3">{t("contacts.noTagsCreate")}</span>}
               {tags.map(tag => (
                 <button key={tag.id} onClick={() => toggleTag(tag.id)}
                   className="inline-flex items-center rounded-full text-[10px] px-2 py-0.5 font-medium transition-all"
-                  style={{ backgroundColor: tag.color + "22", color: tag.color, border: `1px solid ${tag.color}44`,
-                    opacity: selectedTags.includes(tag.id) ? 1 : 0.35, outline: selectedTags.includes(tag.id) ? `2px solid ${tag.color}88` : "none", outlineOffset: 1 }}>
+                  style={{
+                    backgroundColor: selectedTags.includes(tag.id) ? tag.color + "22" : "transparent",
+                    color: selectedTags.includes(tag.id) ? tag.color : "var(--txt2)",
+                    border: `1px solid ${selectedTags.includes(tag.id) ? tag.color + "66" : "var(--border)"}`,
+                    outline: selectedTags.includes(tag.id) ? `2px solid ${tag.color}88` : "none",
+                    outlineOffset: 1,
+                  }}>
                   {tag.name}
                 </button>
               ))}
@@ -216,29 +224,29 @@ function ContactForm({ open, onClose, userId, tags, initial, onSaved }: {
           </div>
         </div>
         <button onClick={() => setShowMore(!showMore)} className="text-xs text-violet2 hover:text-violet">
-          {showMore ? "▾ Hide additional details" : "▸ Show additional details"}
+          {showMore ? `▾ ${t("contacts.hideDetails")}` : `▸ ${t("contacts.showDetails")}`}
         </button>
         {showMore && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-border/50">
-            <F label="Company / Position" value={companyPosition} onChange={setCompanyPosition} placeholder="Manager at Acme Corp" />
-            <F label="Website" value={website} onChange={setWebsite} placeholder="https://example.com" />
-            <F label="Social handle" value={socialHandle} onChange={setSocialHandle} placeholder="@handle (X, LinkedIn...)" />
-            <F label="Address" value={address} onChange={setAddress} placeholder="123 Main St" />
-            <F label="Company number" value={companyNumber} onChange={setCompanyNumber} placeholder="IČO / VAT" />
-            <F label="Other phone" value={altPhone} onChange={setAltPhone} />
-            <F label="Other email" value={altEmail} onChange={setAltEmail} type="email" />
+            <F label={t("contacts.company")} value={companyPosition} onChange={setCompanyPosition} placeholder="Manager at Acme Corp" />
+            <F label={t("contacts.website")} value={website} onChange={setWebsite} placeholder="https://example.com" />
+            <F label={t("contacts.social")} value={socialHandle} onChange={setSocialHandle} placeholder="@handle (X, LinkedIn...)" />
+            <F label={t("contacts.address")} value={address} onChange={setAddress} placeholder="123 Main St" />
+            <F label={t("contacts.companyNumber")} value={companyNumber} onChange={setCompanyNumber} placeholder="IČO / VAT" />
+            <F label={t("contacts.otherPhone")} value={altPhone} onChange={setAltPhone} />
+            <F label={t("contacts.otherEmail")} value={altEmail} onChange={setAltEmail} type="email" />
             <div className="sm:col-span-2">
-              <label className="block text-xs text-txt3 mb-1.5">Notes</label>
+              <label className="block text-xs text-txt3 mb-1.5">{t("common.notes")}</label>
               <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Any notes..."
                 className="w-full glass-field px-3 py-2 text-sm text-txt focus:outline-none focus:border-violet resize-none" />
             </div>
           </div>
         )}
         <div className="flex justify-end gap-2 pt-3 border-t border-border/50">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-txt3 hover:bg-surface3">Cancel</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-txt3 hover:bg-surface3">{t("common.cancel")}</button>
           <button onClick={handleSave} disabled={!name.trim() || saving}
             className="px-4 py-2 rounded-lg text-sm bg-red-acc hover:bg-red-dark text-white disabled:opacity-40">
-            {saving ? "Saving..." : initial ? "Save" : "Add Contact"}
+            {saving ? t("common.saving") : initial ? t("common.save") : t("contacts.addContact")}
           </button>
         </div>
       </div>
@@ -248,6 +256,7 @@ function ContactForm({ open, onClose, userId, tags, initial, onSaved }: {
 
 // ─── Details Modal ──────────────────────────────────────────────
 function DetailsModal({ open, onClose, contact, onCopy }: { open: boolean; onClose: () => void; contact: Contact | null; onCopy: (t: string) => void }) {
+  const { t } = useLocale();
   if (!open || !contact) return null;
   const tags = contact.tags || [];
 
@@ -274,20 +283,20 @@ function DetailsModal({ open, onClose, contact, onCopy }: { open: boolean; onClo
         </div>
         <div className="p-4 sm:p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
-            <Row label="Email" value={contact.email} copyable />
-            <Row label="Phone" value={contact.phone} copyable />
+            <Row label={t("contacts.email")} value={contact.email} copyable />
+            <Row label={t("contacts.phone")} value={contact.phone} copyable />
           </div>
           {tags.length > 0 && <div className="flex flex-wrap gap-1.5 mb-4">{tags.map(t => <TagBadge key={t.id} tag={t} />)}</div>}
           <div className="border-t border-border/30 pt-4">
             {contact.company_position && (
               <div className="mb-3">
-                <span className="text-[10px] text-txt3 uppercase tracking-wider">Position</span>
+                <span className="text-[10px] text-txt3 uppercase tracking-wider">{t("contacts.position")}</span>
                 <p className="text-sm text-txt mt-0.5">{contact.company_position}</p>
               </div>
             )}
             {contact.website && (
               <div className="mb-3">
-                <span className="text-[10px] text-txt3 uppercase tracking-wider">Website</span>
+                <span className="text-[10px] text-txt3 uppercase tracking-wider">{t("contacts.website")}</span>
                 <p className="text-sm mt-0.5">
                   <a href={contact.website.startsWith("http") ? contact.website : `https://${contact.website}`}
                     target="_blank" rel="noopener noreferrer"
@@ -299,18 +308,18 @@ function DetailsModal({ open, onClose, contact, onCopy }: { open: boolean; onClo
             )}
             {contact.social_handle && (
               <div className="mb-3">
-                <span className="text-[10px] text-txt3 uppercase tracking-wider">Social</span>
+                <span className="text-[10px] text-txt3 uppercase tracking-wider">{t("contacts.social")}</span>
                 <p className="text-sm text-txt mt-0.5">{contact.social_handle}</p>
               </div>
             )}
-            <Row label="Address" value={contact.address} copyable />
-            <Row label="Company number" value={contact.company_number} copyable />
-            <Row label="Other phone" value={contact.alt_phone} copyable />
-            <Row label="Other email" value={contact.alt_email} copyable />
-            <Row label="Notes" value={contact.notes} />
+            <Row label={t("contacts.address")} value={contact.address} copyable />
+            <Row label={t("contacts.companyNumber")} value={contact.company_number} copyable />
+            <Row label={t("contacts.otherPhone")} value={contact.alt_phone} copyable />
+            <Row label={t("contacts.otherEmail")} value={contact.alt_email} copyable />
+            <Row label={t("common.notes")} value={contact.notes} />
           </div>
           <div className="border-t border-border/30 pt-3 mt-2">
-            <span className="text-[10px] text-txt3">Added {new Date(contact.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</span>
+            <span className="text-[10px] text-txt3">{t("contacts.added", { date: new Date(contact.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) })}</span>
           </div>
         </div>
       </div>
@@ -332,6 +341,7 @@ export function ContactsPanel({ open, onClose, userId }: { open: boolean; onClos
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const menuRef = useRef<string | null>(null);
   const { toast } = useToast();
+  const { t } = useLocale();
 
   const loadData = useCallback(async () => {
     const supabase = createClient();
@@ -381,12 +391,12 @@ export function ContactsPanel({ open, onClose, userId }: { open: boolean; onClos
   }, [open, formOpen, tagModalOpen, detailContact, onClose]);
 
   const deleteContact = async (id: string) => {
-    if (!confirm("Delete this contact?")) return;
+    if (!confirm(t("contacts.deleteContact"))) return;
     const supabase = createClient();
     await supabase.from("contacts").delete().eq("id", id);
     setContacts(prev => prev.filter(c => c.id !== id));
     setMenuOpen(null);
-    toast("Contact deleted", "info");
+    toast(t("contacts.deleted"), "info");
   };
 
   const filtered = contacts
@@ -417,7 +427,7 @@ export function ContactsPanel({ open, onClose, userId }: { open: boolean; onClos
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-border shrink-0">
           <span className="text-lg">📇</span>
-          <h2 className="font-title text-lg text-bright flex-1">Contacts</h2>
+          <h2 className="font-title text-lg text-bright flex-1">{t("contacts.title")}</h2>
           <span className="text-xs text-txt3 font-mono">{contacts.length}</span>
           <button type="button" onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-txt3 hover:text-txt transition-colors">
             <X size={18} />
@@ -428,16 +438,16 @@ export function ContactsPanel({ open, onClose, userId }: { open: boolean; onClos
         <div className="px-4 py-3 space-y-2.5 border-b border-border shrink-0">
           <div className="flex flex-wrap gap-2 items-center">
             <button onClick={() => { setEditContact(null); setFormOpen(true); }}
-              className="px-3 py-2 rounded-lg text-xs font-semibold bg-red-acc hover:bg-red-dark text-white">＋ Add</button>
+              className="px-3 py-2 rounded-lg text-xs font-semibold bg-red-acc hover:bg-red-dark text-white">{`＋ ${t("common.add")}`}</button>
             <button onClick={() => setTagModalOpen(true)}
-              className="px-3 py-2 rounded-lg text-xs bg-surface2 border border-border text-txt3 hover:text-txt">🏷 Tags</button>
+              className="px-3 py-2 rounded-lg text-xs bg-surface2 border border-border text-txt3 hover:text-txt">{`🏷 ${t("contacts.tags")}`}</button>
             <div className="flex-1 min-w-[20px]" />
             <button onClick={() => setSortBy(s => s === "name" ? "newest" : "name")}
               className="px-2 py-2 rounded-lg text-[10px] text-txt3 hover:text-txt bg-surface2 border border-border">
               {sortBy === "name" ? "A→Z" : "🕐"} ↕
             </button>
           </div>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search contacts..."
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t("contacts.searchPlaceholder")}
             className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-sm text-txt placeholder-txt3 focus:outline-none focus:border-violet" />
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
@@ -462,7 +472,7 @@ export function ContactsPanel({ open, onClose, userId }: { open: boolean; onClos
           {filtered.length === 0 && (
             <div className="text-center py-16 text-txt3">
               <p className="text-2xl mb-2">📭</p>
-              <p className="text-sm">{search || filterTag ? "No contacts match" : "No contacts yet"}</p>
+              <p className="text-sm">{search || filterTag ? t("contacts.noMatch") : t("contacts.empty")}</p>
             </div>
           )}
 
@@ -487,9 +497,9 @@ export function ContactsPanel({ open, onClose, userId }: { open: boolean; onClos
                     {menuOpen === contact.id && (
                       <div data-cmenu="true" className="absolute right-0 top-full mt-1 bg-surface2 border border-border rounded-lg shadow-xl py-1 w-28 z-20">
                         <button onClick={() => { setEditContact(contact); setFormOpen(true); setMenuOpen(null); }}
-                          className="w-full text-left px-3 py-1.5 text-xs text-txt2 hover:bg-surface3">Edit</button>
+                          className="w-full text-left px-3 py-1.5 text-xs text-txt2 hover:bg-surface3">{t("common.edit")}</button>
                         <button onClick={() => deleteContact(contact.id)}
-                          className="w-full text-left px-3 py-1.5 text-xs text-danger hover:bg-surface3">Delete</button>
+                          className="w-full text-left px-3 py-1.5 text-xs text-danger hover:bg-surface3">{t("common.delete")}</button>
                       </div>
                     )}
                   </div>
@@ -497,13 +507,13 @@ export function ContactsPanel({ open, onClose, userId }: { open: boolean; onClos
                 <div className="flex items-center gap-3 text-xs text-txt3">
                   {contact.email && (
                     <button type="button" className="truncate cursor-pointer hover:text-txt transition-colors text-left" title="Click to copy"
-                      onClick={() => { navigator.clipboard.writeText(contact.email); toast("Email copied", "success"); }}>
+                      onClick={() => { navigator.clipboard.writeText(contact.email); toast(t("contacts.emailCopied"), "success"); }}>
                       {contact.email}
                     </button>
                   )}
                   {contact.phone && (
                     <button type="button" className="font-mono text-[11px] cursor-pointer hover:text-txt transition-colors shrink-0" title="Click to copy"
-                      onClick={() => { navigator.clipboard.writeText(contact.phone); toast("Phone copied", "success"); }}>
+                      onClick={() => { navigator.clipboard.writeText(contact.phone); toast(t("contacts.phoneCopied"), "success"); }}>
                       {contact.phone}
                     </button>
                   )}

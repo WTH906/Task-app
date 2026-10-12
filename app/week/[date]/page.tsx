@@ -20,6 +20,7 @@ import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 import { fetchWeekTasksForDate, fetchWeekDayMetaSingle, fetchWeekTemplateSingle, fetchProjectsSlim, fetchProjectTasksSlim } from "@/lib/queries";
 import { injectRoutineTasksForDay } from "@/lib/routine-scheduler";
 import { useToast } from "@/components/Toast";
+import { useLocale, dateLocale } from "@/lib/i18n/useLocale";
 import { CalendarDays } from "lucide-react";
 
 export default function DayDetailPage() {
@@ -27,6 +28,7 @@ export default function DayDetailPage() {
   const router = useRouter();
   const { userId } = useCurrentUser();
   const { toast } = useToast();
+  const { t, locale } = useLocale();
   const dateKey = params.date as string;
   const dateObj = new Date(dateKey + "T00:00:00");
   const dayNum = dateObj.getDay();
@@ -337,7 +339,7 @@ export default function DayDetailPage() {
       .eq("date_key", yesterday)
       .eq("done", false);
 
-    if (!yestTasks?.length) { alert("No unfinished tasks from yesterday"); return; }
+    if (!yestTasks?.length) { alert(t("day.noUnfinished")); return; }
 
     const newTasks: WeekTask[] = [];
     for (const t of yestTasks) {
@@ -386,7 +388,8 @@ export default function DayDetailPage() {
   const prevDay = formatDate(addDays(dateObj, -1));
   const nextDay = formatDate(addDays(dateObj, 1));
 
-  const dateLabel = dateObj.toLocaleDateString("en-US", {
+  const dtLocale = dateLocale(locale);
+  const dateLabel = dateObj.toLocaleDateString(dtLocale, {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -401,19 +404,19 @@ export default function DayDetailPage() {
           onClick={() => router.push(`/week/${prevDay}`)}
           className="px-3 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt2 hover:text-txt"
         >
-          ‹ Prev
+          ‹ {t("common.prev")}
         </button>
         <button
           onClick={() => router.push("/week")}
           className="text-sm text-txt3 hover:text-violet2"
         >
-          Back to Week
+          {t("day.backToWeek")}
         </button>
         <button
           onClick={() => router.push(`/week/${nextDay}`)}
           className="px-3 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt2 hover:text-txt"
         >
-          Next ›
+          {t("common.next")} ›
         </button>
       </div>
 
@@ -425,7 +428,7 @@ export default function DayDetailPage() {
         <p className="text-sm text-txt2 mt-0.5">{dateLabel}</p>
         {isToday && (
           <p className="text-sm font-mono text-violet2 mt-1">
-            {now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+            {now.toLocaleTimeString(dtLocale, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
           </p>
         )}
       </div>
@@ -436,7 +439,7 @@ export default function DayDetailPage() {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={() => saveMeta("title", title)}
-          placeholder="Day theme..."
+          placeholder={t("day.dayTheme")}
           className="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-sm text-txt placeholder-txt3"
         />
         <button
@@ -444,7 +447,7 @@ export default function DayDetailPage() {
           className="text-xs text-txt3 hover:text-violet2 whitespace-nowrap"
           title="Set as default for this weekday"
         >
-          Set default
+          {t("day.setDefault")}
         </button>
       </div>
 
@@ -453,7 +456,7 @@ export default function DayDetailPage() {
         onClick={carryOver}
         className="text-xs text-txt3 hover:text-violet2 mb-4 transition-colors"
       >
-        ↩ Carry over unfinished from yesterday
+        ↩ {t("day.carryOver")}
       </button>
 
       {/*
@@ -524,7 +527,7 @@ export default function DayDetailPage() {
                 {stripTag(task)}
                 {task.rescheduled_to && (
                   <span className="block text-[10px] text-amber mt-0.5">
-                    → rescheduled to {task.rescheduled_to}
+                    → {t("week.rescheduled")} {task.rescheduled_to}
                   </span>
                 )}
               </span>
@@ -560,7 +563,7 @@ export default function DayDetailPage() {
 
       {/* Add task */}
       <div className="space-y-3 mb-6">
-        <p className="text-[10px] text-txt3 uppercase tracking-wider">Add new task</p>
+        <p className="text-[10px] text-txt3 uppercase tracking-wider">{t("day.addNewTask")}</p>
         <div className="flex flex-wrap gap-2">
           <select value={linkProject || ""} onChange={(e) => {
             const val = e.target.value || null;
@@ -571,7 +574,7 @@ export default function DayDetailPage() {
             if (val) loadProjectTasksForLink(val);
           }}
             className="bg-surface border border-border rounded-lg px-3 py-2 text-xs text-txt min-w-[140px]">
-            <option value="">— No project —</option>
+            <option value="">— {t("day.noProject")} —</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>● {p.title}</option>
             ))}
@@ -583,16 +586,16 @@ export default function DayDetailPage() {
               setLinkParentTask(null);
             }}
               className="bg-surface border border-border rounded-lg px-3 py-2 text-xs text-txt">
-              <option value="none">Just tag it</option>
-              <option value="main">→ Create as main task</option>
-              {projectTasks.length > 0 && <option value="subtask">↳ Create as subtask of...</option>}
+              <option value="none">{t("day.justTagIt")}</option>
+              <option value="main">→ {t("day.createMainTask")}</option>
+              {projectTasks.length > 0 && <option value="subtask">↳ {t("day.createSubtask")}</option>}
             </select>
           )}
 
           {linkProject && linkType === "subtask" && projectTasks.length > 0 && (
             <select value={linkParentTask || ""} onChange={(e) => setLinkParentTask(e.target.value || null)}
               className="bg-surface border border-border rounded-lg px-3 py-2 text-xs text-txt flex-1 min-w-[140px]">
-              <option value="">— Pick parent task —</option>
+              <option value="">— {t("day.pickParentTask")} —</option>
               {projectTasks.map((t) => (
                 <option key={t.id} value={t.id}>{t.name}</option>
               ))}
@@ -602,34 +605,34 @@ export default function DayDetailPage() {
 
         {linkProject && (
           <p className="text-[10px] px-1" style={{ color: projects.find(p => p.id === linkProject)?.color || "#7c6fff" }}>
-            {linkType === "none" && "→ Will add a tagged task to this day only"}
-            {linkType === "main" && "→ Will create a new main task in the project + add to this day"}
-            {linkType === "subtask" && !linkParentTask && "→ Select which main task to add the subtask under"}
-            {linkType === "subtask" && linkParentTask && `→ Will create a subtask under "${projectTasks.find(t => t.id === linkParentTask)?.name}" + add to this day`}
+            {linkType === "none" && `→ ${t("day.tagHint")}`}
+            {linkType === "main" && `→ ${t("day.mainTaskHint")}`}
+            {linkType === "subtask" && !linkParentTask && `→ ${t("day.pickParentTask")}`}
+            {linkType === "subtask" && linkParentTask && `→ ${t("day.createSubtask")} "${projectTasks.find(tsk => tsk.id === linkParentTask)?.name}"`}
           </p>
         )}
 
         <div className="flex gap-2">
           <input value={newTask} onChange={(e) => setNewTask(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addTask()}
-            placeholder={linkProject ? "Task name..." : "Add a task..."}
+            placeholder={linkProject ? t("day.taskName") : t("day.addATask")}
             className="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-sm text-txt placeholder-txt3" />
           <button onClick={addTask}
             disabled={!newTask.trim() || (linkType === "subtask" && !linkParentTask)}
             className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent disabled:opacity-50 transition-colors">
-            Add
+            {t("common.add")}
           </button>
         </div>
       </div>
 
       {/* Notes */}
       <div>
-        <label className="block text-sm text-txt2 mb-1.5">Notes</label>
+        <label className="block text-sm text-txt2 mb-1.5">{t("common.notes")}</label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           onBlur={() => saveMeta("notes", notes)}
-          placeholder="Day notes..."
+          placeholder={t("day.dayNotes")}
           className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-txt placeholder-txt3 h-28 resize-none"
         />
       </div>

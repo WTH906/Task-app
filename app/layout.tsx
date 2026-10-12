@@ -33,7 +33,8 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: `
           (function(){try{var t=localStorage.getItem('comfy-theme');if(t&&t!=='purple'){document.documentElement.setAttribute('data-theme',t);if(t==='frost'||t==='cloud'||t==='dawn'){document.documentElement.classList.remove('dark');document.documentElement.style.colorScheme='light'}}}catch(e){}
-          try{if(localStorage.getItem('comfy-sidebar-collapsed')==='1'){document.documentElement.style.setProperty('--sidebar-w','0rem');document.documentElement.setAttribute('data-sidebar','collapsed')}}catch(e){}})();
+          try{if(localStorage.getItem('comfy-sidebar-collapsed')==='1'){document.documentElement.style.setProperty('--sidebar-w','0rem');document.documentElement.setAttribute('data-sidebar','collapsed')}}catch(e){}
+          try{var l=localStorage.getItem('comfy-locale');if(!l){l=navigator.language.slice(0,2)==='fr'?'fr':'en'}if(l==='fr'){document.documentElement.lang='fr'}}catch(e){}})();
         ` }} />
       </head>
       <body className="bg-bg text-txt font-body min-h-screen">

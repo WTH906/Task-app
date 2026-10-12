@@ -9,6 +9,7 @@ import { Sidebar } from "./Sidebar";
 import { ToastProvider, useToast } from "./Toast";
 import { SettingsProvider } from "@/lib/hooks/useSettings";
 import { CurrentUserContext } from "@/lib/hooks/useCurrentUser";
+import { LocaleProvider } from "@/lib/i18n/useLocale";
 
 const ContactsPanel = dynamic(() => import("./ContactsPanel").then(m => ({ default: m.ContactsPanel })), { ssr: false });
 const MonitoringPanel = dynamic(() => import("./MonitoringPanel").then(m => ({ default: m.MonitoringPanel })), { ssr: false });
@@ -92,27 +93,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   if (isLogin || isLanding || !user) {
-    return <ToastProvider><QueryErrorListener />{children}</ToastProvider>;
+    return <LocaleProvider><ToastProvider><QueryErrorListener />{children}</ToastProvider></LocaleProvider>;
   }
 
   return (
-    <ToastProvider>
-      <CurrentUserContext.Provider value={{ id: user.id, email: user.email || "" }}>
-        <SettingsProvider userId={user.id}>
-          <QueryErrorListener />
-          <div className="min-h-screen">
-            <a href="#main-content" className="skip-link">Skip to content</a>
-            <Sidebar user={user} />
-            <main id="main-content" className="app-main min-h-screen animate-fade-in">
-              {children}
-            </main>
-            <ContactsPanel open={contactsOpen} onClose={() => setContactsOpen(false)} userId={user.id} />
-            <MonitoringPanel open={monitoringOpen} onClose={() => setMonitoringOpen(false)} userId={user.id} />
-          </div>
-          <QuickCapture userId={user.id} />
-          <OnboardingModal userId={user.id} />
-        </SettingsProvider>
-      </CurrentUserContext.Provider>
-    </ToastProvider>
+    <LocaleProvider>
+      <ToastProvider>
+        <CurrentUserContext.Provider value={{ id: user.id, email: user.email || "" }}>
+          <SettingsProvider userId={user.id}>
+            <QueryErrorListener />
+            <div className="min-h-screen">
+              <a href="#main-content" className="skip-link">Skip to content</a>
+              <Sidebar user={user} />
+              <main id="main-content" className="app-main min-h-screen animate-fade-in">
+                {children}
+              </main>
+              <ContactsPanel open={contactsOpen} onClose={() => setContactsOpen(false)} userId={user.id} />
+              <MonitoringPanel open={monitoringOpen} onClose={() => setMonitoringOpen(false)} userId={user.id} />
+            </div>
+            <QuickCapture userId={user.id} />
+            <OnboardingModal userId={user.id} />
+          </SettingsProvider>
+        </CurrentUserContext.Provider>
+      </ToastProvider>
+    </LocaleProvider>
   );
 }

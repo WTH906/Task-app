@@ -10,6 +10,7 @@ import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 import { fetchQuickTasks } from "@/lib/queries";
 import { useToast } from "@/components/Toast";
 import { CalendarDays, Timer, RefreshCw } from "lucide-react";
+import { useLocale } from "@/lib/i18n/useLocale";
 
 const PRIORITY_COLORS: Record<number, { border: string; bg: string; text: string; label: string }> = {
   1: { border: "#4ade80", bg: "rgba(74,222,128,0.06)", text: "#4ade80", label: "Low" },
@@ -36,6 +37,16 @@ export default function TaskListPage() {
   const [now] = useState(new Date());
 
   const today = formatDate(now);
+  const { t } = useLocale();
+  const priorityLabels: Record<number, string> = {
+    1: t("tasks.priorityLow"), 2: t("tasks.priorityMediumLow"),
+    3: t("tasks.priorityMedium"), 4: t("tasks.priorityHigh"),
+    5: t("tasks.priorityCritical"),
+  };
+  const recurrenceMap: Record<string, string> = {
+    daily: t("tasks.recurrenceDaily"), weekly: t("tasks.recurrenceWeekly"),
+    monthly: t("tasks.recurrenceMonthly"), yearly: t("tasks.recurrenceYearly"),
+  };
 
   const loadTasks = useCallback(async () => {
     if (!userId) return;
@@ -44,11 +55,11 @@ export default function TaskListPage() {
       setTasks(await fetchQuickTasks(supabase, userId));
     } catch (err) {
       console.error("Tasks load failed:", err);
-      toast("Failed to load tasks", "error");
+      toast(t("toast.failedToLoad", { error: String(err) }), "error");
     }
-  }, [userId, toast]);
+  }, [userId, toast, t]);
 
-  useEffect(() => { document.title = "Comfy Board — Task List"; }, []);
+  useEffect(() => { document.title = `Comfy Board — ${t("tasks.title")}`; }, [t]);
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
@@ -69,7 +80,7 @@ export default function TaskListPage() {
       sort_order: tasks.length,
     }).select().single();
 
-    if (error || !newTask) { toast("Failed to add task", "error"); return; }
+    if (error || !newTask) { toast(t("toast.failedToSave", { error: error?.message || "" }), "error"); return; }
     setTasks((prev) => [...prev, newTask as QuickTask]);
 
     if (newDate) {
@@ -115,7 +126,7 @@ export default function TaskListPage() {
     const supabase = createClient();
     const dbValue = value === "" ? null : value;
     const { error } = await supabase.from("quick_tasks").update({ [field]: dbValue }).eq("id", id);
-    if (error) { toast("Failed to save change", "error"); return; }
+    if (error) { toast(t("toast.failedToSave", { error: error.message }), "error"); return; }
     setTasks((prev) => prev.map((t) => t.id === id ? { ...t, [field]: dbValue } : t));
   };
 
@@ -168,19 +179,19 @@ export default function TaskListPage() {
     <div className="page-shell page-shell--list animate-fade-in">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
         <div>
-          <h1 className="font-title text-2xl text-bright">Task List</h1>
+          <h1 className="font-title text-2xl text-bright">{t("tasks.title")}</h1>
           <p className="text-sm text-txt2 mt-0.5">Quick tasks, appointments & reminders — no project needed</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => setSortDir(sortDir === "priority-asc" ? "priority-desc" : sortDir === "priority-desc" ? "manual" : "priority-asc")}
             className={cn("px-3 py-1.5 rounded-lg border text-xs font-mono transition-colors",
               sortDir.startsWith("priority") ? "border-violet/30 text-violet2 bg-violet/10" : "border-border text-txt3")}>
-            {sortDir === "priority-asc" ? "Priority ↑" : sortDir === "priority-desc" ? "Priority ↓" : "Priority"}
+            {sortDir === "priority-asc" ? `${t("tasks.priority")} ↑` : sortDir === "priority-desc" ? `${t("tasks.priority")} ↓` : t("tasks.priority")}
           </button>
           <button onClick={() => setSortDir(sortDir === "date-asc" ? "date-desc" : sortDir === "date-desc" ? "manual" : "date-asc")}
             className={cn("px-3 py-1.5 rounded-lg border text-xs font-mono transition-colors",
               sortDir.startsWith("date") ? "border-violet/30 text-violet2 bg-violet/10" : "border-border text-txt3")}>
-            {sortDir === "date-asc" ? "Date ↑" : sortDir === "date-desc" ? "Date ↓" : "Date"}
+            {sortDir === "date-asc" ? `${t("tasks.date")} ↑` : sortDir === "date-desc" ? `${t("tasks.date")} ↓` : t("tasks.date")}
           </button>
         </div>
       </div>
@@ -188,9 +199,9 @@ export default function TaskListPage() {
       {/* Stats */}
       {totalTasks > 0 && (
         <div className="flex items-center gap-3 mb-4 text-xs text-txt3">
-          <span>{totalTasks} tasks</span>
-          {criticalCount > 0 && <span className="text-red-400">{criticalCount} high priority</span>}
-          {withDeadline > 0 && <span>{withDeadline} with deadlines</span>}
+          <span>{totalTasks} {t("common.tasks")}</span>
+          {criticalCount > 0 && <span className="text-red-400">{criticalCount} {t("tasks.highPriority")}</span>}
+          {withDeadline > 0 && <span>{withDeadline} {t("tasks.withDeadlines")}</span>}
         </div>
       )}
 
@@ -204,7 +215,7 @@ export default function TaskListPage() {
           <select value={newPriority} onChange={(e) => setNewPriority(parseInt(e.target.value))}
             className="bg-surface2 border border-border rounded-lg px-3 py-2 text-xs text-txt">
             {[1,2,3,4,5].map((p) => (
-              <option key={p} value={p}>P{p} — {PRIORITY_COLORS[p].label}</option>
+              <option key={p} value={p}>P{p} — {priorityLabels[p]}</option>
             ))}
           </select>
         </div>
@@ -214,31 +225,31 @@ export default function TaskListPage() {
           className="w-full bg-surface2 border border-border rounded-lg px-3 py-2 text-xs text-txt placeholder-txt3" />
         <div className="flex flex-wrap gap-2">
           <div className="flex-1 min-w-[140px]">
-            <label className="text-[10px] text-txt3 uppercase tracking-wider mb-1 flex items-center gap-1"><CalendarDays size={10} /> Calendar date</label>
+            <label className="text-[10px] text-txt3 uppercase tracking-wider mb-1 flex items-center gap-1"><CalendarDays size={10} /> {t("tasks.calendarDate")}</label>
             <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)}
               className="w-full bg-surface2 border border-border rounded-lg px-3 py-1.5 text-xs text-txt" />
           </div>
           <div className="flex-1 min-w-[140px]">
-            <label className="text-[10px] text-txt3 uppercase tracking-wider mb-1 flex items-center gap-1"><Timer size={10} /> Deadline</label>
+            <label className="text-[10px] text-txt3 uppercase tracking-wider mb-1 flex items-center gap-1"><Timer size={10} /> {t("tasks.deadline")}</label>
             <input type="date" value={newDeadline} onChange={(e) => setNewDeadline(e.target.value)}
               className="w-full bg-surface2 border border-border rounded-lg px-3 py-1.5 text-xs text-txt" />
           </div>
           <div className="flex-1 min-w-[140px]">
-            <label className="text-[10px] text-txt3 uppercase tracking-wider mb-1 flex items-center gap-1"><RefreshCw size={10} /> Recurring</label>
+            <label className="text-[10px] text-txt3 uppercase tracking-wider mb-1 flex items-center gap-1"><RefreshCw size={10} /> {t("tasks.recurring")}</label>
             <select value={newRecurrence} onChange={(e) => setNewRecurrence(e.target.value)}
               className="w-full bg-surface2 border border-border rounded-lg px-3 py-1.5 text-xs text-txt">
-              <option value="">No</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="yearly">Yearly</option>
+              <option value="">{t("tasks.recurrenceNo")}</option>
+              <option value="daily">{t("tasks.recurrenceDaily")}</option>
+              <option value="weekly">{t("tasks.recurrenceWeekly")}</option>
+              <option value="monthly">{t("tasks.recurrenceMonthly")}</option>
+              <option value="yearly">{t("tasks.recurrenceYearly")}</option>
             </select>
           </div>
         </div>
         <div className="flex justify-end">
           <button onClick={addTask} disabled={!newName.trim()}
             className="px-5 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent disabled:opacity-50 transition-colors">
-            Add Task
+            {t("tasks.addTask")}
           </button>
         </div>
       </div>
@@ -310,7 +321,7 @@ export default function TaskListPage() {
                           updateTask(task.id, "date_key", val || "");
                         }}
                         className="bg-transparent border-none text-[10px] text-violet2 w-[105px] outline-none cursor-pointer"
-                        title="Calendar date" />
+                        title={t("tasks.calendarDate")} />
                       {task.date_key && (
                         <button type="button" onClick={(e) => { e.stopPropagation(); updateTask(task.id, "date_key", ""); setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, date_key: null } : t)); }}
                           aria-label="Clear date" className="text-violet2/50 hover:text-violet2 text-[10px]">✕</button>
@@ -327,15 +338,15 @@ export default function TaskListPage() {
                         }}
                         className="bg-transparent border-none text-[10px] w-[105px] outline-none cursor-pointer"
                         style={{ color: "inherit" }}
-                        title="Deadline" />
+                        title={t("tasks.deadline")} />
                       {task.deadline && daysUntilDeadline !== null && (
                         <span className="text-[10px]">
-                          {isOverdue ? `${Math.abs(daysUntilDeadline)}d late` : daysUntilDeadline === 0 ? "today" : `${daysUntilDeadline}d`}
+                          {isOverdue ? t("tasks.daysLate", { n: Math.abs(daysUntilDeadline) }) : daysUntilDeadline === 0 ? t("common.today") : `${daysUntilDeadline}d`}
                         </span>
                       )}
                     </label>
                     {task.recurrence && (
-                      <span className="text-[10px] text-txt3 inline-flex items-center gap-1"><RefreshCw size={10} /> {task.recurrence}</span>
+                      <span className="text-[10px] text-txt3 inline-flex items-center gap-1"><RefreshCw size={10} /> {recurrenceMap[task.recurrence] || task.recurrence}</span>
                     )}
                   </div>
                 </div>
@@ -358,7 +369,7 @@ export default function TaskListPage() {
                 <button onClick={() => setConfirmId(task.id)}
                   className="text-xs px-2.5 py-1.5 rounded-lg border text-txt3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 hover:border-green-acc hover:text-green-acc hover:bg-green-acc/10 transition-all shrink-0"
                   style={{ borderColor: pc.border + "40" }}>
-                  Done ✓
+                  {t("common.done")} ✓
                 </button>
               </div>
             </div>
@@ -368,8 +379,8 @@ export default function TaskListPage() {
         {tasks.length === 0 && (
           <div className="text-center py-16 text-txt3">
             <p className="text-4xl mb-3 opacity-30">📝</p>
-            <p className="text-lg font-medium text-txt2 mb-1">No tasks yet</p>
-            <p className="text-sm">Dump quick tasks, appointments, and reminders here</p>
+            <p className="text-lg font-medium text-txt2 mb-1">{t("tasks.empty")}</p>
+            <p className="text-sm">{t("tasks.emptyHint")}</p>
           </div>
         )}
       </div>
@@ -379,16 +390,16 @@ export default function TaskListPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop"
           onClick={(e) => { if (e.target === e.currentTarget) setConfirmId(null); }}>
           <div className="bg-surface2 border border-border rounded-xl p-6 max-w-sm w-full shadow-2xl text-center">
-            <p className="text-lg font-title text-bright mb-2">Task completed?</p>
-            <p className="text-sm text-txt2 mb-6">This will permanently remove the task.</p>
+            <p className="text-lg font-title text-bright mb-2">{t("tasks.confirmDone")}</p>
+            <p className="text-sm text-txt2 mb-6">{t("tasks.confirmDoneMessage")}</p>
             <div className="flex gap-3 justify-center">
               <button onClick={() => setConfirmId(null)}
                 className="px-5 py-2 rounded-lg text-sm border border-border text-txt2 hover:bg-surface3 transition-colors">
-                No, keep it
+                {t("tasks.keepIt")}
               </button>
               <button onClick={() => deleteTask(confirmId)}
                 className="px-5 py-2 rounded-lg text-sm bg-green-acc/20 border border-green-acc/40 text-green-acc hover:bg-green-acc/30 transition-colors">
-                Yes, done!
+                {t("tasks.yesDone")}
               </button>
             </div>
           </div>

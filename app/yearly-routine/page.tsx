@@ -10,12 +10,13 @@ import { reorderRows } from "@/lib/db-helpers";
 import { YearlyRoutineTask } from "@/lib/types";
 import { Modal } from "@/components/Modal";
 import { Plus } from "lucide-react";
-
-const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+import { useLocale } from "@/lib/i18n/useLocale";
 
 export default function YearlyRoutinePage() {
   const { userId, loading } = useCurrentUser();
   const { toast } = useToast();
+  const { t } = useLocale();
+  const MONTHS = [t("month.january"),t("month.february"),t("month.march"),t("month.april"),t("month.may"),t("month.june"),t("month.july"),t("month.august"),t("month.september"),t("month.october"),t("month.november"),t("month.december")];
   const [tasks, setTasks] = useState<YearlyRoutineTask[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -61,7 +62,7 @@ export default function YearlyRoutinePage() {
     if (!loading) loadTasks();
   }, [loadTasks, loading]);
 
-  useEffect(() => { document.title = "Comfy Board — Yearly Routine"; }, []);
+  useEffect(() => { document.title = `Comfy Board — ${t("yearly.title")}`; }, [t]);
 
   const toggleCheck = async (task: YearlyRoutineTask) => {
     const supabase = createClient();
@@ -111,7 +112,7 @@ export default function YearlyRoutinePage() {
   };
 
   const deleteTask = async (id: string) => {
-    if (!confirm("Remove this task?")) return;
+    if (!confirm(t("yearly.removeTask"))) return;
     const supabase = createClient();
     await supabase.from("yearly_routine_tasks").delete().eq("id", id);
     setTasks(prev => prev.filter(t => t.id !== id));
@@ -153,7 +154,7 @@ export default function YearlyRoutinePage() {
     if (error) console.error("[yearly-routine:reorder]", error);
   };
 
-  if (loading || dataLoading) return <div className="p-8 text-txt3" role="status">Loading...</div>;
+  if (loading || dataLoading) return <div className="p-8 text-txt3" role="status">{t("common.loading")}</div>;
 
   const done = tasks.filter(t => t.checked).length;
   const total = tasks.length;
@@ -167,19 +168,19 @@ export default function YearlyRoutinePage() {
       <div className="flex items-start justify-between mb-6">
         <div>
           <p className="text-xs text-violet2 mb-1">{currentYear}</p>
-          <h1 className="text-3xl font-title text-bright mb-1">Yearly Routine</h1>
-          <p className="text-txt2 text-sm">Tasks to complete this year</p>
+          <h1 className="text-3xl font-title text-bright mb-1">{t("yearly.title")}</h1>
+          <p className="text-txt2 text-sm">{t("yearly.subtitle")}</p>
         </div>
       </div>
 
       <div className="flex gap-6 text-sm text-txt2 mb-3">
-        <span>Estimated: <strong className="text-bright">{formatMinutes(totalEst)}</strong></span>
-        <span>Remaining: <strong className="text-red-acc">{formatMinutes(remainEst)}</strong></span>
+        <span>{t("common.estimated")} <strong className="text-bright">{formatMinutes(totalEst)}</strong></span>
+        <span>{t("common.remaining")} <strong className="text-red-acc">{formatMinutes(remainEst)}</strong></span>
       </div>
 
       <div className="mb-6">
         <div className="flex justify-between text-xs mb-1">
-          <span className="text-txt2">{done}/{total} completed</span>
+          <span className="text-txt2">{done}/{total} {t("common.completed")}</span>
           <span className="text-red-acc">{pct}%</span>
         </div>
         <ProgressBar value={pct} height={8} />
@@ -187,7 +188,7 @@ export default function YearlyRoutinePage() {
 
       <button onClick={openAdd}
         className="w-full border border-dashed border-border2 rounded-lg px-4 py-2.5 text-sm text-txt3 hover:border-violet hover:text-violet transition-colors mb-3">
-        ＋ Add Task
+        ＋ {t("yearly.addTask")}
       </button>
 
       {/* Task list */}
@@ -240,7 +241,7 @@ export default function YearlyRoutinePage() {
               )}
               <div className="relative">
                 <button onClick={() => openEdit(task)}
-                  className="text-xs text-txt3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 hover:text-violet2 transition-all px-1">Edit</button>
+                  className="text-xs text-txt3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 hover:text-violet2 transition-all px-1">{t("common.edit")}</button>
                 <button type="button" onClick={() => deleteTask(task.id)} aria-label="Delete"
                   className="text-xs text-txt3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 hover:text-danger transition-all px-1">✕</button>
               </div>
@@ -250,64 +251,64 @@ export default function YearlyRoutinePage() {
         {tasks.length === 0 && (
           <div className="text-center py-16 text-txt3">
             <p className="text-4xl mb-3 opacity-30">📆</p>
-            <p className="text-lg font-medium text-txt2 mb-1">No yearly tasks yet</p>
-            <p className="text-sm">Add tasks for things you do once a year — tax filing, renewals, annual reviews...</p>
+            <p className="text-lg font-medium text-txt2 mb-1">{t("yearly.empty")}</p>
+            <p className="text-sm">{t("yearly.emptyHint")}</p>
           </div>
         )}
       </div>
 
       {/* Modal */}
-      <Modal open={modalOpen} onClose={closeModal} title={editingTask ? "Edit Yearly Task" : "Add Yearly Task"}>
+      <Modal open={modalOpen} onClose={closeModal} title={editingTask ? t("yearly.editTask") : t("yearly.addTaskModal")}>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm text-txt2 mb-1.5">Task name</label>
+            <label className="block text-sm text-txt2 mb-1.5">{t("yearly.taskName")}</label>
             <input autoFocus value={formText} onChange={e => setFormText(e.target.value)}
               onKeyDown={e => e.key === "Enter" && saveTask()}
               placeholder="e.g. File annual taxes"
               className="w-full glass-field px-3 py-2 text-txt text-sm" />
           </div>
           <div>
-            <label className="block text-sm text-txt2 mb-1.5">Estimated time (minutes)</label>
+            <label className="block text-sm text-txt2 mb-1.5">{t("yearly.estimatedTime")}</label>
             <input type="number" value={formEst || ""} onChange={e => setFormEst(parseInt(e.target.value) || 0)}
               className="w-20 glass-field px-3 py-2 text-txt text-sm" />
           </div>
           <div>
-            <label className="block text-sm text-txt2 mb-1.5">Month range (optional)</label>
+            <label className="block text-sm text-txt2 mb-1.5">{t("yearly.monthRange")}</label>
             <div className="flex items-center gap-2">
               <select value={formMonthFrom || ""} onChange={e => setFormMonthFrom(parseInt(e.target.value) || null)}
                 className="flex-1 glass-field px-3 py-2 text-txt text-sm">
-                <option value="">Any month</option>
+                <option value="">{t("yearly.anyMonth")}</option>
                 {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
               </select>
-              <span className="text-xs text-txt3">to</span>
+              <span className="text-xs text-txt3">{t("yearly.to")}</span>
               <select value={formMonthTo || ""} onChange={e => setFormMonthTo(parseInt(e.target.value) || null)}
                 className="flex-1 glass-field px-3 py-2 text-txt text-sm">
-                <option value="">Any month</option>
+                <option value="">{t("yearly.anyMonth")}</option>
                 {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
               </select>
             </div>
             {formMonthFrom && formMonthTo && (
               <p className="text-[10px] text-txt3 mt-1">
-                Do between {MONTHS[formMonthFrom - 1]} and {MONTHS[formMonthTo - 1]} each year
+                {t("yearly.doBetween", { start: MONTHS[formMonthFrom - 1], end: MONTHS[formMonthTo - 1] })}
               </p>
             )}
           </div>
           {formMonthFrom && (
             <div>
-              <label className="block text-sm text-txt2 mb-1.5">Day in {MONTHS[formMonthFrom - 1]} (for scheduler)</label>
+              <label className="block text-sm text-txt2 mb-1.5">{t("yearly.dayIn", { month: MONTHS[formMonthFrom - 1] })}</label>
               <input type="number" min={1} max={31} value={formDayFrom || ""} onChange={e => setFormDayFrom(parseInt(e.target.value) || null)}
                 placeholder="e.g. 15"
                 className="w-20 glass-field px-3 py-2 text-txt text-sm" />
               <p className="text-[10px] text-txt3 mt-1">
-                The task will appear in the day scheduler on this day each year
+                {t("yearly.dayInHint")}
               </p>
             </div>
           )}
           <div className="flex justify-end gap-2 pt-2">
-            <button onClick={closeModal} className="px-4 py-2 rounded-lg text-sm text-txt3 hover:bg-surface3">Cancel</button>
+            <button onClick={closeModal} className="px-4 py-2 rounded-lg text-sm text-txt3 hover:bg-surface3">{t("common.cancel")}</button>
             <button onClick={saveTask} disabled={!formText.trim()}
               className="px-4 py-2 rounded-lg text-sm bg-violet text-on-accent hover:opacity-90 disabled:opacity-40">
-              {editingTask ? "Save" : "Add Task"}
+              {editingTask ? t("common.save") : t("yearly.addTask")}
             </button>
           </div>
         </div>

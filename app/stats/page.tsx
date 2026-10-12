@@ -14,9 +14,10 @@ import {
   TrendingUp, TrendingDown, Minus, Calendar, BarChart3,
   ChevronLeft, ChevronRight, Download,
 } from "lucide-react";
+import { useLocale, dateLocale } from "@/lib/i18n/useLocale";
 
 // ─── Weekly Time Summary ─────────────────────────────────────
-function getWeekRange(offset: number) {
+function getWeekRange(offset: number, dateLoc = "en-GB") {
   const now = new Date();
   const day = now.getDay();
   const monday = new Date(now);
@@ -30,13 +31,14 @@ function getWeekRange(offset: number) {
     const dy = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${dy}`;
   };
-  const label = `${monday.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} — ${sunday.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
+  const label = `${monday.toLocaleDateString(dateLoc, { day: "numeric", month: "short" })} — ${sunday.toLocaleDateString(dateLoc, { day: "numeric", month: "short", year: "numeric" })}`;
   return { start: fmt(monday), end: fmt(sunday), label };
 }
 
 interface WeekLog { project_title: string; project_color: string; seconds: number; tasks: Record<string, number>; }
 
 function WeeklyTimeSummary({ userId }: { userId: string }) {
+  const { t, locale } = useLocale();
   const [weekOffset, setWeekOffset] = useState(0);
   const [logs, setLogs] = useState<WeekLog[]>([]);
   const [totalSec, setTotalSec] = useState(0);
@@ -98,7 +100,7 @@ function WeeklyTimeSummary({ userId }: { userId: string }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const { label } = getWeekRange(weekOffset);
+  const { label } = getWeekRange(weekOffset, dateLocale(locale));
   const isThisWeek = weekOffset === 0;
 
   const exportCSV = () => {
@@ -121,7 +123,7 @@ function WeeklyTimeSummary({ userId }: { userId: string }) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Clock size={16} className="text-violet2" />
-          <h2 className="text-sm font-semibold text-bright">Weekly Time</h2>
+          <h2 className="text-sm font-semibold text-bright">{t("stats.weeklyTime")}</h2>
         </div>
         <div className="flex items-center gap-1.5">
           <button type="button" onClick={() => setWeekOffset(w => w - 1)} aria-label="Previous week" className="w-6 h-6 rounded flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface3"><ChevronLeft size={14} /></button>
@@ -134,17 +136,17 @@ function WeeklyTimeSummary({ userId }: { userId: string }) {
       </div>
 
       {loading ? (
-        <div className="text-center py-6 text-txt3 text-xs" role="status">Loading...</div>
+        <div className="text-center py-6 text-txt3 text-xs" role="status">{t("common.loading")}</div>
       ) : logs.length === 0 ? (
         <div className="text-center py-6">
-          <p className="text-txt3 text-xs">No time tracked this week</p>
+          <p className="text-txt3 text-xs">{t("stats.noTimeTracked")}</p>
           <p className="text-[10px] text-txt3 mt-1">Timer sessions are logged automatically when you stop a timer</p>
         </div>
       ) : (
         <div className="space-y-3">
           <div className="flex items-baseline gap-2 mb-3">
             <span className="text-2xl font-bold text-bright">{formatSeconds(totalSec)}</span>
-            <span className="text-xs text-txt3">total</span>
+            <span className="text-xs text-txt3">{t("common.total")}</span>
           </div>
           {logs.map(log => {
             const pct = totalSec > 0 ? (log.seconds / totalSec) * 100 : 0;
@@ -181,6 +183,7 @@ function WeeklyTimeSummary({ userId }: { userId: string }) {
 export default function StatsPage() {
   const { userId, loading: authLoading } = useCurrentUser();
   const { toast } = useToast();
+  const { t, locale } = useLocale();
   const { has } = useSettings();
   const monthlyEnabled = has("monthlyRoutine");
 
@@ -212,8 +215,8 @@ export default function StatsPage() {
   return (
     <div className="page-shell animate-fade-in">
       <div className="mb-6">
-        <h1 className="font-title text-2xl text-bright flex items-center gap-2"><PieChart size={22} /> Stats & Activity</h1>
-        <p className="text-sm text-txt2 mt-0.5">Your productivity at a glance</p>
+        <h1 className="font-title text-2xl text-bright flex items-center gap-2"><PieChart size={22} /> {t("stats.title")}</h1>
+        <p className="text-sm text-txt2 mt-0.5">{t("stats.subtitle")}</p>
       </div>
 
       {/* Top highlight cards */}
@@ -221,22 +224,22 @@ export default function StatsPage() {
         <div className="bg-surface border border-border rounded-xl p-4 text-center card-float">
           <div className="flex items-center justify-center gap-1.5 text-green-acc mb-2"><CheckCircle size={18} /></div>
           <p className="text-2xl font-bold text-bright">{s.overallCompletionRate}%</p>
-          <p className="text-[10px] text-txt3 uppercase tracking-wider mt-1">Completion Rate</p>
+          <p className="text-[10px] text-txt3 uppercase tracking-wider mt-1">{t("stats.completionRate")}</p>
         </div>
         <div className="bg-surface border border-border rounded-xl p-4 text-center card-float">
           <div className="flex items-center justify-center gap-1.5 text-muted-acc2 mb-2"><Clock size={18} /></div>
           <p className="text-2xl font-bold text-bright">{totalHours}h {totalMins}m</p>
-          <p className="text-[10px] text-txt3 uppercase tracking-wider mt-1">Total Tracked</p>
+          <p className="text-[10px] text-txt3 uppercase tracking-wider mt-1">{t("stats.totalTracked")}</p>
         </div>
         <div className="bg-surface border border-border rounded-xl p-4 text-center card-float">
           <div className="flex items-center justify-center gap-1.5 mb-2" style={{ color: streakColor }}><Flame size={18} /></div>
           <p className="text-2xl font-bold text-bright">{s.dailyStreak}</p>
-          <p className="text-[10px] text-txt3 uppercase tracking-wider mt-1">Day Streak</p>
+          <p className="text-[10px] text-txt3 uppercase tracking-wider mt-1">{t("stats.dayStreak")}</p>
         </div>
         <div className="bg-surface border border-border rounded-xl p-4 text-center card-float">
           <div className="flex items-center justify-center gap-1.5 text-red-acc mb-2"><Target size={18} /></div>
           <p className="text-2xl font-bold text-bright">{s.completedTasks + s.completedSubtasks}</p>
-          <p className="text-[10px] text-txt3 uppercase tracking-wider mt-1">Tasks Done</p>
+          <p className="text-[10px] text-txt3 uppercase tracking-wider mt-1">{t("stats.tasksDone")}</p>
         </div>
       </div>
 
@@ -246,7 +249,7 @@ export default function StatsPage() {
       {/* Projects & Tasks */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div className="bg-surface border border-border rounded-xl p-4 card-float">
-          <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-4"><Folder size={15} /> Projects</h2>
+          <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-4"><Folder size={15} /> {t("stats.projectsSection")}</h2>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs text-txt3">Active projects</span>
@@ -281,7 +284,7 @@ export default function StatsPage() {
 
         {/* Time tracking */}
         <div className="bg-surface border border-border rounded-xl p-4 card-float">
-          <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-4"><Clock size={15} /> Time Tracking</h2>
+          <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-4"><Clock size={15} /> {t("stats.timeTracking")}</h2>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs text-txt3">Total tracked</span>
@@ -322,11 +325,11 @@ export default function StatsPage() {
 
       {/* Routines */}
       <div className="bg-surface border border-border rounded-xl p-4 mb-4 card-float">
-        <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-4"><Trophy size={15} /> Routine Streaks</h2>
+        <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-4"><Trophy size={15} /> {t("stats.routineStreaks")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Daily */}
           <div className="bg-surface2 rounded-lg p-3">
-            <div className="flex items-center gap-1.5 text-xs text-txt2 mb-2"><ListChecks size={13} /> Daily Routine</div>
+            <div className="flex items-center gap-1.5 text-xs text-txt2 mb-2"><ListChecks size={13} /> {t("routine.title")}</div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-txt3">Today</span>
               <span className="text-sm font-mono text-bright">{s.dailyCheckedToday}/{s.dailyRoutineTotal}</span>
@@ -343,7 +346,7 @@ export default function StatsPage() {
 
           {/* Weekly */}
           <div className="bg-surface2 rounded-lg p-3">
-            <div className="flex items-center gap-1.5 text-xs text-txt2 mb-2"><RefreshCw size={13} /> Weekly Routine</div>
+            <div className="flex items-center gap-1.5 text-xs text-txt2 mb-2"><RefreshCw size={13} /> {t("weekly.title")}</div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-txt3">This week</span>
               <span className="text-sm font-mono text-bright">{s.weeklyCheckedThisWeek}/{s.weeklyRoutineTotal}</span>
@@ -354,7 +357,7 @@ export default function StatsPage() {
           {/* Monthly */}
           {monthlyEnabled && (
             <div className="bg-surface2 rounded-lg p-3">
-              <div className="flex items-center gap-1.5 text-xs text-txt2 mb-2"><CalendarRange size={13} /> Monthly Routine</div>
+              <div className="flex items-center gap-1.5 text-xs text-txt2 mb-2"><CalendarRange size={13} /> {t("monthly.title")}</div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-txt3">This month</span>
                 <span className="text-sm font-mono text-bright">{s.monthlyCheckedThisMonth}/{s.monthlyRoutineTotal}</span>
@@ -368,7 +371,7 @@ export default function StatsPage() {
       {/* Weekly comparison */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div className="bg-surface border border-border rounded-xl p-4 card-float">
-          <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-4"><Calendar size={15} /> This Week vs Last Week</h2>
+          <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-4"><Calendar size={15} /> {t("stats.thisVsLast")}</h2>
           <div className="space-y-4">
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -380,7 +383,7 @@ export default function StatsPage() {
                   ) : s.thisWeekCompleted < s.lastWeekCompleted ? (
                     <span className="text-[10px] text-danger flex items-center gap-0.5"><TrendingDown size={11} /> {s.thisWeekCompleted - s.lastWeekCompleted}</span>
                   ) : (
-                    <span className="text-[10px] text-txt3 flex items-center gap-0.5"><Minus size={11} /> same</span>
+                    <span className="text-[10px] text-txt3 flex items-center gap-0.5"><Minus size={11} /> {t("stats.same")}</span>
                   )}
                 </div>
               </div>
@@ -397,8 +400,8 @@ export default function StatsPage() {
                 </div>
               </div>
               <div className="flex justify-between mt-1">
-                <span className="text-[10px] text-muted-acc2">Last: {s.lastWeekCompleted}</span>
-                <span className="text-[10px] text-green-acc">This: {s.thisWeekCompleted}</span>
+                <span className="text-[10px] text-muted-acc2">{t("stats.last")} {s.lastWeekCompleted}</span>
+                <span className="text-[10px] text-green-acc">{t("stats.this")} {s.thisWeekCompleted}</span>
               </div>
             </div>
             <div>
@@ -424,7 +427,7 @@ export default function StatsPage() {
 
         {/* Most productive day */}
         <div className="bg-surface border border-border rounded-xl p-4 card-float">
-          <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-4"><BarChart3 size={15} /> Most Productive Day</h2>
+          <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-4"><BarChart3 size={15} /> {t("stats.mostProductive")}</h2>
           {(() => {
             const maxCount = Math.max(...s.productiveDayStats.map((d) => d.count), 1);
             const bestDay = s.productiveDayStats.reduce((best, d) => d.count > best.count ? d : best, s.productiveDayStats[0]);
@@ -445,7 +448,7 @@ export default function StatsPage() {
                   );
                 })}
                 {bestDay && bestDay.count > 0 && (
-                  <p className="text-[10px] text-txt3 mt-2">You&apos;re most active on <span className="text-green-acc font-medium">{["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"][s.productiveDayStats.indexOf(bestDay)]}s</span> based on completed tasks and routine checks</p>
+                  <p className="text-[10px] text-txt3 mt-2">You&apos;re most active on <span className="text-green-acc font-medium">{[t("day.sunday"),t("day.monday"),t("day.tuesday"),t("day.wednesday"),t("day.thursday"),t("day.friday"),t("day.saturday")][s.productiveDayStats.indexOf(bestDay)]}s</span> based on completed tasks and routine checks</p>
                 )}
               </div>
             );
@@ -461,7 +464,7 @@ export default function StatsPage() {
         <div className="bg-surface border border-border rounded-xl p-4 mb-4 card-float">
           <div className="flex items-center justify-between mb-1">
             <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5">
-              <Target size={15} /> Estimates vs reality
+              <Target size={15} /> {t("stats.estimatesVsReality")}
             </h2>
             <span className="text-[11px] text-txt3">
               {s.accuracy.sampleSize} completed task{s.accuracy.sampleSize === 1 ? "" : "s"}
@@ -553,7 +556,7 @@ export default function StatsPage() {
       {s.accuracy.sampleSize === 0 && (
         <div className="bg-surface border border-border rounded-xl p-4 mb-4 card-float">
           <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-2">
-            <Target size={15} /> Estimates vs reality
+            <Target size={15} /> {t("stats.estimatesVsReality")}
           </h2>
           <p className="text-xs text-txt3">
             Give a task an estimate, run its timer, and finish it — this fills in with how
@@ -565,7 +568,7 @@ export default function StatsPage() {
       {/* Time per project */}
       {s.projectTimeStats.length > 0 && (
         <div className="bg-surface border border-border rounded-xl p-4 mb-4 card-float">
-          <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-4"><Folder size={15} /> Time per Project</h2>
+          <h2 className="text-sm font-medium text-txt2 flex items-center gap-1.5 mb-4"><Folder size={15} /> {t("stats.timePerProject")}</h2>
           {(() => {
             const maxSecs = Math.max(...s.projectTimeStats.map((p) => p.seconds), 1);
             const totalSecs = s.projectTimeStats.reduce((s, p) => s + p.seconds, 0);

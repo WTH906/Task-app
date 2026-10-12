@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useLocale } from "@/lib/i18n/useLocale";
 
 export default function GlobalError({
   error,
@@ -9,6 +10,8 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { t } = useLocale();
+
   useEffect(() => {
     console.error("Global error:", error);
   }, [error]);
@@ -29,12 +32,12 @@ export default function GlobalError({
         }}
       >
         <div style={{ maxWidth: "28rem", textAlign: "center" }}>
-          <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>😵</div>
+          <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>&#x1F635;</div>
           <h1 style={{ fontSize: "1.25rem", marginBottom: "0.5rem" }}>
-            Something broke badly
+            {t("error.fatal")}
           </h1>
           <p style={{ opacity: 0.7, fontSize: "0.875rem", lineHeight: 1.6 }}>
-            The error has been recorded. Reloading usually fixes it.
+            {t("error.fatalMessage")}
           </p>
           <div
             style={{
@@ -56,7 +59,7 @@ export default function GlobalError({
                 fontSize: "0.875rem",
               }}
             >
-              Try again
+              {t("error.tryAgain")}
             </button>
             <button
               onClick={() => (window.location.href = "/")}
@@ -70,7 +73,7 @@ export default function GlobalError({
                 fontSize: "0.875rem",
               }}
             >
-              Go to Dashboard
+              {t("error.goToDashboard")}
             </button>
           </div>
         </div>

@@ -10,9 +10,11 @@ import { reorderRows } from "@/lib/db-helpers";
 import { useToast } from "@/components/Toast";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 import { fetchRoutineWithChecks } from "@/lib/queries";
+import { useLocale, dateLocale } from "@/lib/i18n/useLocale";
 
 export default function RoutinePage() {
   const { toast } = useToast();
+  const { t, locale } = useLocale();
   const { userId, loading: authLoading } = useCurrentUser();
   const [tasks, setTasks] = useState<RoutineTask[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -23,7 +25,7 @@ export default function RoutinePage() {
   const [dragIdx, setDragIdx] = useState<number | null>(null);
 
   // Close menu on outside click
-  useEffect(() => { document.title = "Comfy Board — Daily Routine"; }, []);
+  useEffect(() => { document.title = `Comfy Board — ${t("routine.title")}`; }, [t]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -41,7 +43,7 @@ export default function RoutinePage() {
       setTasks(await fetchRoutineWithChecks(supabase, userId, today));
     } catch (err) {
       console.error("Routine load failed:", err);
-      toast("Failed to load routine", "error");
+      toast(t("toast.failedToLoad", { error: String(err) }), "error");
     }
   }, [today, userId, toast]);
 
@@ -73,7 +75,7 @@ export default function RoutinePage() {
         .eq("checked_date", today));
     }
     if (error) {
-      toast("Failed to save: " + error.message, "error");
+      toast(t("toast.failedToSave", { error: error.message }), "error");
       setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, checked: !newChecked } : t)));
     }
   };
@@ -87,7 +89,7 @@ export default function RoutinePage() {
         .from("routine_tasks")
         .update({ text: formText.trim(), est_minutes: formEst })
         .eq("id", editingTask.id);
-      if (error) { toast("Failed to save: " + error.message, "error"); return; }
+      if (error) { toast(t("toast.failedToSave", { error: error.message }), "error"); return; }
       setTasks((prev) => prev.map((t) => t.id === editingTask.id
         ? { ...t, text: formText.trim(), est_minutes: formEst } : t));
     } else {
@@ -97,7 +99,7 @@ export default function RoutinePage() {
         est_minutes: formEst,
         sort_order: tasks.length,
       }).select().single();
-      if (error) { toast("Failed to save: " + error.message, "error"); return; }
+      if (error) { toast(t("toast.failedToSave", { error: error.message }), "error"); return; }
       if (newTask) setTasks((prev) => [...prev, { ...newTask as RoutineTask, checked: false }]);
     }
 
@@ -144,7 +146,7 @@ export default function RoutinePage() {
     if (!userId) return;
     const supabase = createClient();
     const { error } = await reorderRows(supabase, "routine_tasks", tasks.map((t) => t.id), userId);
-    if (error) toast("Failed to reorder: " + error, "error");
+    if (error) toast(t("toast.failedToReorder", { error: String(error) }), "error");
   };
 
   const moveItem = async (idx: number, dir: -1 | 1) => {
@@ -155,7 +157,7 @@ export default function RoutinePage() {
     setTasks(next);
     if (!userId) return;
     const { error } = await reorderRows(createClient(), "routine_tasks", next.map((t) => t.id), userId);
-    if (error) toast("Failed to reorder: " + error, "error");
+    if (error) toast(t("toast.failedToReorder", { error: String(error) }), "error");
   };
 
   const checked = tasks.filter((t) => t.checked).length;
@@ -165,7 +167,7 @@ export default function RoutinePage() {
   const remainEst = tasks.filter((t) => !t.checked).reduce((s, t) => s + t.est_minutes, 0);
 
   const dateObj = new Date();
-  const dateStr = dateObj.toLocaleDateString("en-US", {
+  const dateStr = dateObj.toLocaleDateString(dateLocale(locale), {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -177,19 +179,19 @@ export default function RoutinePage() {
       {/* Header */}
       <div className="mb-6">
         <p className="text-xs text-txt3 uppercase tracking-wider mb-1">{dateStr}</p>
-        <h1 className="font-title text-2xl text-bright mb-1">Daily Routine</h1>
-        <p className="text-sm text-txt2">Check off your tasks for today</p>
+        <h1 className="font-title text-2xl text-bright mb-1">{t("routine.title")}</h1>
+        <p className="text-sm text-txt2">{t("routine.subtitle")}</p>
       </div>
 
       {/* Time summary */}
       <div className="flex items-center gap-4 mb-4 text-sm">
         <div className="flex items-center gap-1.5">
-          <span className="text-txt3">Estimated:</span>
+          <span className="text-txt3">{t("common.estimated")}</span>
           <span className="text-bright font-mono">{formatMinutes(totalEst)}</span>
         </div>
         <div className="w-px h-4 bg-border" />
         <div className="flex items-center gap-1.5">
-          <span className="text-txt3">Remaining:</span>
+          <span className="text-txt3">{t("common.remaining")}</span>
           <span className="text-red-acc font-mono">{formatMinutes(remainEst)}</span>
         </div>
       </div>
@@ -198,7 +200,7 @@ export default function RoutinePage() {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-sm text-txt2">
-            {checked}/{total} completed
+            {checked}/{total} {t("common.completed")}
           </span>
           <span className="text-sm font-mono text-red-acc">{pct}%</span>
         </div>
@@ -278,13 +280,13 @@ export default function RoutinePage() {
                     onClick={() => openEdit(task)}
                     className="w-full text-left px-3 py-1.5 text-sm text-txt2 hover:bg-surface3 hover:text-txt"
                   >
-                    Edit
+                    {t("common.edit")}
                   </button>
                   <button
                     onClick={() => { removeTask(task.id); setMenuOpen(null); }}
                     className="w-full text-left px-3 py-1.5 text-sm text-danger hover:bg-surface3"
                   >
-                    Remove
+                    {t("common.remove")}
                   </button>
                 </div>
               )}
@@ -294,8 +296,8 @@ export default function RoutinePage() {
 
         {tasks.length === 0 && (
           <div className="text-center py-12 text-txt3">
-            <p className="text-lg mb-2">No routine tasks yet</p>
-            <p className="text-sm">Add your daily tasks to get started</p>
+            <p className="text-lg mb-2">{t("routine.empty")}</p>
+            <p className="text-sm">{t("routine.emptyHint")}</p>
           </div>
         )}
       </div>
@@ -305,30 +307,30 @@ export default function RoutinePage() {
         onClick={openAdd}
         className="w-full bg-surface border border-dashed border-border2 rounded-lg px-4 py-3 text-sm text-txt3 hover:border-red-acc hover:text-red-acc transition-colors"
       >
-        ＋ Add Task
+        ＋ {t("routine.addTask")}
       </button>
 
       {/* Modal */}
       <Modal
         open={modalOpen}
         onClose={() => { setModalOpen(false); setEditingTask(null); }}
-        title={editingTask ? "Edit Task" : "Add Task"}
+        title={editingTask ? t("routine.editTask") : t("routine.addTask")}
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm text-txt2 mb-1.5">Task name</label>
+            <label className="block text-sm text-txt2 mb-1.5">{t("routine.taskName")}</label>
             <input
               type="text"
               value={formText}
               onChange={(e) => setFormText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && saveTask()}
               className="w-full glass-field px-3 py-2 text-txt text-sm"
-              placeholder="e.g. Morning workout"
+              placeholder={t("routine.placeholder")}
               autoFocus
             />
           </div>
           <div>
-            <label className="block text-sm text-txt2 mb-1.5">Estimated time</label>
+            <label className="block text-sm text-txt2 mb-1.5">{t("routine.estimatedTime")}</label>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1">
                 <input type="number" value={Math.floor(formEst / 60) || ""} onChange={(e) => { const h = parseInt(e.target.value) || 0; setFormEst(Math.max(0, h * 60 + (formEst % 60))); }}
@@ -349,14 +351,14 @@ export default function RoutinePage() {
               onClick={() => { setModalOpen(false); setEditingTask(null); }}
               className="px-4 py-2 rounded-lg text-sm text-txt2 hover:bg-surface3 transition-colors"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               onClick={saveTask}
               disabled={!formText.trim()}
               className="px-4 py-2 rounded-lg text-sm bg-red-acc hover:bg-red-dark text-white transition-colors disabled:opacity-50"
             >
-              {editingTask ? "Save" : "Add"}
+              {editingTask ? t("common.save") : t("common.add")}
             </button>
           </div>
         </div>

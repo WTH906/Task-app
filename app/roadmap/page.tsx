@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 import { fetchProjects, fetchProjectTasksWithSubs, fetchRoadmapData } from "@/lib/queries";
 import { useToast } from "@/components/Toast";
+import { useLocale } from "@/lib/i18n/useLocale";
 
 interface RoadmapCheck {
   text: string;
@@ -28,7 +29,7 @@ interface Phase {
   milestones: Milestone[];
 }
 
-const STATUS_LABELS: Record<string, string> = { future: "upcoming", active: "in progress", done: "done" };
+const STATUS_KEYS: Record<string, "roadmap.upcoming" | "roadmap.inProgress" | "roadmap.done"> = { future: "roadmap.upcoming", active: "roadmap.inProgress", done: "roadmap.done" };
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; dot: string }> = {
   future: { bg: "bg-surface3", text: "text-txt3", border: "border-border", dot: "bg-surface border-border2" },
   active: { bg: "bg-violet/10", text: "text-violet2", border: "border-violet/30", dot: "bg-violet border-violet" },
@@ -49,6 +50,7 @@ export default function RoadmapPage() {
   const [phases, setPhases] = useState<Phase[]>([]);
   const [projectTasks, setProjectTasks] = useState<ProjectTask[]>([]);
   const { userId } = useCurrentUser();
+  const { t } = useLocale();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -272,16 +274,16 @@ export default function RoadmapPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
-          <h1 className="font-title text-2xl text-bright">Roadmap</h1>
+          <h1 className="font-title text-2xl text-bright">{t("roadmap.title")}</h1>
           <p className="text-sm text-txt2 mt-0.5">
-            Visual timeline for your project milestones
-            {saving && <span className="text-yellow-500 ml-2 animate-pulse">· saving...</span>}
-            {!saving && selectedProject && <span className="text-green-acc ml-2">· saved</span>}
+            {t("roadmap.subtitle")}
+            {saving && <span className="text-yellow-500 ml-2 animate-pulse">· {t("roadmap.saving")}</span>}
+            {!saving && selectedProject && <span className="text-green-acc ml-2">· {t("roadmap.saved")}</span>}
           </p>
         </div>
         <select value={selectedProject || ""} onChange={(e) => selectProject(e.target.value || null)}
           className="bg-surface border border-border rounded-lg px-4 py-2 text-sm text-txt min-w-[200px]">
-          <option value="">Select a project...</option>
+          <option value="">{t("roadmap.selectProject")}</option>
           {projects.map((p) => (
             <option key={p.id} value={p.id}>{p.title}</option>
           ))}
@@ -291,8 +293,8 @@ export default function RoadmapPage() {
       {!selectedProject && (
         <div className="text-center py-20 text-txt3">
           <p className="text-4xl mb-3 opacity-30">📋</p>
-          <p className="text-lg font-medium text-txt2 mb-1">Select a project</p>
-          <p className="text-sm">Choose a project to build its roadmap</p>
+          <p className="text-lg font-medium text-txt2 mb-1">{t("roadmap.empty")}</p>
+          <p className="text-sm">{t("roadmap.emptyHint")}</p>
         </div>
       )}
 
@@ -311,7 +313,7 @@ export default function RoadmapPage() {
               <div className="flex items-center gap-3 mb-4 group">
                 <input value={phase.name} onChange={(e) => updatePhase(pi, e.target.value)}
                   className="text-[10px] font-bold uppercase tracking-[1.2px] text-txt3 bg-transparent border-b border-transparent focus:border-border2 focus:text-txt2 outline-none flex-1 py-1"
-                  spellCheck={false} placeholder="Phase name..." />
+                  spellCheck={false} placeholder={t("roadmap.phaseName")} />
                 <button onClick={() => deletePhase(pi)}
                   className="text-[10px] px-2 py-1 rounded border border-border text-txt3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 hover:border-danger hover:text-danger transition-all">
                   delete
@@ -350,10 +352,10 @@ export default function RoadmapPage() {
                         <div className="flex items-center gap-2 mb-2">
                           <input value={ms.date_label} onChange={(e) => updateMilestone(pi, mi, "date_label", e.target.value)}
                             className="font-mono text-[11px] text-txt3 bg-transparent border-b border-transparent focus:border-violet outline-none w-24"
-                            placeholder="Week 1..." spellCheck={false} />
+                            placeholder={t("roadmap.weekPlaceholder")} spellCheck={false} />
                           <button onClick={() => cycleStatus(pi, mi)}
                             className={cn("text-[9px] font-bold px-2 py-0.5 rounded cursor-pointer transition-all", sc.bg, sc.text)}>
-                            {STATUS_LABELS[st]}
+                            {t(STATUS_KEYS[st])}
                           </button>
                           {taskProgress !== null && (
                             <span className="text-[10px] font-mono text-txt3 ml-1">{taskProgress}%</span>
@@ -381,13 +383,13 @@ export default function RoadmapPage() {
                           <input value={ms.title} onChange={(e) => updateMilestone(pi, mi, "title", e.target.value)}
                             className={cn("flex-1 text-sm font-bold bg-transparent border-b border-transparent focus:border-violet outline-none",
                               taskProgress !== null && taskProgress >= 100 ? "text-txt3 line-through" : "text-bright")}
-                            placeholder="Milestone title..." spellCheck={false} />
+                            placeholder={t("roadmap.milestoneTitle")} spellCheck={false} />
                           <select value={ms.project_task_id || ""} onChange={(e) => linkTaskToMilestone(pi, mi, e.target.value || null)}
                             className="bg-surface3 border border-border rounded px-1.5 py-0.5 text-[10px] text-txt3 max-w-[120px] opacity-0 group-hover/card:opacity-100 transition-opacity"
                             title="Pull from project task">
-                            <option value="">📌 Link task</option>
-                            {projectTasks.map((t) => (
-                              <option key={t.id} value={t.id}>{t.name}</option>
+                            <option value="">{"📌 " + t("roadmap.linkTask")}</option>
+                            {projectTasks.map((pt) => (
+                              <option key={pt.id} value={pt.id}>{pt.name}</option>
                             ))}
                           </select>
                         </div>
@@ -395,7 +397,7 @@ export default function RoadmapPage() {
                         {/* Description */}
                         <input value={ms.description} onChange={(e) => updateMilestone(pi, mi, "description", e.target.value)}
                           className="text-xs text-txt3 bg-transparent border-b border-transparent focus:border-border2 outline-none w-full"
-                          placeholder="Description..." spellCheck={false} />
+                          placeholder={t("roadmap.description")} spellCheck={false} />
 
                         {/* Checklist */}
                         <div className="mt-2 pt-2 border-t border-border/50">
@@ -414,11 +416,11 @@ export default function RoadmapPage() {
                                 <input value={ck.text} onChange={(e) => updateCheck(pi, mi, ci, e.target.value)}
                                   className={cn("flex-1 text-xs bg-transparent border-b border-transparent focus:border-border2 outline-none",
                                     subProgress !== null && subProgress >= 100 ? "text-txt3 line-through" : "text-txt2")}
-                                  placeholder="Task..." spellCheck={false} />
+                                  placeholder={t("roadmap.taskPlaceholder")} spellCheck={false} />
                                 <select value={ck.subtask_id || ""} onChange={(e) => linkSubtaskToCheck(pi, mi, ci, e.target.value || null)}
                                   className="bg-transparent border-none text-[9px] text-txt3 max-w-[100px] opacity-0 group-hover/ck:opacity-100"
                                   title="Link to subtask">
-                                  <option value="">↳ link</option>
+                                  <option value="">{"↳ " + t("roadmap.link")}</option>
                                   {allSubtasks.map((s) => (
                                     <option key={s.id} value={s.id}>{s.name}</option>
                                   ))}
@@ -430,7 +432,7 @@ export default function RoadmapPage() {
                           })}
                           <button onClick={() => addCheck(pi, mi)}
                             className="text-[11px] text-txt3 hover:text-violet2 font-semibold mt-1 transition-colors">
-                            + Add task
+                            {t("roadmap.addTask")}
                           </button>
                         </div>
                       </div>
@@ -442,7 +444,7 @@ export default function RoadmapPage() {
               {/* Add milestone */}
               <button onClick={() => addMilestone(pi)}
                 className="ml-10 mt-3 flex items-center gap-2 px-4 py-2 border border-dashed border-border rounded-lg text-[11px] font-bold text-txt3 hover:border-violet hover:text-violet2 transition-all">
-                + Add milestone
+                {t("roadmap.addMilestone")}
               </button>
             </div>
           ))}
@@ -450,7 +452,7 @@ export default function RoadmapPage() {
           {/* Add phase */}
           <button onClick={addPhase}
             className="w-full mt-4 flex items-center justify-center gap-2 px-4 py-3 border border-dashed border-border rounded-lg text-[11px] font-bold text-txt3 hover:border-violet hover:text-violet2 transition-all">
-            + Add phase
+            {t("roadmap.addPhase")}
           </button>
         </div>
       )}

@@ -4,6 +4,7 @@ import { useState, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { cleanDeadline, detectFileType } from "@/lib/import-helpers";
 import { Download, FolderOpen, Folder } from "lucide-react";
+import { useLocale } from "@/lib/i18n/useLocale";
 
 interface ImportModalProps {
   open: boolean;
@@ -13,6 +14,7 @@ interface ImportModalProps {
 }
 
 export function ImportModal({ open, onClose, userId, onComplete }: ImportModalProps) {
+  const { t } = useLocale();
   const [dragging, setDragging] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
@@ -239,8 +241,8 @@ export function ImportModal({ open, onClose, userId, onComplete }: ImportModalPr
       <div className="bg-surface2 border border-border rounded-xl max-w-lg w-full max-h-[85vh] overflow-hidden shadow-2xl flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
           <div>
-            <h2 className="font-title text-bright text-lg flex items-center gap-2"><Download size={18} /> Import Data</h2>
-            <p className="text-xs text-txt3 mt-0.5">Drag & drop JSON files or click to browse</p>
+            <h2 className="font-title text-bright text-lg flex items-center gap-2"><Download size={18} /> {t("import.title")}</h2>
+            <p className="text-xs text-txt3 mt-0.5">{t("import.dragDrop")}</p>
           </div>
           {!importing && (
             <button type="button" onClick={handleClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface3 text-txt3 hover:text-txt">✕</button>
@@ -263,12 +265,12 @@ export function ImportModal({ open, onClose, userId, onComplete }: ImportModalPr
             >
               <div className="text-3xl mb-3 flex justify-center">{dragging ? <FolderOpen size={40} className="text-violet2" /> : <Folder size={40} className="text-txt3" />}</div>
               <p className="text-sm text-bright mb-1">
-                {dragging ? "Drop files here!" : "Drag & drop your JSON files here"}
+                {dragging ? t("import.dropHere") : t("import.dragHint")}
               </p>
-              <p className="text-xs text-txt3 mb-3">or click to browse</p>
+              <p className="text-xs text-txt3 mb-3">{t("import.orBrowse")}</p>
               <div className="flex flex-wrap justify-center gap-2 text-[10px] text-txt3">
-                <span className="bg-surface3 px-2 py-1 rounded">Projects</span>
-                <span className="bg-surface3 px-2 py-1 rounded">Templates</span>
+                <span className="bg-surface3 px-2 py-1 rounded">{t("import.projects")}</span>
+                <span className="bg-surface3 px-2 py-1 rounded">{t("import.templates")}</span>
                 <span className="bg-surface3 px-2 py-1 rounded">projects.json</span>
                 <span className="bg-surface3 px-2 py-1 rounded">tasks.json</span>
               </div>
@@ -289,7 +291,7 @@ export function ImportModal({ open, onClose, userId, onComplete }: ImportModalPr
                   "text-txt2"
                 }>{line}</p>
               ))}
-              {importing && <p className="text-txt3 animate-pulse" role="status">Working...</p>}
+              {importing && <p className="text-txt3 animate-pulse" role="status">{t("import.working")}</p>}
             </div>
           )}
         </div>
@@ -298,12 +300,12 @@ export function ImportModal({ open, onClose, userId, onComplete }: ImportModalPr
           {done && !importing ? (
             <>
               <button onClick={() => { setLog([]); setDone(false); }}
-                className="text-xs text-txt3 hover:text-violet2 transition-colors">Import more</button>
+                className="text-xs text-txt3 hover:text-violet2 transition-colors">{t("import.importMore")}</button>
               <button onClick={handleClose}
-                className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent transition-colors">Done</button>
+                className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent transition-colors">{t("common.done")}</button>
             </>
           ) : (
-            <span className="text-xs text-txt3">{importing ? "Importing..." : "Supports multiple files"}</span>
+            <span className="text-xs text-txt3">{importing ? t("import.importing") : t("import.supportsMultiple")}</span>
           )}
         </div>
       </div>

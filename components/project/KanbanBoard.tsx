@@ -5,6 +5,7 @@ import { ProjectTask } from "@/lib/types";
 import { ProgressBar } from "@/components/ProgressBar";
 import { formatMinutes, cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight, GripVertical } from "lucide-react";
+import { useLocale } from "@/lib/i18n/useLocale";
 
 type Column = "todo" | "in_progress" | "done";
 
@@ -40,6 +41,8 @@ interface KanbanBoardProps {
 export function KanbanBoard({
   tasks, projectTitle, elapsed, onTaskClick, onProgressChange, onSubtaskToggle,
 }: KanbanBoardProps) {
+  const { t } = useLocale();
+  const columnLabel = (k: Column) => k === "todo" ? t("kanban.toDo") : k === "in_progress" ? t("kanban.inProgress") : t("kanban.done");
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const dragRef = useRef<{ taskId: string; fromCol: Column } | null>(null);
   const [dragOverCol, setDragOverCol] = useState<Column | null>(null);
@@ -98,7 +101,7 @@ export function KanbanBoard({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-      {COLUMNS.map(({ key, label, accent }) => (
+      {COLUMNS.map(({ key, accent }) => (
         <div
           key={key}
           className={cn(
@@ -114,7 +117,7 @@ export function KanbanBoard({
               className="w-2 h-2 rounded-full shrink-0"
               style={{ backgroundColor: accent }}
             />
-            <span className="text-xs font-medium text-txt2">{label}</span>
+            <span className="text-xs font-medium text-txt2">{columnLabel(key)}</span>
             <span className="text-[10px] font-mono text-txt3 ml-auto">
               {columns[key].length}
             </span>
@@ -161,8 +164,8 @@ export function KanbanBoard({
                         }}
                         className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity bg-surface2 border border-border rounded text-[9px] text-txt3 px-1 py-0.5 w-[70px]"
                       >
-                        {COLUMNS.map(({ key: colKey, label: colLabel }) => (
-                          <option key={colKey} value={colKey}>{colLabel}</option>
+                        {COLUMNS.map(({ key: colKey }) => (
+                          <option key={colKey} value={colKey}>{columnLabel(colKey)}</option>
                         ))}
                       </select>
                     </div>
@@ -182,11 +185,11 @@ export function KanbanBoard({
                         )}
                         {task.deadline && (
                           <span className="text-[10px] text-txt3">
-                            Due {task.deadline}
+                            {t("kanban.due", { date: task.deadline })}
                           </span>
                         )}
                         {task.monitoring && (
-                          <span className="text-[10px] text-amber">monitored</span>
+                          <span className="text-[10px] text-amber">{t("kanban.monitored")}</span>
                         )}
                       </div>
 
@@ -204,7 +207,7 @@ export function KanbanBoard({
                             className="flex items-center gap-1 mt-1.5 text-[10px] text-txt3 hover:text-txt transition-colors"
                           >
                             {isExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
-                            {doneSubs}/{subs.length} subtasks
+                            {doneSubs}/{subs.length} {t("kanban.subtasks")}
                           </button>
 
                           {isExpanded && (
@@ -260,7 +263,7 @@ export function KanbanBoard({
 
             {columns[key].length === 0 && (
               <div className="flex items-center justify-center h-20 text-[11px] text-txt3 opacity-50">
-                {key === "todo" ? "All tasks started" : key === "done" ? "Nothing completed yet" : "Drag tasks here"}
+                {key === "todo" ? t("kanban.allStarted") : key === "done" ? t("kanban.nothingCompleted") : t("kanban.dragHere")}
               </div>
             )}
           </div>

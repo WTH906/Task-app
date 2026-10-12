@@ -13,6 +13,7 @@ import { fetchWeekTasksGrouped, fetchWeekDayMeta, fetchWeekTemplates, fetchProje
 import { useToast } from "@/components/Toast";
 import { CalendarDays, List, Clock, RefreshCw } from "lucide-react";
 import { useSettings } from "@/lib/hooks/useSettings";
+import { useLocale, dateLocale } from "@/lib/i18n/useLocale";
 import dynamic from "next/dynamic";
 import { Modal } from "@/components/Modal";
 
@@ -38,18 +39,17 @@ const PRIORITY_TEXT_COLORS: Record<number, string> = {
  * — once per second, forever, even on an idle tab. Scoping it to a leaf means
  * the tick repaints ~20 characters instead of the whole planner.
  */
-const LiveClock = memo(function LiveClock({ withSeconds = false }: { withSeconds?: boolean }) {
+const LiveClock = memo(function LiveClock({ withSeconds = false, dtLocale = "en-US" }: { withSeconds?: boolean; dtLocale?: string }) {
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
     setNow(new Date());
-    // Seconds need a 1s tick; the header clock only changes once a minute.
     const iv = setInterval(() => setNow(new Date()), withSeconds ? 1000 : 15000);
     return () => clearInterval(iv);
   }, [withSeconds]);
   if (!now) return null;
   return (
     <>
-      {now.toLocaleTimeString("en-US", withSeconds
+      {now.toLocaleTimeString(dtLocale, withSeconds
         ? { hour: "2-digit", minute: "2-digit", second: "2-digit" }
         : { hour: "2-digit", minute: "2-digit" })}
     </>
@@ -60,6 +60,7 @@ export default function WeekPage() {
   const router = useRouter();
   const { userId } = useCurrentUser();
   const { toast } = useToast();
+  const { t, locale } = useLocale();
   const [viewMode, setViewMode] = useState<"week" | "month" | "planner">("week");
   const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
   const [monthDate, setMonthDate] = useState(() => new Date());
@@ -342,14 +343,15 @@ export default function WeekPage() {
   );
 
   // Intl formatter construction is expensive; only redo it when the range moves.
+  const dtLocale = dateLocale(locale);
   const rangeLabel = useMemo(() => {
-    if (viewMode === "planner") return `${quickTasks.length} tasks`;
+    if (viewMode === "planner") return `${quickTasks.length} ${t("common.tasks")}`;
     if (viewMode === "week") {
       const end = addDays(weekStart, 6);
-      return `${weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+      return `${weekStart.toLocaleDateString(dtLocale, { month: "short", day: "numeric" })} – ${end.toLocaleDateString(dtLocale, { month: "short", day: "numeric", year: "numeric" })}`;
     }
-    return monthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-  }, [viewMode, weekStart, monthDate, quickTasks.length]);
+    return monthDate.toLocaleDateString(dtLocale, { month: "long", year: "numeric" });
+  }, [viewMode, weekStart, monthDate, quickTasks.length, dtLocale, t]);
 
   // The week columns and month cells share the memoised range.
   const monthGridDates = viewMode === "month" ? visibleDates : [];
@@ -369,7 +371,7 @@ export default function WeekPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <div>
           <h1 className="font-title text-2xl text-bright cursor-pointer hover:text-violet2 transition-colors"
-            onClick={() => setViewMode("week")}>Planner</h1>
+            onClick={() => setViewMode("week")}>{t("week.title")}</h1>
           <p className="text-sm text-txt2 mt-0.5">{rangeLabel}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -377,15 +379,15 @@ export default function WeekPage() {
           <div className="flex rounded-lg border border-border overflow-hidden">
             <button onClick={() => setViewMode("week")}
               className={`px-3 py-1.5 text-xs transition-colors ${viewMode === "week" ? "bg-violet/15 text-violet2" : "text-txt3 hover:text-txt"}`}>
-              Week
+              {t("week.viewWeek")}
             </button>
             <button onClick={() => setViewMode("month")}
               className={`px-3 py-1.5 text-xs transition-colors ${viewMode === "month" ? "bg-violet/15 text-violet2" : "text-txt3 hover:text-txt"}`}>
-              Month
+              {t("week.viewMonth")}
             </button>
             <button onClick={() => setViewMode("planner")}
               className={`px-3 py-1.5 text-xs transition-colors flex items-center gap-1 ${viewMode === "planner" ? "bg-violet/15 text-violet2" : "text-txt3 hover:text-txt"}`}>
-              <List size={12} /> List
+              <List size={12} /> {t("week.viewList")}
             </button>
           </div>
           {showRoutines && (
@@ -403,7 +405,7 @@ export default function WeekPage() {
                 className="px-3 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt2 hover:text-txt hover:border-border2">‹</button>
               <div className="relative">
                 <button onClick={goToday}
-                  className="px-3 py-1.5 rounded-lg bg-violet/10 border border-violet/30 text-sm text-violet2 hover:bg-violet/20">Today</button>
+                  className="px-3 py-1.5 rounded-lg bg-violet/10 border border-violet/30 text-sm text-violet2 hover:bg-violet/20">{t("common.today")}</button>
                 <button type="button" onClick={() => setJumpPickerOpen(!jumpPickerOpen)}
                   className="ml-1 px-2 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt3 hover:text-txt hover:border-border2" title="Jump to date" aria-label="Jump to date"><CalendarDays size={14} /></button>
                 {jumpPickerOpen && (
@@ -425,9 +427,9 @@ export default function WeekPage() {
       {viewMode !== "planner" && (
       <div className="mb-4 space-y-2">
         <div className="flex items-center gap-3 text-sm">
-          <span className="text-txt3">Week:</span>
+          <span className="text-txt3">{t("week.weekLabel")}</span>
           <span className="text-bright font-mono">{doneCount}/{totalCount}</span>
-          {rescheduledTotal > 0 && <span className="text-xs text-amber font-mono ml-2">{rescheduledTotal} rescheduled</span>}
+          {rescheduledTotal > 0 && <span className="text-xs text-amber font-mono ml-2">{rescheduledTotal} {t("week.rescheduled")}</span>}
           {totalCount > 0 && (
             <div className="w-32 h-2 bg-surface3 rounded-full overflow-hidden">
               <div className="h-full rounded-full bg-violet transition-all" style={{ width: `${(doneCount / totalCount) * 100}%` }} />
@@ -519,7 +521,7 @@ export default function WeekPage() {
                   )}
                   {isToday && (
                     <p className="text-[10px] font-mono text-violet2 mt-0.5">
-                      <LiveClock />
+                      <LiveClock dtLocale={dtLocale} />
                     </p>
                   )}
                 </div>
@@ -599,7 +601,7 @@ export default function WeekPage() {
       {viewMode === "month" && (
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="grid grid-cols-7 gap-1 mb-1">
-            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => (
+            {([t("day.mon"), t("day.tue"), t("day.wed"), t("day.thu"), t("day.fri"), t("day.sat"), t("day.sun")] as string[]).map((d, i) => (
               <div key={d} className="text-center text-[10px] text-txt3 uppercase tracking-wider py-1"
                 style={{ color: DAY_COLORS[[1,2,3,4,5,6,0][i]] }}>{d}</div>
             ))}
@@ -680,21 +682,21 @@ export default function WeekPage() {
         return (
           <div className="flex-1 overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-txt2">{quickTasks.length} tasks · {dated.length} scheduled</p>
-              <a href="/tasks" className="text-xs text-violet2 hover:underline">Open full task list →</a>
+              <p className="text-sm text-txt2">{quickTasks.length} {t("common.tasks")} · {dated.length} {t("week.scheduled")}</p>
+              <a href="/tasks" className="text-xs text-violet2 hover:underline">{t("week.openTaskList")} →</a>
             </div>
 
             {sortedDates.map((dateKey) => {
               const dayTasks = grouped[dateKey];
               const d = new Date(dateKey + "T00:00:00");
-              const label = d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+              const label = d.toLocaleDateString(dtLocale, { weekday: "short", month: "short", day: "numeric" });
               const isToday = dateKey === today;
               const isPast = dateKey < today;
               return (
                 <div key={dateKey} className="mb-4">
                   <h2 className={cn("text-xs font-medium mb-2 uppercase tracking-wider",
                     isToday ? "text-violet2" : isPast ? "text-danger" : "text-txt3")}>
-                    {isToday ? "Today" : label} {isPast && !isToday && "· overdue"}
+                    {isToday ? t("common.today") : label} {isPast && !isToday && `· ${t("week.overdue")}`}
                   </h2>
                   <div className="space-y-1.5">
                     {dayTasks.map((t) => (
@@ -714,7 +716,7 @@ export default function WeekPage() {
 
             {undated.length > 0 && (
               <div className="mb-4">
-                <h2 className="text-xs font-medium mb-2 uppercase tracking-wider text-txt3">Unscheduled</h2>
+                <h2 className="text-xs font-medium mb-2 uppercase tracking-wider text-txt3">{t("week.unscheduled")}</h2>
                 <div className="space-y-1.5">
                   {undated.map((t) => (
                     <div key={t.id} className="bg-surface border border-border rounded-lg px-3 py-2 flex items-center gap-3 group"
@@ -731,8 +733,8 @@ export default function WeekPage() {
 
             {quickTasks.length === 0 && (
               <div className="text-center py-16 text-txt3">
-                <p className="text-lg font-medium text-txt2 mb-1">No quick tasks</p>
-                <p className="text-sm">Add tasks in the <a href="/tasks" className="text-violet2 hover:underline">Task List</a></p>
+                <p className="text-lg font-medium text-txt2 mb-1">{t("week.noQuickTasks")}</p>
+                <p className="text-sm">{t("week.openTaskList")}</p>
               </div>
             )}
           </div>
@@ -753,7 +755,7 @@ export default function WeekPage() {
           open
           onClose={() => setGridDate(null)}
           maxWidth="max-w-5xl"
-          title={new Date(gridDate + "T00:00:00").toLocaleDateString("en-US", {
+          title={new Date(gridDate + "T00:00:00").toLocaleDateString(dtLocale, {
             weekday: "long", month: "long", day: "numeric",
           })}
         >

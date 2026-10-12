@@ -12,6 +12,7 @@ import { SearchModal } from "./SearchModal";
 import { WorkClock } from "./WorkClock";
 import { ActiveTimerBadge } from "./ActiveTimerBadge";
 import { useToast } from "./Toast";
+import { useLocale, type MessageKey } from "@/lib/i18n/useLocale";
 import { fetchProjects as fetchProjectsQuery, fetchTemplates as fetchTemplatesQuery } from "@/lib/queries";
 import { reorderRows } from "@/lib/db-helpers";
 import { useSettings } from "@/lib/hooks/useSettings";
@@ -44,6 +45,7 @@ function applyCollapsed(collapsed: boolean) {
 
 export function Sidebar({ user }: { user: User }) {
   const { has } = useSettings();
+  const { t } = useLocale();
   const pathname = usePathname();
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
@@ -248,17 +250,17 @@ export function Sidebar({ user }: { user: User }) {
   // Nav is driven by the feature toggles now, not localStorage flags — so it
   // follows the user between browsers and can't drift from what /settings says.
   const navItems: Array<{ href: string; icon: React.ReactNode; label: string; accent: string; key: string }> = [
-    { href: "/", icon: <LayoutDashboard size={18} />, label: "Dashboard", accent: "violet", key: "D" },
-    ...(has("dailyRoutine") ? [{ href: "/routine", icon: <ListChecks size={18} />, label: "Daily Routine", accent: "red-acc", key: "R" }] : []),
-    ...(has("weeklyRoutine") ? [{ href: "/weekly-routine", icon: <RefreshCw size={18} />, label: "Weekly Routine", accent: "violet", key: "E" }] : []),
-    ...(has("monthlyRoutine") ? [{ href: "/monthly-routine", icon: <CalendarRange size={18} />, label: "Monthly Routine", accent: "violet", key: "Y" }] : []),
-    ...(has("yearlyRoutine") ? [{ href: "/yearly-routine", icon: <CalendarRange size={18} />, label: "Yearly Routine", accent: "violet", key: "" }] : []),
-    ...(has("planner") ? [{ href: "/week", icon: <CalendarDays size={18} />, label: "Calendar", accent: "violet", key: "W" }] : []),
-    ...(has("taskList") ? [{ href: "/tasks", icon: <ClipboardList size={18} />, label: "Task List", accent: "violet", key: "Q" }] : []),
-    ...(has("roadmap") ? [{ href: "/roadmap", icon: <Map size={18} />, label: "Roadmap", accent: "violet", key: "M" }] : []),
-    ...(has("retro") ? [{ href: "/retro", icon: <BarChart3 size={18} />, label: "Retro Planning", accent: "violet", key: "T" }] : []),
-    ...(has("deadlines") ? [{ href: "/deadlines", icon: <Timer size={18} />, label: "Deadlines", accent: "violet", key: "L" }] : []),
-    ...(has("stats") ? [{ href: "/stats", icon: <PieChart size={18} />, label: "Stats", accent: "violet", key: "" }] : []),
+    { href: "/", icon: <LayoutDashboard size={18} />, label: t("nav.dashboard"), accent: "violet", key: "D" },
+    ...(has("dailyRoutine") ? [{ href: "/routine", icon: <ListChecks size={18} />, label: t("nav.dailyRoutine"), accent: "red-acc", key: "R" }] : []),
+    ...(has("weeklyRoutine") ? [{ href: "/weekly-routine", icon: <RefreshCw size={18} />, label: t("nav.weeklyRoutine"), accent: "violet", key: "E" }] : []),
+    ...(has("monthlyRoutine") ? [{ href: "/monthly-routine", icon: <CalendarRange size={18} />, label: t("nav.monthlyRoutine"), accent: "violet", key: "Y" }] : []),
+    ...(has("yearlyRoutine") ? [{ href: "/yearly-routine", icon: <CalendarRange size={18} />, label: t("nav.yearlyRoutine"), accent: "violet", key: "" }] : []),
+    ...(has("planner") ? [{ href: "/week", icon: <CalendarDays size={18} />, label: t("nav.calendar"), accent: "violet", key: "W" }] : []),
+    ...(has("taskList") ? [{ href: "/tasks", icon: <ClipboardList size={18} />, label: t("nav.taskList"), accent: "violet", key: "Q" }] : []),
+    ...(has("roadmap") ? [{ href: "/roadmap", icon: <Map size={18} />, label: t("nav.roadmap"), accent: "violet", key: "M" }] : []),
+    ...(has("retro") ? [{ href: "/retro", icon: <BarChart3 size={18} />, label: t("nav.retroPlanning"), accent: "violet", key: "T" }] : []),
+    ...(has("deadlines") ? [{ href: "/deadlines", icon: <Timer size={18} />, label: t("nav.deadlines"), accent: "violet", key: "L" }] : []),
+    ...(has("stats") ? [{ href: "/stats", icon: <PieChart size={18} />, label: t("nav.stats"), accent: "violet", key: "" }] : []),
   ];
 
   const handleSignOut = async () => {
@@ -338,7 +340,7 @@ export function Sidebar({ user }: { user: User }) {
   };
 
   const deleteTemplate = async (id: string) => {
-    if (!confirm("Delete this template?")) return;
+    if (!confirm(t("templates.deleteConfirm"))) return;
     const supabase = createClient();
     await supabase.from("templates").delete().eq("id", id);
     setTemplates((prev) => prev.filter((t) => t.id !== id));
@@ -427,19 +429,19 @@ export function Sidebar({ user }: { user: User }) {
               <div className="absolute left-0 top-full mt-1 bg-surface2 border border-border rounded-lg shadow-xl py-1 w-full z-50">
                 <Link href="/stats" onClick={() => { setUserMenuOpen(false); setOpen(false); }}
                   className="flex items-center gap-2 px-3 py-2 text-xs text-txt2 hover:bg-surface3 transition-colors w-full">
-                  <PieChart size={13} /> Stats & Activity
+                  <PieChart size={13} /> {t("nav.stats")}
                 </Link>
                 <div className="border-t border-border my-1" />
                 <div className="px-3 py-1">
-                  <span className="text-[10px] text-txt3 uppercase tracking-wider">Theme</span>
+                  <span className="text-[10px] text-txt3 uppercase tracking-wider">{t("nav.theme")}</span>
                 </div>
-                {THEMES.map(t => (
-                  <button key={t.id} onClick={(e) => {
+                {THEMES.map(thm => (
+                  <button key={thm.id} onClick={(e) => {
                     e.stopPropagation();
-                    setTheme(t.id);
-                    localStorage.setItem("comfy-theme", t.id);
-                    document.documentElement.setAttribute("data-theme", t.id === "purple" ? "" : t.id);
-                    const isLight = t.id === "frost" || t.id === "cloud";
+                    setTheme(thm.id);
+                    localStorage.setItem("comfy-theme", thm.id);
+                    document.documentElement.setAttribute("data-theme", thm.id === "purple" ? "" : thm.id);
+                    const isLight = thm.id === "frost" || thm.id === "cloud";
                     if (isLight) {
                       document.documentElement.classList.remove("dark");
                       document.documentElement.style.colorScheme = "light";
@@ -449,15 +451,15 @@ export function Sidebar({ user }: { user: User }) {
                     }
                   }}
                     className="flex items-center gap-2 px-3 py-1.5 text-xs text-txt2 hover:bg-surface3 transition-colors w-full">
-                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: t.dot }} />
-                    <span className="flex-1 text-left">{t.label}</span>
-                    {theme === t.id && <span className="text-[10px] text-violet2">✓</span>}
+                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: thm.dot }} />
+                    <span className="flex-1 text-left">{t(`theme.${thm.id}` as MessageKey)}{(thm.id === "frost" || thm.id === "cloud") ? " ☀" : ""}</span>
+                    {theme === thm.id && <span className="text-[10px] text-violet2">✓</span>}
                   </button>
                 ))}
                 <div className="border-t border-border my-1" />
                 <button onClick={handleSignOut}
                   className="flex items-center gap-2 px-3 py-2 text-xs text-txt3 hover:text-danger hover:bg-surface3 transition-colors w-full">
-                  <LogOut size={13} /> Sign out
+                  <LogOut size={13} /> {t("nav.signOut")}
                 </button>
               </div>
             )}
@@ -466,7 +468,7 @@ export function Sidebar({ user }: { user: User }) {
 
         <button onClick={() => setSearchOpen(true)}
           className="mx-2 mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-surface2 border border-border text-sm text-txt3 hover:text-txt hover:border-border2 transition-colors">
-          <span><Search size={14} /></span><span className="flex-1 text-left">Search...</span>
+          <span><Search size={14} /></span><span className="flex-1 text-left">{t("common.search")}</span>
           <kbd className="text-[9px] bg-surface3 px-1 py-0.5 rounded">⌘K</kbd>
         </button>
 
@@ -493,7 +495,7 @@ export function Sidebar({ user }: { user: User }) {
 
           <div className="px-3 mb-1 flex items-center justify-between">
             <Link href="/projects" onClick={() => setOpen(false)}
-              className="text-[11px] uppercase tracking-wider text-txt3 hover:text-red-acc transition-colors">Projects</Link>
+              className="text-[11px] uppercase tracking-wider text-txt3 hover:text-red-acc transition-colors">{t("nav.projects")}</Link>
             <div className="flex items-center gap-1">
               <button onClick={() => setProjectSort(s => s === "custom" ? "alpha" : s === "alpha" ? "deadline" : "custom")}
                 title={`Sort: ${projectSort}`}
@@ -501,15 +503,15 @@ export function Sidebar({ user }: { user: User }) {
                 className="text-[9px] text-txt3 hover:text-txt transition-colors px-1.5 py-1 rounded bg-surface3 min-w-[24px] min-h-[24px] flex items-center justify-center">
                 <span aria-hidden="true">{projectSort === "custom" ? "⠿" : projectSort === "alpha" ? "AZ" : "📅"}</span>
               </button>
-              <button type="button" onClick={() => setImportOpen(true)} title="Import" aria-label="Import" className="text-txt3 hover:text-green-acc transition-colors p-1 min-w-[24px] min-h-[24px] flex items-center justify-center"><Download size={14} /></button>
-              <button type="button" onClick={() => { fetchTemplates(); setTemplateOpen(!templateOpen); }} title="Templates" aria-expanded={templateOpen} aria-label="Templates" className="text-txt3 hover:text-violet2 transition-colors p-1 min-w-[24px] min-h-[24px] flex items-center justify-center"><ClipboardCopy size={14} /></button>
+              <button type="button" onClick={() => setImportOpen(true)} title={t("projects.import")} aria-label={t("projects.import")} className="text-txt3 hover:text-green-acc transition-colors p-1 min-w-[24px] min-h-[24px] flex items-center justify-center"><Download size={14} /></button>
+              <button type="button" onClick={() => { fetchTemplates(); setTemplateOpen(!templateOpen); }} title={t("projects.templates")} aria-expanded={templateOpen} aria-label={t("projects.templates")} className="text-txt3 hover:text-violet2 transition-colors p-1 min-w-[24px] min-h-[24px] flex items-center justify-center"><ClipboardCopy size={14} /></button>
             </div>
           </div>
 
           {templateOpen && (
             <div className="mx-2 mb-2 bg-surface2 border border-border rounded-lg overflow-hidden">
               {templates.length === 0 ? (
-                <p className="text-[11px] text-txt3 px-3 py-2 text-center">No templates</p>
+                <p className="text-[11px] text-txt3 px-3 py-2 text-center">{t("templates.noTemplates")}</p>
               ) : templates.map((t) => (
                 <div key={t.id} className="flex items-center border-b border-border/50 last:border-b-0 group">
                   <button onClick={() => createFromTemplate(t)}
@@ -621,7 +623,7 @@ export function Sidebar({ user }: { user: User }) {
 
           <button onClick={handleNewProject}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-txt3 hover:bg-surface2 hover:text-txt w-full transition-colors">
-            <FolderPlus size={16} className="shrink-0" /><span>New Project</span>
+            <FolderPlus size={16} className="shrink-0" /><span>{t("nav.newProject")}</span>
             <kbd className="text-[9px] text-txt3 bg-surface3 px-1 py-0.5 rounded ml-auto">N</kbd>
           </button>
         </nav>
@@ -637,7 +639,7 @@ export function Sidebar({ user }: { user: User }) {
             aria-expanded={toolsOpen}
             className="flex items-center w-full px-3 py-2 text-[11px] uppercase tracking-wider text-txt3 hover:text-txt transition-colors">
             <ChevronDown size={12} className={cn("transition-transform mr-1.5", !toolsOpen && "-rotate-90")} />
-            Tools
+            {t("nav.tools")}
           </button>
           {toolsOpen && (
             <div className="px-3 pb-3 space-y-1">
@@ -647,7 +649,7 @@ export function Sidebar({ user }: { user: User }) {
               {has("contacts") && (
                 <button onClick={() => window.dispatchEvent(new Event("toggle-contacts"))}
                   className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-xs text-txt3 hover:bg-surface2 hover:text-txt transition-colors">
-                  <BookUser size={15} /> <span>Contacts</span>
+                  <BookUser size={15} /> <span>{t("nav.contacts")}</span>
                   <span className="ml-auto text-[9px] text-txt3" aria-hidden>→</span>
                 </button>
               )}
@@ -655,29 +657,29 @@ export function Sidebar({ user }: { user: User }) {
               {has("monitoring") && (
                 <button onClick={() => window.dispatchEvent(new Event("toggle-monitoring"))}
                   className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-xs text-txt3 hover:bg-surface2 hover:text-amber transition-colors">
-                  <Clock size={15} /> <span>Monitoring</span>
+                  <Clock size={15} /> <span>{t("nav.monitoring")}</span>
                   <span className="ml-auto text-[9px] text-txt3" aria-hidden>←</span>
                 </button>
               )}
 
               <Link href="/guide"
                 className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-xs text-txt3 hover:bg-surface2 hover:text-txt transition-colors">
-                <BookOpen size={15} /> <span>Guide</span>
+                <BookOpen size={15} /> <span>{t("nav.guide")}</span>
               </Link>
 
               <Link href="/settings"
                 className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-xs text-txt3 hover:bg-surface2 hover:text-txt transition-colors">
-                <SlidersHorizontal size={15} /> <span>Settings</span>
+                <SlidersHorizontal size={15} /> <span>{t("nav.settings")}</span>
               </Link>
 
               <div className="text-[10px] text-txt3 px-2 space-y-0.5">
                 <p>
-                  <kbd className="bg-surface3 px-1 py-0.5 rounded">A</kbd> Capture ·{" "}
-                  <kbd className="bg-surface3 px-1 py-0.5 rounded">⌘K</kbd> Search ·{" "}
-                  <kbd className="bg-surface3 px-1 py-0.5 rounded">D</kbd> Home ·{" "}
-                  <kbd className="bg-surface3 px-1 py-0.5 rounded">W</kbd> Calendar ·{" "}
-                  <kbd className="bg-surface3 px-1 py-0.5 rounded">N</kbd> New ·{" "}
-                  <kbd className="bg-surface3 px-1 py-0.5 rounded">⌘B</kbd> Panel
+                  <kbd className="bg-surface3 px-1 py-0.5 rounded">A</kbd> {t("shortcut.capture")} ·{" "}
+                  <kbd className="bg-surface3 px-1 py-0.5 rounded">⌘K</kbd> {t("shortcut.search")} ·{" "}
+                  <kbd className="bg-surface3 px-1 py-0.5 rounded">D</kbd> {t("shortcut.home")} ·{" "}
+                  <kbd className="bg-surface3 px-1 py-0.5 rounded">W</kbd> {t("shortcut.calendar")} ·{" "}
+                  <kbd className="bg-surface3 px-1 py-0.5 rounded">N</kbd> {t("shortcut.new")} ·{" "}
+                  <kbd className="bg-surface3 px-1 py-0.5 rounded">⌘B</kbd> {t("shortcut.panel")}
                 </p>
               </div>
             </div>
@@ -701,7 +703,7 @@ export function Sidebar({ user }: { user: User }) {
               border: "1px solid var(--border)",
               boxShadow: "0 24px 48px rgba(0,0,0,0.4)",
             }}>
-            <h2 className="text-lg font-semibold text-bright mb-4">New Project</h2>
+            <h2 className="text-lg font-semibold text-bright mb-4">{t("nav.newProject")}</h2>
             <input
               autoFocus
               value={newProjectName}
@@ -712,9 +714,9 @@ export function Sidebar({ user }: { user: User }) {
             />
             <div className="flex justify-end gap-2">
               <button onClick={() => { setNewProjectOpen(false); pendingTemplateRef.current = null; }}
-                className="px-4 py-2 text-sm text-txt3 hover:text-txt transition-colors">Cancel</button>
+                className="px-4 py-2 text-sm text-txt3 hover:text-txt transition-colors">{t("common.cancel")}</button>
               <button onClick={handleProjectModalSubmit} disabled={!newProjectName.trim()}
-                className="px-4 py-2 text-sm bg-violet text-on-accent rounded-lg hover:opacity-90 disabled:opacity-40 transition-colors">Create</button>
+                className="px-4 py-2 text-sm bg-violet text-on-accent rounded-lg hover:opacity-90 disabled:opacity-40 transition-colors">{t("common.create")}</button>
             </div>
           </div>
         </>

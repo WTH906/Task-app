@@ -9,6 +9,7 @@ import {
 } from "@/lib/schedule";
 import { run } from "@/lib/db-helpers";
 import { Clock } from "lucide-react";
+import { useLocale } from "@/lib/i18n/useLocale";
 
 export interface ScheduleTarget {
   /** week_tasks row id. */
@@ -56,6 +57,7 @@ interface Props {
 export function ScheduleModal({
   target, onClose, onSave, onClear, isToday = false, allowTimes = true,
 }: Props) {
+  const { t } = useLocale();
   const [dayLabel, setDayLabel] = useState("");
   const [startLabel, setStartLabel] = useState("09:00");
   const [endLabel, setEndLabel] = useState("10:00");
@@ -81,12 +83,12 @@ export function ScheduleModal({
 
   // Why this can't be saved, in the words you'd use out loud. `null` = fine.
   const problem: string | null =
-    !dayLabel || !/^\d{4}-\d{2}-\d{2}$/.test(dayLabel) ? "Pick a day."
+    !dayLabel || !/^\d{4}-\d{2}-\d{2}$/.test(dayLabel) ? t("schedule.pickDay")
     : !allowTimes ? null
-    : start === null || end === null ? "Enter both times."
-    : end <= start ? "The end time has to be after the start."
-    : end - start < MIN_BLOCK_MINUTES ? `Blocks are at least ${MIN_BLOCK_MINUTES} minutes.`
-    : end > DAY_MINUTES ? "A block has to finish before midnight."
+    : start === null || end === null ? t("schedule.enterBothTimes")
+    : end <= start ? t("schedule.endAfterStart")
+    : end - start < MIN_BLOCK_MINUTES ? t("schedule.minBlock", { n: MIN_BLOCK_MINUTES })
+    : end > DAY_MINUTES ? t("schedule.beforeMidnight")
     : null;
 
   const duration = start !== null && end !== null && end > start ? end - start : null;
@@ -116,13 +118,13 @@ export function ScheduleModal({
     <Modal
       open={!!target}
       onClose={onClose}
-      title={!allowTimes ? "Move to another day" : target?.current ? "Reschedule" : "Schedule"}
+      title={!allowTimes ? t("schedule.moveToDay") : target?.current ? t("schedule.reschedule") : t("schedule.schedule")}
     >
       <div className="space-y-4">
         <p className="text-sm text-txt2 break-words">{target?.label}</p>
 
         <div>
-          <label htmlFor="sched-day" className="block text-xs text-txt3 mb-1.5">Day</label>
+          <label htmlFor="sched-day" className="block text-xs text-txt3 mb-1.5">{t("schedule.day")}</label>
           <input
             id="sched-day"
             type="date"
@@ -139,15 +141,14 @@ export function ScheduleModal({
           */}
           {dayChanged && (
             <p className="text-[10px] text-amber mt-1">
-              Moves it to {dayLabel}. The old day keeps a greyed-out entry
-              showing it was rescheduled.
+              {t("schedule.movedTo", { date: dayLabel })}
             </p>
           )}
         </div>
 
         {allowTimes && <div className="flex items-end gap-3">
           <div className="flex-1">
-            <label htmlFor="sched-start" className="block text-xs text-txt3 mb-1.5">Starts</label>
+            <label htmlFor="sched-start" className="block text-xs text-txt3 mb-1.5">{t("schedule.starts")}</label>
             <input
               id="sched-start"
               type="time"
@@ -172,7 +173,7 @@ export function ScheduleModal({
           </div>
           <span className="pb-2.5 text-txt3">–</span>
           <div className="flex-1">
-            <label htmlFor="sched-end" className="block text-xs text-txt3 mb-1.5">Ends</label>
+            <label htmlFor="sched-end" className="block text-xs text-txt3 mb-1.5">{t("schedule.ends")}</label>
             <input
               id="sched-end"
               type="time"
@@ -191,12 +192,10 @@ export function ScheduleModal({
           ) : allowTimes ? (
             <>
               <Clock size={12} className="text-txt3 shrink-0" />
-              <span className="text-txt2">{formatDuration(duration ?? 0)} blocked out</span>
-              {/* The estimate is shown for context only. A gap between the two
-                  is information, not a mistake to be corrected. */}
+              <span className="text-txt2">{formatDuration(duration ?? 0)} {t("schedule.blockedOut")}</span>
               {target?.estMinutes ? (
                 <span className="text-txt3">
-                  · estimate is {formatDuration(target.estMinutes)}
+                  · {t("schedule.estimateIs", { time: formatDuration(target.estMinutes) })}
                 </span>
               ) : null}
             </>
@@ -209,19 +208,19 @@ export function ScheduleModal({
               onClick={async () => { if (target) { await onClear(target.id); onClose(); } }}
               className="px-3 py-2 rounded-lg text-sm text-txt3 hover:text-danger hover:bg-surface3 transition-colors"
             >
-              Remove time
+              {t("schedule.removeTime")}
             </button>
           ) : <span />}
 
           <div className="flex gap-2">
             <button onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm text-txt2 hover:bg-surface3">Cancel</button>
+              className="px-4 py-2 rounded-lg text-sm text-txt2 hover:bg-surface3">{t("common.cancel")}</button>
             <button
               onClick={() => run(commit(), "schedule:save")}
               disabled={!!problem || saving}
               className="px-4 py-2 rounded-lg text-sm bg-violet text-on-accent hover:opacity-90 disabled:opacity-40 transition-opacity"
             >
-              {saving ? "Saving..." : "Save"}
+              {saving ? t("common.saving") : t("common.save")}
             </button>
           </div>
         </div>

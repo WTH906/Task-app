@@ -2,6 +2,7 @@
 
 import { CalendarDays, Timer, RefreshCw } from "lucide-react";
 import { Modal } from "@/components/Modal";
+import { useLocale } from "@/lib/i18n/useLocale";
 
 interface TaskFormModalProps {
   open: boolean;
@@ -29,15 +30,16 @@ export function TaskFormModal({
   formRecurrence, setFormRecurrence,
   saving, onSave,
 }: TaskFormModalProps) {
+  const { t } = useLocale();
   const label = mode === "task"
-    ? isEdit ? "Edit Task" : "Add Task"
-    : isEdit ? "Edit Subtask" : "Add Subtask";
+    ? isEdit ? t("taskForm.editTask") : t("taskForm.addTask")
+    : isEdit ? t("taskForm.editSubtask") : t("taskForm.addSubtask");
 
   return (
     <Modal open={open} onClose={onClose} title={label}>
       <div className="space-y-4">
         <div>
-          <label className="block text-sm text-txt2 mb-1.5">Name</label>
+          <label className="block text-sm text-txt2 mb-1.5">{t("taskForm.name")}</label>
           <input
             type="text"
             value={formName}
@@ -48,7 +50,7 @@ export function TaskFormModal({
           />
         </div>
         <div>
-          <label className="block text-sm text-txt2 mb-1.5">Estimated time</label>
+          <label className="block text-sm text-txt2 mb-1.5">{t("taskForm.estimatedTime")}</label>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1">
               <input
@@ -84,54 +86,53 @@ export function TaskFormModal({
           </div>
         </div>
         <div>
-          <label className="text-sm text-txt2 mb-1.5 flex items-center gap-1.5"><CalendarDays size={14} /> Schedule on calendar</label>
+          <label className="text-sm text-txt2 mb-1.5 flex items-center gap-1.5"><CalendarDays size={14} /> {t("taskForm.scheduleOnCalendar")}</label>
           <input
             type="date"
             value={formDate}
             onChange={(e) => setFormDate(e.target.value)}
             className="w-full glass-field px-3 py-2 text-txt text-sm"
           />
-          {formDate && <p className="text-[10px] text-violet2 mt-1">Task will appear on the calendar for this date</p>}
+          {formDate && <p className="text-[10px] text-violet2 mt-1">{t("taskForm.taskOnCalendar")}</p>}
         </div>
         <div>
-          <label className="text-sm text-txt2 mb-1.5 flex items-center gap-1.5"><Timer size={14} /> Deadline (due date)</label>
+          <label className="text-sm text-txt2 mb-1.5 flex items-center gap-1.5"><Timer size={14} /> {t("taskForm.deadlineDueDate")}</label>
           <input
             type="date"
             value={formDeadline}
             onChange={(e) => setFormDeadline(e.target.value)}
             className="w-full glass-field px-3 py-2 text-txt text-sm"
           />
-          {formDeadline && <p className="text-[10px] text-danger mt-1">A countdown deadline will be created</p>}
+          {formDeadline && <p className="text-[10px] text-danger mt-1">{t("taskForm.deadlineCreated")}</p>}
         </div>
         <div>
-          <label className="text-sm text-txt2 mb-1.5 flex items-center gap-1.5"><RefreshCw size={14} /> Repeat</label>
+          <label className="text-sm text-txt2 mb-1.5 flex items-center gap-1.5"><RefreshCw size={14} /> {t("taskForm.repeat")}</label>
           <select value={formRecurrence || ""} onChange={(e) => setFormRecurrence(e.target.value || null)}
             className="w-full glass-field px-3 py-2 text-txt text-sm">
-            <option value="">No — one-time</option>
-            <option value="daily">Every day</option>
-            <option value="weekly">Every week</option>
-            <option value="monthly">Every month</option>
-            <option value="yearly">Every year</option>
+            <option value="">{t("taskForm.noOneTime")}</option>
+            <option value="daily">{t("taskForm.everyDay")}</option>
+            <option value="weekly">{t("taskForm.everyWeek")}</option>
+            <option value="monthly">{t("taskForm.everyMonth")}</option>
+            <option value="yearly">{t("taskForm.everyYear")}</option>
           </select>
           {formRecurrence && (
             <p className="text-[10px] text-violet2 mt-1">
               {formDate
-                ? `Repeats on the calendar from ${formDate}.`
-                : "No date set — it will start from today."}
-              {mode === "task" && <> Ticking it counts for the current period only; it comes back
-              unticked when the next one starts.</>}
+                ? t("taskForm.repeatHint", { date: formDate })
+                : t("taskForm.noDateHint")}
+              {mode === "task" && <> {t("taskForm.tickHint")}</>}
             </p>
           )}
-          {formRecurrence && formDeadline && <p className="text-[10px] text-danger mt-1">The countdown deadline will recur too.</p>}
+          {formRecurrence && formDeadline && <p className="text-[10px] text-danger mt-1">{t("taskForm.deadlineRecurHint")}</p>}
         </div>
         <div className="flex justify-end gap-2 pt-2">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-txt2 hover:bg-surface3">Cancel</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-txt2 hover:bg-surface3">{t("common.cancel")}</button>
           <button
             onClick={onSave}
             disabled={!formName.trim() || saving}
             className="px-4 py-2 rounded-lg text-sm bg-red-acc hover:bg-red-dark text-white disabled:opacity-50"
           >
-            {saving ? "Saving..." : "Save"}
+            {saving ? t("common.saving") : t("common.save")}
           </button>
         </div>
       </div>

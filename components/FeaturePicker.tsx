@@ -1,6 +1,7 @@
 "use client";
 
 import { FEATURES, FEATURE_GROUPS, FeatureMap } from "@/lib/features";
+import { useLocale, type MessageKey } from "@/lib/i18n/useLocale";
 import { cn } from "@/lib/utils";
 
 /**
@@ -18,6 +19,8 @@ export function FeaturePicker({
   onChange: (next: FeatureMap) => void;
   compact?: boolean;
 }) {
+  const { t } = useLocale();
+
   const toggle = (key: keyof FeatureMap) => {
     onChange({ ...value, [key]: !value[key] });
   };
@@ -29,7 +32,7 @@ export function FeaturePicker({
         if (items.length === 0) return null;
         return (
           <div key={group}>
-            <p className="text-[10px] uppercase tracking-widest text-txt3 mb-2">{group}</p>
+            <p className="text-[10px] uppercase tracking-widest text-txt3 mb-2">{t(("featureGroup." + group) as MessageKey)}</p>
             <div className="space-y-1">
               {items.map((f) => {
                 const on = value[f.key];
@@ -48,19 +51,19 @@ export function FeaturePicker({
                       checked={on}
                       disabled={f.locked}
                       onChange={() => !f.locked && toggle(f.key)}
-                      aria-label={f.label}
+                      aria-label={t(("feature." + f.key + ".label") as MessageKey)}
                       className="mt-0.5 w-4 h-4 shrink-0"
                     />
                     <span className="min-w-0">
                       <span className="flex items-center gap-2">
-                        <span className={cn("text-sm", on ? "text-bright" : "text-txt2")}>{f.label}</span>
+                        <span className={cn("text-sm", on ? "text-bright" : "text-txt2")}>{t(("feature." + f.key + ".label") as MessageKey)}</span>
                         {f.locked && (
                           <span className="text-[9px] uppercase tracking-wider text-txt3 border border-border rounded px-1 py-0.5">
-                            always on
+                            {t("featurePicker.alwaysOn")}
                           </span>
                         )}
                       </span>
-                      <span className="block text-xs text-txt3 mt-0.5">{f.blurb}</span>
+                      <span className="block text-xs text-txt3 mt-0.5">{t(("feature." + f.key + ".blurb") as MessageKey)}</span>
                     </span>
                   </label>
                 );
@@ -70,8 +73,7 @@ export function FeaturePicker({
         );
       })}
       <p className="text-[11px] text-txt3">
-        Switching something off only hides it — nothing is deleted, and turning it
-        back on restores exactly what was there.
+        {t("featurePicker.footer")}
       </p>
     </div>
   );

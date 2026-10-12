@@ -15,6 +15,7 @@ import {
   RECURRENCE_LABEL, PERIOD_NOUN,
 } from "@/lib/recurrence";
 import { RefreshCw, Flame } from "lucide-react";
+import { useLocale } from "@/lib/i18n/useLocale";
 
 export interface TaskActions {
   toggleTimer: (id: string) => void;
@@ -79,9 +80,7 @@ export function TaskItem({
   onDragStart, onDragOver, onDragEnd,
 }: TaskItemProps) {
   const { has } = useSettings();
-  // Timers can be switched off — but hiding the button while a timer is
-  // running would strand it: `timer_started_at` stays set with no way to
-  // clear it. Always show the control for a timer that's actually running.
+  const { t } = useLocale();
   const showTimers = has("timers");
   const isActive = activeTaskId === task.id;
   const [menuDir, setMenuDir] = useState<"above" | "below">("below");
@@ -137,12 +136,12 @@ export function TaskItem({
           <div className="flex items-center gap-0.5">
             <span className="cursor-grab text-txt3 hover:text-txt select-none">⠿</span>
             <div className="flex flex-col">
-              <button type="button" aria-label="Move up" disabled={idx === 0}
+              <button type="button" aria-label={t("taskItem.moveUp")} disabled={idx === 0}
                 onClick={() => { actions.moveTaskItem(idx, -1).catch(() => {}); }}
                 className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
                 <span aria-hidden="true" className="text-[10px]">▲</span>
               </button>
-              <button type="button" aria-label="Move down" disabled={idx === taskCount - 1}
+              <button type="button" aria-label={t("taskItem.moveDown")} disabled={idx === taskCount - 1}
                 onClick={() => { actions.moveTaskItem(idx, 1).catch(() => {}); }}
                 className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
                 <span aria-hidden="true" className="text-[10px]">▼</span>
@@ -157,13 +156,13 @@ export function TaskItem({
               : actions.updateTaskField(task.id, "progress", isDone ? 0 : 100)}
             className="shrink-0"
             aria-label={recurrence
-              ? `${isDone ? "Not done" : "Done"} ${PERIOD_NOUN[recurrence]}: ${task.name}`
-              : `${isDone ? "Mark incomplete" : "Mark complete"}: ${task.name}`}
+              ? `${isDone ? t("taskItem.markIncomplete") : t("taskItem.markComplete")}: ${task.name}`
+              : `${isDone ? t("taskItem.markIncomplete") : t("taskItem.markComplete")}: ${task.name}`}
             title={recurrence
               ? isDone
-                ? `Done ${PERIOD_NOUN[recurrence]} — click to undo`
-                : `Mark done for ${PERIOD_NOUN[recurrence]}`
-              : isDone ? "Mark as incomplete" : "Mark as complete"}
+                ? t("taskItem.doneForPeriod", { period: PERIOD_NOUN[recurrence] })
+                : t("taskItem.markDoneForPeriod", { period: PERIOD_NOUN[recurrence] })
+              : isDone ? t("taskItem.markIncomplete") : t("taskItem.markComplete")}
           />
           {(showTimers || isActive) && (
             <button
@@ -269,7 +268,7 @@ export function TaskItem({
               {formatSeconds(elapsed[task.id] ?? task.elapsed_seconds)}
             </span>
           )}
-          <InlineEdit value={task.notes} onSave={(v) => actions.updateTaskField(task.id, "notes", v)} placeholder="Notes..." className="text-xs text-txt3 flex-1 min-w-[80px]" />
+          <InlineEdit value={task.notes} onSave={(v) => actions.updateTaskField(task.id, "notes", v)} placeholder={t("taskItem.notesPlaceholder")} className="text-xs text-txt3 flex-1 min-w-[80px]" />
           {has("attachments") && <FileAttachment
             fileUrl={task.file_url} fileName={task.file_name} userId={userId} entityId={task.id}
             onUploaded={async (url, name) => { const s = createClient(); await s.from("project_tasks").update({ file_url: url, file_name: name }).eq("id", task.id); actions.updateTaskLocal(task.id, { file_url: url, file_name: name }); }}
@@ -296,31 +295,25 @@ export function TaskItem({
             {menuOpen === task.id && (
               <div data-ctx-menu className={cn("absolute right-0 glass-popover py-1 w-40 z-[100]", menuDir === "above" ? "bottom-full mb-1" : "top-full mt-1")}>
                 <button onClick={() => { actions.openEditModal(task, "task"); setMenuOpen(null); }}
-                  className="w-full text-left px-3 py-1.5 text-sm text-glass-text hover:bg-white/5">Edit</button>
+                  className="w-full text-left px-3 py-1.5 text-sm text-glass-text hover:bg-white/5">{t("taskItem.edit")}</button>
                 {(task.subtasks?.length || 0) < 10 && (
                   <button onClick={() => { actions.openEditModal(null, "subtask", task.id); setMenuOpen(null); }}
-                    className="w-full text-left px-3 py-1.5 text-sm text-glass-text hover:bg-white/5">Add subtask</button>
+                    className="w-full text-left px-3 py-1.5 text-sm text-glass-text hover:bg-white/5">{t("taskItem.addSubtask")}</button>
                 )}
-                {/*
-                  Only offered once the task has a day. A time is a refinement
-                  of "which day", so without a date there is no occurrence on
-                  the calendar to put it on — the item would open a picker
-                  that had nowhere to save to.
-                */}
                 {has("scheduler") && task.date_key && (
                   <button onClick={() => { actions.scheduleTask(task); setMenuOpen(null); }}
-                    className="w-full text-left px-3 py-1.5 text-sm text-glass-text hover:bg-white/5">Schedule…</button>
+                    className="w-full text-left px-3 py-1.5 text-sm text-glass-text hover:bg-white/5">{t("taskItem.schedule")}</button>
                 )}
                 {has("monitoring") && (
                   <button onClick={() => { actions.monitorTask(task.id, task.name); setMenuOpen(null); }}
                     className="w-full text-left px-3 py-1.5 text-sm text-amber hover:bg-white/5">
-                    {task.monitoring ? "Unmonitor" : "Monitor"}
+                    {task.monitoring ? t("taskItem.unmonitor") : t("taskItem.monitor")}
                   </button>
                 )}
                 <button onClick={() => { actions.archiveTask(task.id); setMenuOpen(null); }}
-                  className="w-full text-left px-3 py-1.5 text-sm text-txt3 hover:bg-white/5">Archive</button>
+                  className="w-full text-left px-3 py-1.5 text-sm text-txt3 hover:bg-white/5">{t("taskItem.archive")}</button>
                 <button onClick={() => actions.removeTask(task.id)}
-                  className="w-full text-left px-3 py-1.5 text-sm text-danger hover:bg-white/5">Remove</button>
+                  className="w-full text-left px-3 py-1.5 text-sm text-danger hover:bg-white/5">{t("taskItem.remove")}</button>
               </div>
             )}
           </div>
@@ -345,12 +338,12 @@ export function TaskItem({
                 <div className="flex items-center gap-0.5">
                   <span className="cursor-grab text-txt3 opacity-30 hover:opacity-100 select-none text-[10px]">⠿</span>
                   <div className="flex flex-col">
-                    <button type="button" aria-label="Move subtask up" disabled={subIdx === 0}
+                    <button type="button" aria-label={t("taskItem.moveSubUp")} disabled={subIdx === 0}
                       onClick={() => { actions.moveSubItem(task.id, subIdx, -1).catch(() => {}); }}
                       className="p-0.5 min-w-[20px] min-h-[16px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
                       <span aria-hidden="true" className="text-[9px]">▲</span>
                     </button>
-                    <button type="button" aria-label="Move subtask down" disabled={subIdx === (task.subtasks?.length || 1) - 1}
+                    <button type="button" aria-label={t("taskItem.moveSubDown")} disabled={subIdx === (task.subtasks?.length || 1) - 1}
                       onClick={() => { actions.moveSubItem(task.id, subIdx, 1).catch(() => {}); }}
                       className="p-0.5 min-w-[20px] min-h-[16px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
                       <span aria-hidden="true" className="text-[9px]">▼</span>
@@ -362,8 +355,8 @@ export function TaskItem({
                   checked={sub.progress >= 100}
                   onChange={() => actions.updateSubtaskField(sub.id, task.id, "progress", sub.progress >= 100 ? 0 : 100)}
                   className="shrink-0"
-                  aria-label={`${sub.progress >= 100 ? "Mark incomplete" : "Mark complete"}: ${sub.name}`}
-                  title={sub.progress >= 100 ? "Mark as incomplete" : "Mark as complete"}
+                  aria-label={`${sub.progress >= 100 ? t("taskItem.markIncomplete") : t("taskItem.markComplete")}: ${sub.name}`}
+                  title={sub.progress >= 100 ? t("taskItem.markIncomplete") : t("taskItem.markComplete")}
                 />
                 {(showTimers || activeTaskId === `sub:${sub.id}`) && (
                   <button type="button" onClick={() => actions.toggleTimer(`sub:${sub.id}`)}
@@ -407,7 +400,7 @@ export function TaskItem({
                   <InlineEdit
                     value={sub.notes}
                     onSave={(v) => actions.updateSubtaskField(sub.id, task.id, "notes", v)}
-                    placeholder="Notes..."
+                    placeholder={t("taskItem.notesPlaceholder")}
                     className="text-xs text-txt3 note-clamp"
                     title={sub.notes || undefined}
                   />
@@ -425,21 +418,21 @@ export function TaskItem({
                   {subMenuOpen === sub.id && (
                     <div data-ctx-menu className={cn("absolute right-0 glass-popover py-1 w-40 z-[100]", menuDir === "above" ? "bottom-full mb-1" : "top-full mt-1")}>
                       <button onClick={() => { actions.openEditModal(sub, "subtask", task.id); setSubMenuOpen(null); }}
-                        className="w-full text-left px-3 py-1.5 text-xs text-glass-text hover:bg-white/5">Edit</button>
+                        className="w-full text-left px-3 py-1.5 text-xs text-glass-text hover:bg-white/5">{t("taskItem.edit")}</button>
                       <button onClick={() => { actions.duplicateSubtask(sub, task.id); setSubMenuOpen(null); }}
-                        className="w-full text-left px-3 py-1.5 text-xs text-glass-text hover:bg-white/5">Duplicate</button>
+                        className="w-full text-left px-3 py-1.5 text-xs text-glass-text hover:bg-white/5">{t("taskItem.duplicate")}</button>
                       <button onClick={() => { actions.setMoveSubModal({ subId: sub.id, subName: sub.name, fromTaskId: task.id }); setSubMenuOpen(null); }}
-                        className="w-full text-left px-3 py-1.5 text-xs text-glass-text hover:bg-white/5">Move to task...</button>
+                        className="w-full text-left px-3 py-1.5 text-xs text-glass-text hover:bg-white/5">{t("taskItem.moveToTask")}</button>
                       {has("monitoring") && (
                         <button onClick={() => { actions.monitorTask(task.id, sub.name, true, sub.id); setSubMenuOpen(null); }}
                           className="w-full text-left px-3 py-1.5 text-xs text-amber hover:bg-white/5">
-                          {sub.monitoring ? "Unmonitor" : "Monitor"}
+                          {sub.monitoring ? t("taskItem.unmonitor") : t("taskItem.monitor")}
                         </button>
                       )}
                       <button onClick={() => { actions.archiveSubtask(sub.id, task.id); setSubMenuOpen(null); }}
-                        className="w-full text-left px-3 py-1.5 text-xs text-glass-text hover:bg-white/5">Archive</button>
+                        className="w-full text-left px-3 py-1.5 text-xs text-glass-text hover:bg-white/5">{t("taskItem.archive")}</button>
                       <button onClick={() => { actions.removeSubtask(sub.id, task.id); setSubMenuOpen(null); }}
-                        className="w-full text-left px-3 py-1.5 text-xs text-danger hover:bg-white/5">Remove</button>
+                        className="w-full text-left px-3 py-1.5 text-xs text-danger hover:bg-white/5">{t("taskItem.remove")}</button>
                     </div>
                   )}
                 </div>

@@ -12,23 +12,23 @@ import { useToast } from "@/components/Toast";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 import { fetchMonthlyRoutineWithChecks } from "@/lib/queries";
 import { CalendarDays } from "lucide-react";
+import { useLocale, dateLocale } from "@/lib/i18n/useLocale";
 
 function YearlyToggle() {
-  // Progressive disclosure, but writing to the same DB-backed feature map as
-  // /settings — two toggles for one thing, in two storage layers, was how the
-  // sidebar and the settings page ended up able to disagree.
   const { has, setFeature } = useSettings();
+  const { t } = useLocale();
   const enabled = has("yearlyRoutine");
   return (
     <button onClick={() => { setFeature("yearlyRoutine", !enabled); }}
       className="px-3 py-1.5 rounded-lg text-xs text-txt3 border border-border hover:border-violet hover:text-violet transition-colors">
-      {enabled ? "Hide yearly routine" : "Need a yearly routine?"}
+      {enabled ? t("monthly.hideYearly") : t("monthly.needYearly")}
     </button>
   );
 }
 
 export default function MonthlyRoutinePage() {
   const { toast } = useToast();
+  const { t, locale } = useLocale();
   const { userId, loading: authLoading } = useCurrentUser();
   const [tasks, setTasks] = useState<MonthlyRoutineTask[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -41,7 +41,7 @@ export default function MonthlyRoutinePage() {
 
   const monthKey = getMonthKey(new Date());
   const now = new Date();
-  const monthName = now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const monthName = now.toLocaleDateString(dateLocale(locale), { month: "long", year: "numeric" });
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const daysLeft = daysInMonth - now.getDate();
 
@@ -51,11 +51,11 @@ export default function MonthlyRoutinePage() {
       const supabase = createClient();
       setTasks(await fetchMonthlyRoutineWithChecks(supabase, userId, monthKey));
     } catch {
-      toast("Failed to load monthly routine", "error");
+      toast(t("toast.failedToLoad", { error: "" }), "error");
     }
   }, [userId, monthKey, toast]);
 
-  useEffect(() => { document.title = "Comfy Board — Monthly Routine"; }, []);
+  useEffect(() => { document.title = `Comfy Board — ${t("monthly.title")}`; }, [t]);
 
   useEffect(() => { if (!authLoading && userId) loadTasks(); }, [authLoading, userId, loadTasks]);
 
@@ -65,10 +65,10 @@ export default function MonthlyRoutinePage() {
     setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, checked: newChecked } : t));
     if (newChecked) {
       const { error } = await supabase.from("monthly_routine_checks").insert({ user_id: userId, task_id: task.id, month_key: monthKey });
-      if (error) { toast("Failed to save", "error"); setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, checked: !newChecked } : t)); }
+      if (error) { toast(t("toast.failedToSave", { error: "" }), "error"); setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, checked: !newChecked } : t)); }
     } else {
       const { error } = await supabase.from("monthly_routine_checks").delete().eq("task_id", task.id).eq("month_key", monthKey);
-      if (error) { toast("Failed to save", "error"); setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, checked: !newChecked } : t)); }
+      if (error) { toast(t("toast.failedToSave", { error: "" }), "error"); setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, checked: !newChecked } : t)); }
     }
   };
 
@@ -77,14 +77,14 @@ export default function MonthlyRoutinePage() {
     const supabase = createClient();
     if (editingTask) {
       const { error } = await supabase.from("monthly_routine_tasks").update({ text: formText.trim(), est_minutes: formEst, date_from: formDateFrom, date_to: formDateTo }).eq("id", editingTask.id);
-      if (error) { toast("Failed to save: " + error.message, "error"); return; }
+      if (error) { toast(t("toast.failedToSave", { error: error.message }), "error"); return; }
       setTasks((prev) => prev.map((t) => t.id === editingTask.id
         ? { ...t, text: formText.trim(), est_minutes: formEst, date_from: formDateFrom, date_to: formDateTo } : t));
     } else {
       const { data: newTask, error } = await supabase.from("monthly_routine_tasks").insert({
         user_id: userId, text: formText.trim(), est_minutes: formEst, date_from: formDateFrom, date_to: formDateTo, sort_order: tasks.length,
       }).select().single();
-      if (error) { toast("Failed to save: " + error.message, "error"); return; }
+      if (error) { toast(t("toast.failedToSave", { error: error.message }), "error"); return; }
       if (newTask) setTasks((prev) => [...prev, { ...newTask as MonthlyRoutineTask, checked: false }]);
     }
     setModalOpen(false);
@@ -93,7 +93,7 @@ export default function MonthlyRoutinePage() {
   };
 
   const deleteTask = async (id: string) => {
-    if (!confirm("Delete this task?")) return;
+    if (!confirm(t("monthly.deleteTask"))) return;
     const supabase = createClient();
     await supabase.from("monthly_routine_tasks").delete().eq("id", id);
     setTasks((prev) => prev.filter((t) => t.id !== id));
@@ -137,9 +137,9 @@ export default function MonthlyRoutinePage() {
       <div className="flex items-center justify-between mb-2">
         <div>
           <h1 className="font-title text-2xl text-bright flex items-center gap-2">
-            <CalendarDays size={22} /> Monthly Routine
+            <CalendarDays size={22} /> {t("monthly.title")}
           </h1>
-          <p className="text-sm text-txt2 mt-0.5">{monthName} · {daysLeft} days left</p>
+          <p className="text-sm text-txt2 mt-0.5">{monthName} · {t("monthly.daysLeft", { n: daysLeft })}</p>
         </div>
         <div className="flex items-center gap-2">
           <YearlyToggle />
@@ -147,14 +147,14 @@ export default function MonthlyRoutinePage() {
       </div>
 
       <div className="flex items-center gap-4 mb-4 text-xs text-txt3">
-        <span>{checked}/{total} completed</span>
-        <span>{formatMinutes(checkedEst)} / {formatMinutes(totalEst)} estimated</span>
+        <span>{checked}/{total} {t("common.completed")}</span>
+        <span>{formatMinutes(checkedEst)} / {formatMinutes(totalEst)} {t("common.estimated")}</span>
       </div>
       <ProgressBar value={pct} height={10} showLabel />
 
       <button onClick={() => { setEditingTask(null); setFormText(""); setFormEst(0); setFormDateFrom(null); setFormDateTo(null); setModalOpen(true); }}
         className="w-full border border-dashed border-border2 rounded-lg px-4 py-2.5 text-sm text-txt3 hover:border-violet hover:text-violet transition-colors mb-3">
-        ＋ Add Task
+        ＋ {t("monthly.addTask")}
       </button>
 
       <div className="mt-2 space-y-2">
@@ -189,13 +189,13 @@ export default function MonthlyRoutinePage() {
                 {task.date_from && task.date_to
                   ? `${task.date_from}${task.date_from > 3 && task.date_from < 21 ? "th" : task.date_from % 10 === 1 ? "st" : task.date_from % 10 === 2 ? "nd" : task.date_from % 10 === 3 ? "rd" : "th"} – ${task.date_to}${task.date_to > 3 && task.date_to < 21 ? "th" : task.date_to % 10 === 1 ? "st" : task.date_to % 10 === 2 ? "nd" : task.date_to % 10 === 3 ? "rd" : "th"}`
                   : task.date_from
-                  ? `From the ${task.date_from}${task.date_from > 3 && task.date_from < 21 ? "th" : task.date_from % 10 === 1 ? "st" : task.date_from % 10 === 2 ? "nd" : task.date_from % 10 === 3 ? "rd" : "th"}`
-                  : `Until the ${task.date_to}${task.date_to! > 3 && task.date_to! < 21 ? "th" : task.date_to! % 10 === 1 ? "st" : task.date_to! % 10 === 2 ? "nd" : task.date_to! % 10 === 3 ? "rd" : "th"}`}
+                  ? t("monthly.fromThe", { n: `${task.date_from}${task.date_from > 3 && task.date_from < 21 ? "th" : task.date_from % 10 === 1 ? "st" : task.date_from % 10 === 2 ? "nd" : task.date_from % 10 === 3 ? "rd" : "th"}` })
+                  : t("monthly.untilThe", { n: `${task.date_to}${task.date_to! > 3 && task.date_to! < 21 ? "th" : task.date_to! % 10 === 1 ? "st" : task.date_to! % 10 === 2 ? "nd" : task.date_to! % 10 === 3 ? "rd" : "th"}` })}
               </span>
             )}
             <div className="relative">
               <button onClick={() => { setEditingTask(task); setFormText(task.text); setFormEst(task.est_minutes); setFormDateFrom(task.date_from); setFormDateTo(task.date_to); setModalOpen(true); }}
-                className="text-xs text-txt3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 hover:text-violet2 transition-all px-1">Edit</button>
+                className="text-xs text-txt3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 hover:text-violet2 transition-all px-1">{t("common.edit")}</button>
               <button type="button" onClick={() => deleteTask(task.id)} aria-label="Delete"
                 className="text-xs text-txt3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 hover:text-danger transition-all px-1">✕</button>
             </div>
@@ -204,22 +204,22 @@ export default function MonthlyRoutinePage() {
         {tasks.length === 0 && (
           <div className="text-center py-16 text-txt3">
             <p className="text-4xl mb-3 opacity-30">📅</p>
-            <p className="text-lg font-medium text-txt2 mb-1">No monthly tasks yet</p>
-            <p className="text-sm">Add recurring monthly tasks like reviews, reports, or check-ins</p>
+            <p className="text-lg font-medium text-txt2 mb-1">{t("monthly.empty")}</p>
+            <p className="text-sm">{t("monthly.emptyHint")}</p>
           </div>
         )}
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingTask ? "Edit Task" : "Add Monthly Task"}>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingTask ? t("monthly.editTask") : t("monthly.addTaskModal")}>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm text-txt2 mb-1.5">Task</label>
+            <label className="block text-sm text-txt2 mb-1.5">{t("monthly.taskLabel")}</label>
             <input type="text" value={formText} onChange={(e) => setFormText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && saveTask()}
               className="w-full glass-field px-3 py-2 text-txt text-sm" autoFocus />
           </div>
           <div>
-            <label className="block text-sm text-txt2 mb-1.5">Estimated time</label>
+            <label className="block text-sm text-txt2 mb-1.5">{t("monthly.estimatedTime")}</label>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1">
                 <input type="number" value={Math.floor(formEst / 60) || ""} onChange={(e) => { const h = parseInt(e.target.value) || 0; setFormEst(Math.max(0, h * 60 + (formEst % 60))); }}
@@ -236,7 +236,7 @@ export default function MonthlyRoutinePage() {
             </div>
           </div>
           <div>
-            <label className="block text-sm text-txt2 mb-1.5">Date range (optional)</label>
+            <label className="block text-sm text-txt2 mb-1.5">{t("monthly.dateRange")}</label>
             <div className="flex items-center gap-2">
               <input type="number" value={formDateFrom || ""} onChange={(e) => setFormDateFrom(parseInt(e.target.value) || null)}
                 min={1} max={31} placeholder="From"
@@ -245,14 +245,14 @@ export default function MonthlyRoutinePage() {
               <input type="number" value={formDateTo || ""} onChange={(e) => setFormDateTo(parseInt(e.target.value) || null)}
                 min={1} max={31} placeholder="To"
                 className="w-20 glass-field px-3 py-2 text-txt text-sm" />
-              <span className="text-[10px] text-txt3">of the month</span>
+              <span className="text-[10px] text-txt3">{t("monthly.ofTheMonth")}</span>
             </div>
-            {formDateFrom && formDateTo && <p className="text-[10px] text-txt3 mt-1">Do between the {formDateFrom}th and {formDateTo}th of each month</p>}
+            {formDateFrom && formDateTo && <p className="text-[10px] text-txt3 mt-1">{t("monthly.doBetween", { start: formDateFrom, end: formDateTo })}</p>}
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <button onClick={() => setModalOpen(false)} className="px-4 py-2 rounded-lg text-sm text-txt2 hover:bg-surface3">Cancel</button>
+            <button onClick={() => setModalOpen(false)} className="px-4 py-2 rounded-lg text-sm text-txt2 hover:bg-surface3">{t("common.cancel")}</button>
             <button onClick={saveTask} disabled={!formText.trim()}
-              className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent disabled:opacity-50">Save</button>
+              className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent disabled:opacity-50">{t("common.save")}</button>
           </div>
         </div>
       </Modal>

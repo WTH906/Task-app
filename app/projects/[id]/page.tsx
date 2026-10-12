@@ -30,6 +30,7 @@ import { Save, Upload, Calendar, Pencil, Trash2, AlertTriangle, Archive, List, L
 import { TaskItem, TaskActions } from "@/components/project/TaskItem";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 import { fetchProjectById, fetchProjectTasksWithSubs } from "@/lib/queries";
+import { useLocale, dateLocale } from "@/lib/i18n/useLocale";
 
 const ScheduleModal = dynamic(() => import("@/components/ScheduleModal").then(m => ({ default: m.ScheduleModal })), { ssr: false });
 const CalendarPicker = dynamic(() => import("@/components/CalendarPicker").then(m => ({ default: m.CalendarPicker })), { ssr: false });
@@ -46,6 +47,7 @@ export default function ProjectDetailPage() {
   const projectId = params.id as string;
   const { toast } = useToast();
   const { userId } = useCurrentUser();
+  const { t, locale } = useLocale();
 
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
@@ -424,7 +426,7 @@ export default function ProjectDetailPage() {
 
   const removeSubtask = (subtaskId: string, parentId: string) => {
     setConfirmAction({
-      message: "Remove this subtask?",
+      message: t("project.removeSubtask"),
       action: () => {
         removeSubtaskLocal(parentId, subtaskId);
         const parent = tasks.find((t) => t.id === parentId);
@@ -1139,7 +1141,7 @@ export default function ProjectDetailPage() {
                   setProject({ ...project, start_date: d });
                 }}
               />
-              {project.start_date && <span className="text-[10px] text-txt3">Start: {project.start_date}</span>}
+              {project.start_date && <span className="text-[10px] text-txt3">{t("project.start")} {project.start_date}</span>}
               <CalendarPicker
                 value={project.deadline || null}
                 variant="deadline"
@@ -1154,7 +1156,7 @@ export default function ProjectDetailPage() {
                 const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
                 const color = days < 0 ? "#5c5a7a" : days <= 3 ? "#f43f5e" : days <= 7 ? "#f59e0b" : "#4caf50";
                 return <span className="text-xs font-mono" style={{ color }}>
-                  {days < 0 ? `${Math.abs(days)}d overdue` : days === 0 ? "Due today" : `${days}d left`}
+                  {days < 0 ? `${Math.abs(days)}d ${t("projects.overdue")}` : days === 0 ? t("projects.dueToday") : `${days}d ${t("projects.left")}`}
                 </span>;
               })()}
             </div>
@@ -1178,31 +1180,31 @@ export default function ProjectDetailPage() {
               onClick={() => { setDescDraft(project.description || ""); setDescModalOpen(true); }}
               className="text-xs text-txt3 hover:text-txt transition-colors"
             >
-              <span className="flex items-center gap-1"><Pencil size={12} /> Edit description</span>
+              <span className="flex items-center gap-1"><Pencil size={12} /> {t("project.editDescription")}</span>
             </button>
             <button
               onClick={() => setConfirmDeleteOpen(true)}
               className="text-xs text-txt3 hover:text-danger transition-colors"
             >
-              <span className="flex items-center gap-1"><Trash2 size={12} /> Delete</span>
+              <span className="flex items-center gap-1"><Trash2 size={12} /> {t("common.delete")}</span>
             </button>
 
             <div className="w-px h-4 bg-border mx-1" />
 
             {/* Secondary: exports — icon-only with tooltips */}
-            <button type="button" onClick={saveAsTemplate} title="Save as template" aria-label="Save as template"
+            <button type="button" onClick={saveAsTemplate} title={t("project.saveTemplate")} aria-label={t("project.saveTemplate")}
               className="w-7 h-7 rounded-md flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface2 transition-colors">
               <Save size={13} />
             </button>
-            <button type="button" onClick={exportProject} title="Export JSON" aria-label="Export JSON"
+            <button type="button" onClick={exportProject} title={t("project.exportJSON")} aria-label={t("project.exportJSON")}
               className="w-7 h-7 rounded-md flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface2 transition-colors">
               <Upload size={13} />
             </button>
-            <button onClick={exportProjectCSV} title="Export CSV"
+            <button onClick={exportProjectCSV} title={t("project.exportCSV")}
               className="w-7 h-7 rounded-md flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface2 transition-colors text-[10px] font-mono font-bold">
               CSV
             </button>
-            <button type="button" onClick={() => setGcalModalOpen(true)} title="Sync to Google Calendar" aria-label="Sync to Google Calendar"
+            <button type="button" onClick={() => setGcalModalOpen(true)} title={t("project.syncGCal")} aria-label={t("project.syncGCal")}
               className="w-7 h-7 rounded-md flex items-center justify-center text-txt3 hover:text-amber hover:bg-amber/10 transition-colors">
               <Calendar size={13} />
             </button>
@@ -1214,8 +1216,8 @@ export default function ProjectDetailPage() {
               <button
                 type="button"
                 onClick={() => setViewMode("list")}
-                title="List view"
-                aria-label="List view"
+                title={t("project.listView")}
+                aria-label={t("project.listView")}
                 className={cn(
                   "w-7 h-7 rounded-md flex items-center justify-center transition-colors",
                   viewMode === "list" ? "bg-surface text-bright shadow-sm" : "text-txt3 hover:text-txt"
@@ -1226,8 +1228,8 @@ export default function ProjectDetailPage() {
               <button
                 type="button"
                 onClick={() => setViewMode("kanban")}
-                title="Kanban view"
-                aria-label="Kanban view"
+                title={t("project.kanbanView")}
+                aria-label={t("project.kanbanView")}
                 className={cn(
                   "w-7 h-7 rounded-md flex items-center justify-center transition-colors",
                   viewMode === "kanban" ? "bg-surface text-bright shadow-sm" : "text-txt3 hover:text-txt"
@@ -1252,12 +1254,12 @@ export default function ProjectDetailPage() {
             isOvertime ? "border-danger/50" : "border-border"
           }`}>
             <div>
-              <span className="text-txt3">Estimated: </span>
+              <span className="text-txt3">{t("project.estimated")} </span>
               <span className="text-bright font-mono">{formatMinutes(totalEst)}</span>
             </div>
             <div className="w-px h-4 bg-border" />
             <div>
-              <span className="text-txt3">Tracked: </span>
+              <span className="text-txt3">{t("project.tracked")} </span>
               <span className={`font-mono ${isOvertime ? "text-danger" : "text-red-acc"}`}>
                 {formatSeconds(totalElapsed)}
               </span>
@@ -1270,16 +1272,16 @@ export default function ProjectDetailPage() {
                 <div className="w-px h-4 bg-border" />
                 <div>
                   <span className="text-danger font-medium inline-flex items-center gap-1">
-                    <AlertTriangle size={13} /> Overtime: +{formatSeconds(overtimeSec)}
+                    <AlertTriangle size={13} /> {t("project.overtime")} +{formatSeconds(overtimeSec)}
                   </span>
                 </div>
               </>
             )}
             <div className="w-px h-4 bg-border" />
             <div>
-              <span className="text-txt3">Status: </span>
+              <span className="text-txt3">{t("project.status")} </span>
               <span className={activeTaskId ? "text-green-acc" : "text-txt3"}>
-                {activeTaskId ? "⏱ Running" : "● Stopped"}
+                {activeTaskId ? `⏱ ${t("project.running")}` : `● ${t("project.stopped")}`}
               </span>
             </div>
           </div>
@@ -1299,7 +1301,7 @@ export default function ProjectDetailPage() {
         onClick={() => openEditModal(null, "task")}
         className="w-full bg-surface border border-dashed border-border2 rounded-lg px-4 py-2.5 text-sm text-txt3 hover:border-violet hover:text-violet transition-colors mb-3"
       >
-        ＋ Add Task
+        ＋ {t("project.addTask")}
       </button>
 
       {viewMode === "kanban" ? (
@@ -1356,8 +1358,8 @@ export default function ProjectDetailPage() {
 
             {tasks.length === 0 && (
               <div className="text-center py-12 text-txt3">
-                <p className="text-lg mb-2">No tasks yet</p>
-                <p className="text-sm">Add tasks to track your project progress</p>
+                <p className="text-lg mb-2">{t("tasks.empty")}</p>
+                <p className="text-sm">{t("tasks.emptyHint")}</p>
               </div>
             )}
           </div>
@@ -1386,15 +1388,15 @@ export default function ProjectDetailPage() {
         }}
           className="text-xs text-txt3 hover:text-txt transition-colors flex items-center gap-1.5">
           <Archive size={12} />
-          {showArchived ? "Hide archived" : "Show archived tasks"}
+          {showArchived ? t("project.hideArchived") : t("project.showArchived")}
           {archivedCount > 0 && <span className="text-[10px] font-mono bg-surface3 px-1.5 py-0.5 rounded">({archivedCount})</span>}
         </button>
 
         {showArchived && (
           <div className="mt-3 border border-border rounded-xl bg-surface/50 overflow-hidden">
             <div className="px-4 py-2.5 border-b border-border bg-surface2/30 flex items-center justify-between">
-              <span className="text-xs font-medium text-txt2">Archived Tasks</span>
-              <span className="text-[10px] text-txt3">{archivedTasks.length} task{archivedTasks.length !== 1 ? "s" : ""}</span>
+              <span className="text-xs font-medium text-txt2">{t("project.archivedTasks")}</span>
+              <span className="text-[10px] text-txt3">{archivedTasks.length} {t("common.tasks")}</span>
             </div>
 
             {archivedTasks.length === 0 && archivedSubs.length === 0 ? (
@@ -1403,14 +1405,14 @@ export default function ProjectDetailPage() {
               <div className="divide-y divide-border">
                 {archivedSubs.length > 0 && (
                   <div className="px-4 py-3">
-                    <div className="text-[10px] font-medium text-txt3 uppercase tracking-wide mb-2">Archived subtasks</div>
+                    <div className="text-[10px] font-medium text-txt3 uppercase tracking-wide mb-2">{t("project.archivedSubtasks")}</div>
                     <div className="space-y-2">
                       {archivedSubs.map(sub => (
                         <div key={sub.id} className="flex items-center gap-2">
                           <span className="text-[10px] text-txt3 opacity-60">↳</span>
                           <span className="text-sm text-txt2 flex-1 min-w-0 truncate">{sub.name}</span>
                           <span className="text-[10px] text-txt3 shrink-0">from {sub.project_tasks.name}</span>
-                          {sub.archived_at && <span className="text-[10px] text-txt3 shrink-0">{new Date(sub.archived_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>}
+                          {sub.archived_at && <span className="text-[10px] text-txt3 shrink-0">{new Date(sub.archived_at).toLocaleDateString(dateLocale(locale), { day: "numeric", month: "short" })}</span>}
                           <button onClick={async () => {
                             const supabase = createClient();
                             await supabase.from("subtasks").update({ archived_at: null }).eq("id", sub.id);
@@ -1419,7 +1421,7 @@ export default function ProjectDetailPage() {
                             await loadProject();
                             toast("Subtask restored", "success");
                           }} className="text-xs text-violet2 hover:text-violet px-2 py-1 rounded hover:bg-violet/10 transition-colors shrink-0">
-                            Restore
+                            {t("common.restore")}
                           </button>
                         </div>
                       ))}
@@ -1438,11 +1440,11 @@ export default function ProjectDetailPage() {
                         await loadProject();
                         toast("Task restored", "success");
                       }} className="text-xs text-violet2 hover:text-violet px-2 py-1 rounded hover:bg-violet/10 transition-colors">
-                        Restore
+                        {t("common.restore")}
                       </button>
                       <button onClick={() => {
                         setConfirmAction({
-                          message: `Permanently delete "${task.name}"?`,
+                          message: t("project.permanentDelete"),
                           action: async () => {
                             const supabase = createClient();
                             await supabase.from("project_tasks").delete().eq("id", task.id);
@@ -1452,7 +1454,7 @@ export default function ProjectDetailPage() {
                           },
                         });
                       }} className="text-xs text-txt3 hover:text-danger px-2 py-1 rounded hover:bg-danger/10 transition-colors">
-                        Delete
+                        {t("common.delete")}
                       </button>
                     </div>
                     <div className="flex flex-wrap items-center gap-3 text-[10px] text-txt3">
@@ -1461,7 +1463,7 @@ export default function ProjectDetailPage() {
                       {task.deadline && <span>Deadline: {task.deadline}</span>}
                       {task.date_key && <span>Date: {task.date_key}</span>}
                       <span>{task.progress}% done</span>
-                      {task.archived_at && <span>Archived {new Date(task.archived_at).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>}
+                      {task.archived_at && <span>{t("common.archive")} {new Date(task.archived_at).toLocaleDateString(dateLocale(locale), { day: "numeric", month: "short" })}</span>}
                     </div>
                     {task.subtasks && task.subtasks.length > 0 && (
                       <div className="mt-2 ml-3 space-y-1">
@@ -1507,7 +1509,7 @@ export default function ProjectDetailPage() {
       <Modal
         open={descModalOpen}
         onClose={() => setDescModalOpen(false)}
-        title="Project Description"
+        title={t("project.editDescription")}
       >
         <div className="space-y-4">
           <textarea
@@ -1521,13 +1523,13 @@ export default function ProjectDetailPage() {
               onClick={() => setDescModalOpen(false)}
               className="px-4 py-2 rounded-lg text-sm text-txt2 hover:bg-surface3"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               onClick={updateDescription}
               className="px-4 py-2 rounded-lg text-sm bg-red-acc hover:bg-red-dark text-white"
             >
-              Save
+              {t("common.save")}
             </button>
           </div>
         </div>
@@ -1543,18 +1545,17 @@ export default function ProjectDetailPage() {
 
       {/* Move Subtask Modal */}
       {moveSubModal && (
-        <Modal open={true} onClose={() => setMoveSubModal(null)} title={`Move "${moveSubModal.subName}"`}>
+        <Modal open={true} onClose={() => setMoveSubModal(null)} title={`${t("taskItem.moveToTask")} "${moveSubModal.subName}"`}>
           <div className="space-y-2">
-            <p className="text-sm text-txt2 mb-3">Select the target task:</p>
-            {tasks.filter((t) => t.id !== moveSubModal.fromTaskId).map((t) => (
-              <button key={t.id} onClick={() => moveSubtask(moveSubModal.subId, moveSubModal.fromTaskId, t.id)}
+            {tasks.filter((tsk) => tsk.id !== moveSubModal.fromTaskId).map((tsk) => (
+              <button key={tsk.id} onClick={() => moveSubtask(moveSubModal.subId, moveSubModal.fromTaskId, tsk.id)}
                 className="glass-field w-full text-left px-3 py-2.5 text-sm text-txt hover:border-violet/50 hover:text-violet2 transition-colors">
-                {t.name}
-                <span className="text-[10px] text-txt3 ml-2">{t.subtasks?.length || 0} subtasks</span>
+                {tsk.name}
+                <span className="text-[10px] text-txt3 ml-2">{tsk.subtasks?.length || 0} {t("kanban.subtasks")}</span>
               </button>
             ))}
-            {tasks.filter((t) => t.id !== moveSubModal.fromTaskId).length === 0 && (
-              <p className="text-sm text-txt3 text-center py-4">No other tasks to move to</p>
+            {tasks.filter((tsk) => tsk.id !== moveSubModal.fromTaskId).length === 0 && (
+              <p className="text-sm text-txt3 text-center py-4">{t("common.noResults")}</p>
             )}
           </div>
         </Modal>
@@ -1596,7 +1597,7 @@ export default function ProjectDetailPage() {
         open={!!confirmAction}
         message={confirmAction?.message || ""}
         danger
-        confirmLabel="Remove"
+        confirmLabel={t("common.remove")}
         onConfirm={() => { confirmAction?.action(); }}
         onClose={() => setConfirmAction(null)}
       />

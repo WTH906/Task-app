@@ -7,6 +7,7 @@ import { cn, formatDate, deadlineColor } from "@/lib/utils";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 import { fetchDeadlines, fetchProjects, fetchTaskDeadlines } from "@/lib/queries";
 import { useToast } from "@/components/Toast";
+import { useLocale, dateLocale } from "@/lib/i18n/useLocale";
 
 interface AggregatedDeadline {
   id: string;
@@ -21,6 +22,7 @@ interface AggregatedDeadline {
 export default function DeadlinesPage() {
   const { userId } = useCurrentUser();
   const { toast } = useToast();
+  const { t, locale } = useLocale();
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [taskDeadlines, setTaskDeadlines] = useState<AggregatedDeadline[]>([]);
@@ -58,11 +60,11 @@ export default function DeadlinesPage() {
       setTaskDeadlines(tds);
     } catch (err) {
       console.error("Deadlines load failed:", err);
-      toast("Failed to load deadlines", "error");
+      toast(t("toast.failedToLoad", { error: String(err) }), "error");
     }
-  }, [userId, toast]);
+  }, [userId, toast, t]);
 
-  useEffect(() => { document.title = "Comfy Board — Deadlines"; }, []);
+  useEffect(() => { document.title = `Comfy Board — ${t("deadlines.title")}`; }, [t]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { const iv = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(iv); }, []);
@@ -108,7 +110,7 @@ export default function DeadlinesPage() {
 
   const getCountdown = (target: string) => {
     const diff = new Date(target).getTime() - now.getTime();
-    if (diff <= 0) return { text: "Passed", passed: true };
+    if (diff <= 0) return { text: t("deadlines.passed"), passed: true };
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -123,7 +125,8 @@ export default function DeadlinesPage() {
   const getColor = (target: string) => deadlineColor(target, now);
 
   const recurrenceLabels: Record<string, string> = {
-    daily: "🔄 Daily", weekly: "🔄 Weekly", monthly: "🔄 Monthly", yearly: "🔄 Yearly",
+    daily: `🔄 ${t("recurrence.daily")}`, weekly: `🔄 ${t("recurrence.weekly")}`,
+    monthly: `🔄 ${t("recurrence.monthly")}`, yearly: `🔄 ${t("recurrence.yearly")}`,
   };
 
   // All deadlines combined for the modal
@@ -142,12 +145,12 @@ export default function DeadlinesPage() {
     <div className="page-shell">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="font-title text-2xl text-bright">Deadlines</h1>
-          <p className="text-sm text-txt2 mt-0.5">{deadlines.length} countdowns · {taskDeadlines.length} task deadlines</p>
+          <h1 className="font-title text-2xl text-bright">{t("deadlines.title")}</h1>
+          <p className="text-sm text-txt2 mt-0.5">{deadlines.length} {t("deadlines.countdown")}s · {taskDeadlines.length} {t("tasks.withDeadlines")}</p>
         </div>
         <button onClick={() => setShowAllModal(true)}
           className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent transition-colors">
-          Show All Deadlines
+          {t("deadlines.showAll")}
         </button>
       </div>
 
@@ -156,7 +159,7 @@ export default function DeadlinesPage() {
         {deadlines.map((d) => {
           const { text, passed } = getCountdown(d.target_datetime);
           const color = getColor(d.target_datetime);
-          const dateStr = new Date(d.target_datetime).toLocaleDateString("en-US", {
+          const dateStr = new Date(d.target_datetime).toLocaleDateString(dateLocale(locale), {
             weekday: "short", month: "short", day: "numeric", year: "numeric",
             hour: "2-digit", minute: "2-digit",
           });
@@ -182,8 +185,8 @@ export default function DeadlinesPage() {
       {deadlines.length === 0 && !showAllModal && (
         <div className="text-center py-16 text-txt3">
           <p className="text-4xl mb-3 opacity-30">⏳</p>
-          <p className="text-lg font-medium text-txt2 mb-1">No countdown deadlines</p>
-          <p className="text-sm">Deadlines are created automatically when you set dates on tasks</p>
+          <p className="text-lg font-medium text-txt2 mb-1">{t("deadlines.empty")}</p>
+          <p className="text-sm">{t("deadlines.emptyHint")}</p>
         </div>
       )}
 
@@ -194,14 +197,14 @@ export default function DeadlinesPage() {
           <div className="bg-surface2 border border-border rounded-xl max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
               <div>
-                <h2 className="font-title text-lg text-bright">All Deadlines</h2>
-                <p className="text-xs text-txt3 mt-0.5">{allDeadlines.length} total · sorted by date</p>
+                <h2 className="font-title text-lg text-bright">{t("deadlines.allTitle")}</h2>
+                <p className="text-xs text-txt3 mt-0.5">{allDeadlines.length} {t("deadlines.sortedByDate")}</p>
               </div>
               <button type="button" onClick={() => setShowAllModal(false)} aria-label="Close"
                 className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface3 text-txt3 hover:text-txt">✕</button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-1.5">
-              {allDeadlines.length === 0 && <p className="text-sm text-txt3 text-center py-8">No deadlines found</p>}
+              {allDeadlines.length === 0 && <p className="text-sm text-txt3 text-center py-8">{t("dashboard.noDeadlines")}</p>}
               {allDeadlines.map((d) => {
                 const isPast = d.date < today;
                 const isToday = d.date === today;
@@ -210,7 +213,7 @@ export default function DeadlinesPage() {
                     className={cn("flex items-center gap-3 bg-surface border border-border rounded-lg px-3 py-2.5",
                       isPast && "opacity-50")}>
                     <span className="font-mono text-[11px] text-txt3 w-24 shrink-0">
-                      {isToday ? <span className="text-danger font-bold">TODAY</span> : d.date}
+                      {isToday ? <span className="text-danger font-bold">{t("deadlines.todayBadge")}</span> : d.date}
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-bright truncate">{d.label}</p>
@@ -223,7 +226,7 @@ export default function DeadlinesPage() {
                     </div>
                     <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded",
                       d.source === "task" ? "bg-violet/10 text-violet2" : "bg-surface3 text-txt3")}>
-                      {d.source === "task" ? "task" : d.recurrence ? recurrenceLabels[d.recurrence] : "countdown"}
+                      {d.source === "task" ? t("common.task") : d.recurrence ? recurrenceLabels[d.recurrence] : t("deadlines.countdown")}
                     </span>
                   </div>
                 );

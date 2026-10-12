@@ -9,6 +9,7 @@ import { FeatureMap } from "@/lib/features";
 import { useToast } from "@/components/Toast";
 import { formatDate, addDays } from "@/lib/utils";
 import { syncTaskDeadlineToDeadlines } from "@/lib/sync";
+import { useLocale } from "@/lib/i18n/useLocale";
 import { CalendarDays, Timer, ListChecks, Folder, Zap } from "lucide-react";
 
 /**
@@ -33,6 +34,7 @@ const STEPS = 5;
 
 export function OnboardingModal({ userId }: { userId: string }) {
   const { loaded, onboarded, features, completeOnboarding } = useSettings();
+  const { t } = useLocale();
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<FeatureMap | null>(null);
   const [seeding, setSeeding] = useState(false);
@@ -90,14 +92,14 @@ export function OnboardingModal({ userId }: { userId: string }) {
       );
 
       setSeeded(true);
-      toast("Example project created", "success");
+      toast(t("onboarding.exampleCreated"), "success");
       window.dispatchEvent(new Event("projects-changed"));
     } catch (err) {
       console.error("[onboarding:seed]", err);
-      toast("Couldn't create the example project", "error");
+      toast(t("onboarding.exampleFailed"), "error");
     }
     setSeeding(false);
-  }, [seeding, seeded, userId, toast]);
+  }, [seeding, seeded, userId, toast, t]);
 
   if (!loaded || onboarded) return null;
 
@@ -107,7 +109,7 @@ export function OnboardingModal({ userId }: { userId: string }) {
   return (
     <div className="fixed inset-0 z-[190] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)" }}
-      role="dialog" aria-modal="true" aria-label="Welcome to Comfy Board">
+      role="dialog" aria-modal="true" aria-label={t("onboarding.welcome")}>
       <div className="w-full max-w-lg rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col max-h-[88vh]"
         style={{ backgroundColor: "var(--surface2)", position: "relative" }}>
 
@@ -122,71 +124,67 @@ export function OnboardingModal({ userId }: { userId: string }) {
         <div className="p-6 overflow-y-auto flex-1 min-h-0">
           {step === 0 && (
             <div>
-              <h2 className="font-title text-2xl text-bright mb-2">Welcome to Comfy Board</h2>
+              <h2 className="font-title text-2xl text-bright mb-2">{t("onboarding.welcome")}</h2>
               <p className="text-sm text-txt2 leading-relaxed mb-5">
-                It&apos;s two things in one place: a hub for the rhythms of your daily life,
-                and somewhere to run actual projects.
+                {t("onboarding.welcomeBody")}
               </p>
               <div className="space-y-3">
                 <div className="flex gap-3 items-start p-3 rounded-lg bg-surface border border-border">
                   <ListChecks size={18} className="text-violet2 mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-sm text-bright">Routines</p>
-                    <p className="text-xs text-txt3">Things that come back — daily, weekly, monthly, yearly.</p>
+                    <p className="text-sm text-bright">{t("guide.shape.routinesTitle")}</p>
+                    <p className="text-xs text-txt3">{t("onboarding.routinesShort")}</p>
                   </div>
                 </div>
                 <div className="flex gap-3 items-start p-3 rounded-lg bg-surface border border-border">
                   <Folder size={18} className="text-violet2 mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-sm text-bright">Projects</p>
-                    <p className="text-xs text-txt3">Work with a beginning and an end, broken into tasks and subtasks.</p>
+                    <p className="text-sm text-bright">{t("guide.shape.projectsTitle")}</p>
+                    <p className="text-xs text-txt3">{t("onboarding.projectsShort")}</p>
                   </div>
                 </div>
               </div>
               <p className="text-xs text-txt3 mt-4">
-                Keeping them apart is the point — maintenance doesn&apos;t drown your real work.
+                {t("onboarding.separatePoint")}
               </p>
             </div>
           )}
 
           {step === 1 && (
             <div>
-              <h2 className="font-title text-xl text-bright mb-2">Two dates, two meanings</h2>
+              <h2 className="font-title text-xl text-bright mb-2">{t("onboarding.dates")}</h2>
               <p className="text-sm text-txt2 leading-relaxed mb-5">
-                This is the one thing worth knowing up front. Every task can carry
-                two different dates, and they do different jobs.
+                {t("onboarding.datesBody")}
               </p>
               <div className="space-y-3">
                 <div className="p-3 rounded-lg bg-surface border border-border">
                   <span className="flex items-center gap-1.5 text-xs px-2 py-1 rounded bg-surface3 text-txt2 w-fit mb-2">
-                    <CalendarDays size={12} /> <span className="text-txt3">Work on</span> today
+                    <CalendarDays size={12} /> <span className="text-txt3">{t("guide.dates.workOn")}</span> {t("common.today").toLowerCase()}
                   </span>
                   <p className="text-xs text-txt3">
-                    When you plan to sit down and do it. This is what puts the task on your planner.
+                    {t("onboarding.workOnBody")}
                   </p>
                 </div>
                 <div className="p-3 rounded-lg bg-surface border border-border">
                   <span className="flex items-center gap-1.5 text-xs px-2 py-1 rounded border border-amber/50 text-amber w-fit mb-2">
-                    <Timer size={12} /> <span className="text-txt3">Due</span> Friday
+                    <Timer size={12} /> <span className="text-txt3">{t("guide.dates.due")}</span> {t("day.friday")}
                   </span>
                   <p className="text-xs text-txt3">
-                    When it has to be finished. This is what creates a countdown on your Deadlines page.
+                    {t("onboarding.dueBody")}
                   </p>
                 </div>
               </div>
               <p className="text-xs text-txt3 mt-4">
-                A task can have either, both, or neither. Most tools only give you one — which is
-                why plans and deadlines end up tangled together.
+                {t("onboarding.datesBoth")}
               </p>
             </div>
           )}
 
           {step === 2 && (
             <div>
-              <h2 className="font-title text-xl text-bright mb-2">Pick what you want to see</h2>
+              <h2 className="font-title text-xl text-bright mb-2">{t("onboarding.pickFeatures")}</h2>
               <p className="text-sm text-txt2 leading-relaxed mb-5">
-                Comfy Board has more in it than most people need on day one. Start small —
-                you can turn anything on later in Settings, and nothing you switch off is lost.
+                {t("onboarding.pickFeaturesBody")}
               </p>
               <FeaturePicker value={current} onChange={setDraft} compact />
             </div>
@@ -194,34 +192,30 @@ export function OnboardingModal({ userId }: { userId: string }) {
 
           {step === 3 && (
             <div>
-              <h2 className="font-title text-xl text-bright mb-2">Catch things as they occur to you</h2>
+              <h2 className="font-title text-xl text-bright mb-2">{t("onboarding.capture")}</h2>
               <p className="text-sm text-txt2 leading-relaxed mb-5">
-                Press <kbd className="bg-surface3 px-1.5 py-0.5 rounded text-xs mx-0.5">A</kbd> anywhere
-                in the app. One field, no questions — type the thought and hit Enter.
+                {t("onboarding.captureBody")}
               </p>
               <div className="rounded-lg border border-border overflow-hidden mb-4" style={{ backgroundColor: "var(--surface)" }}>
                 <div className="flex items-center gap-3 px-4 py-3">
                   <span className="text-txt3 text-lg" aria-hidden>＋</span>
-                  <span className="text-txt text-sm">Call the accountant friday p1</span>
+                  <span className="text-txt text-sm">{t("onboarding.captureExample")}</span>
                 </div>
                 <div className="px-4 py-2 border-t border-border/60 text-[11px] text-violet2">
-                  Call the accountant · <span className="font-mono">next Friday</span> · P1
+                  {t("onboarding.captureExampleParsed")} · <span className="font-mono">{t("onboarding.captureExampleDate")}</span> · P1
                 </div>
               </div>
               <p className="text-xs text-txt3">
-                It understands “today”, “tomorrow”, “friday”, “in 3 days”, “20/08” and “p1”–“p5”.
-                Everything lands in your Task list, where you sort it out later — capturing and
-                organising are different jobs.
+                {t("onboarding.captureHint")}
               </p>
             </div>
           )}
 
           {step === 4 && (
             <div>
-              <h2 className="font-title text-xl text-bright mb-2">That&apos;s the whole tour</h2>
+              <h2 className="font-title text-xl text-bright mb-2">{t("onboarding.done")}</h2>
               <p className="text-sm text-txt2 leading-relaxed mb-5">
-                You can reread any of this from <span className="text-violet2">Guide</span> in the
-                sidebar, and change which features are on from Settings, at any time.
+                {t("onboarding.doneBody", { guide: t("nav.guide") })}
               </p>
               <button
                 onClick={seedExample}
@@ -231,12 +225,12 @@ export function OnboardingModal({ userId }: { userId: string }) {
                 <Zap size={18} className="text-violet2 shrink-0" />
                 <span>
                   <span className="block text-sm text-bright">
-                    {seeded ? "Example project created" : seeding ? "Creating…" : "Create an example project"}
+                    {seeded ? t("onboarding.exampleCreated") : seeding ? t("onboarding.exampleCreating") : t("onboarding.exampleCreate")}
                   </span>
                   <span className="block text-xs text-txt3">
                     {seeded
-                      ? "Have a look, then delete it whenever you like."
-                      : "A task with two subtasks, a date and a deadline — so you can see it working."}
+                      ? t("onboarding.exampleCreatedHint")
+                      : t("onboarding.exampleCreateHint")}
                   </span>
                 </span>
               </button>
@@ -247,27 +241,27 @@ export function OnboardingModal({ userId }: { userId: string }) {
         {/* Footer */}
         <div className="flex items-center justify-between gap-3 px-6 py-4 border-t border-border shrink-0">
           <button onClick={finish} className="text-xs text-txt3 hover:text-txt2 transition-colors">
-            {step === STEPS - 1 ? "" : "Skip"}
+            {step === STEPS - 1 ? "" : t("onboarding.skip")}
           </button>
           <div className="flex items-center gap-2">
             {step > 0 && (
               <button onClick={back}
                 className="px-3 py-2 rounded-lg text-sm text-txt2 hover:bg-surface3 transition-colors">
-                Back
+                {t("onboarding.back")}
               </button>
             )}
             {step < STEPS - 1 ? (
               <button onClick={next}
                 className="px-4 py-2 rounded-lg text-sm text-on-accent transition-colors"
                 style={{ backgroundColor: "var(--accent)" }}>
-                {step === 2 ? "Save and continue" : "Next"}
+                {step === 2 ? t("onboarding.saveAndContinue") : t("onboarding.next")}
               </button>
             ) : (
               <button
                 onClick={async () => { await finish(); router.push("/"); }}
                 className="px-4 py-2 rounded-lg text-sm text-on-accent transition-colors"
                 style={{ backgroundColor: "var(--accent)" }}>
-                Start using Comfy Board
+                {t("onboarding.start")}
               </button>
             )}
           </div>

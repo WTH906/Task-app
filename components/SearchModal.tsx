@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useLocale } from "@/lib/i18n/useLocale";
 import { Folder, Pin, CornerDownRight, ListChecks, Timer, Search } from "lucide-react";
 
 interface SearchResult {
@@ -15,6 +16,7 @@ interface SearchResult {
 
 export function SearchModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const router = useRouter();
+  const { t } = useLocale();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [selected, setSelected] = useState(0);
@@ -48,8 +50,8 @@ export function SearchModal({ open, onClose }: { open: boolean; onClose: () => v
       const { data: tasks } = await supabase
         .from("project_tasks").select("id, name, project_id, notes").eq("user_id", user.id).is("archived_at", null)
         .or(`name.ilike.${term},notes.ilike.${term}`).limit(8);
-      for (const t of tasks || [])
-        items.push({ type: "task", id: t.id, title: t.name, subtitle: t.notes?.slice(0, 60) || "Task", href: `/projects/${t.project_id}` });
+      for (const tk of tasks || [])
+        items.push({ type: "task", id: tk.id, title: tk.name, subtitle: tk.notes?.slice(0, 60) || "Task", href: `/projects/${tk.project_id}` });
 
       const { data: routines } = await supabase
         .from("routine_tasks").select("id, text").eq("user_id", user.id).ilike("text", term).limit(3);
@@ -95,13 +97,13 @@ export function SearchModal({ open, onClose }: { open: boolean; onClose: () => v
 
   return (
     <div className="fixed inset-0 z-[60] flex items-start justify-center pt-[15vh] p-4 modal-backdrop"
-      role="dialog" aria-modal="true" aria-label="Search"
+      role="dialog" aria-modal="true" aria-label={t("shortcut.search")}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="bg-surface2 border border-border rounded-xl max-w-lg w-full shadow-2xl overflow-hidden">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
           <span className="text-txt3" aria-hidden="true"><Search size={16} /></span>
           <input ref={inputRef} type="text" value={query} onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKey} placeholder="Search projects, tasks, deadlines..."
+            onKeyDown={handleKey} placeholder={t("search.placeholder")}
             role="combobox"
             aria-expanded={results.length > 0}
             aria-controls="search-results"
@@ -111,9 +113,9 @@ export function SearchModal({ open, onClose }: { open: boolean; onClose: () => v
           <kbd className="text-[10px] text-txt3 bg-surface3 px-1.5 py-0.5 rounded" aria-hidden="true">ESC</kbd>
         </div>
         <div id="search-results" role="listbox" aria-label="Search results" className="max-h-80 overflow-y-auto">
-          {searching && <p className="text-xs text-txt3 text-center py-4 animate-pulse" role="status">Searching...</p>}
+          {searching && <p className="text-xs text-txt3 text-center py-4 animate-pulse" role="status">{t("search.searching")}</p>}
           {!searching && query && results.length === 0 && (
-            <p className="text-xs text-txt3 text-center py-6" role="status">No results for &ldquo;{query}&rdquo;</p>
+            <p className="text-xs text-txt3 text-center py-6" role="status">{t("search.noResultsFor", { query })}</p>
           )}
           {results.map((r, i) => (
             <button key={`${r.type}-${r.id}`}
@@ -136,7 +138,7 @@ export function SearchModal({ open, onClose }: { open: boolean; onClose: () => v
         </div>
         {!query && (
           <div className="px-4 py-3 text-[11px] text-txt3 border-t border-border">
-            Type to search · <kbd className="bg-surface3 px-1 py-0.5 rounded">↑↓</kbd> navigate · <kbd className="bg-surface3 px-1 py-0.5 rounded">↵</kbd> open
+            {t("search.hint")}
           </div>
         )}
       </div>

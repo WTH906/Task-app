@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import { useLocale } from "@/lib/i18n/useLocale";
 
 export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -13,8 +14,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const router = useRouter();
+  const { t } = useLocale();
 
-  useEffect(() => { document.title = "Comfy Board — Login"; }, []);
+  useEffect(() => { document.title = "Comfy Board — " + t("login.signIn"); }, [t]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +33,7 @@ export default function LoginPage() {
       if (err) {
         setError(err.message);
       } else {
-        setMessage("Check your email for a password reset link.");
+        setMessage(t("login.resetSent"));
       }
     } else if (isSignUp) {
       const { error: err } = await supabase.auth.signUp({
@@ -41,7 +43,7 @@ export default function LoginPage() {
       if (err) {
         setError(err.message);
       } else {
-        setMessage("Check your email to confirm your account, then sign in.");
+        setMessage(t("login.signUpSuccess"));
         setIsSignUp(false);
       }
     } else {
@@ -75,18 +77,18 @@ export default function LoginPage() {
             Comfy Board
           </h1>
           <p className="text-txt3 text-sm mt-2">
-            Your dashboard, routines, projects, and planner
+            {t("login.subtitle")}
           </p>
         </div>
 
         <div className="glass-panel p-6">
           <h2 className="glass-header text-lg font-medium text-bright pb-4 mb-5">
-            {isForgot ? "Reset password" : isSignUp ? "Create account" : "Sign in"}
+            {isForgot ? t("login.forgotPassword") : isSignUp ? t("login.signUp") : t("login.signIn")}
           </h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="login-email" className="block text-sm text-txt2 mb-1.5 font-medium">Email</label>
+              <label htmlFor="login-email" className="block text-sm text-txt2 mb-1.5 font-medium">{t("login.email")}</label>
               <input
                 id="login-email"
                 type="email"
@@ -100,7 +102,7 @@ export default function LoginPage() {
             </div>
             {!isForgot && (
               <div>
-                <label htmlFor="login-password" className="block text-sm text-txt2 mb-1.5 font-medium">Password</label>
+                <label htmlFor="login-password" className="block text-sm text-txt2 mb-1.5 font-medium">{t("login.password")}</label>
                 <input
                   id="login-password"
                   type="password"
@@ -139,7 +141,7 @@ export default function LoginPage() {
               onMouseEnter={(e) => e.currentTarget.style.background = "var(--accent2)"}
               onMouseLeave={(e) => e.currentTarget.style.background = "var(--accent)"}
             >
-              {loading ? "Loading..." : isForgot ? "Send reset link" : isSignUp ? "Sign up" : "Sign in"}
+              {loading ? t("common.loading") : isForgot ? t("login.sendResetLink") : isSignUp ? t("login.signUp") : t("login.signIn")}
             </button>
           </form>
 
@@ -149,14 +151,14 @@ export default function LoginPage() {
                 onClick={() => { setIsForgot(true); setError(""); setMessage(""); }}
                 className="block w-full text-sm text-txt3 hover:text-bright transition-colors cursor-pointer"
               >
-                Forgot password?
+                {t("login.forgotPassword")}
               </button>
             )}
             <button
               onClick={switchMode}
               className="block w-full text-sm text-txt3 hover:text-bright transition-colors cursor-pointer"
             >
-              {isForgot ? "Back to sign in" : isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
+              {isForgot ? t("login.backToSignIn") : isSignUp ? `${t("login.alreadyHaveAccount")} ${t("login.signIn")}` : `${t("login.noAccount")} ${t("login.signUp")}`}
             </button>
           </div>
         </div>

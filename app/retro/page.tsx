@@ -8,9 +8,11 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 import { fetchProjects, fetchProjectTasksWithSubs } from "@/lib/queries";
 import { useToast } from "@/components/Toast";
+import { useLocale, dateLocale } from "@/lib/i18n/useLocale";
 
 export default function RetroPlanningPage() {
   const { userId } = useCurrentUser();
+  const { t, locale } = useLocale();
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
@@ -101,7 +103,7 @@ export default function RetroPlanningPage() {
   while (cursor <= endDate) {
     const dateStr = formatDate(cursor);
     months.push({
-      label: cursor.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+      label: cursor.toLocaleDateString(dateLocale(locale), { month: "short", year: "numeric" }),
       pos: dateToPos(dateStr),
     });
     cursor.setMonth(cursor.getMonth() + 1);
@@ -127,12 +129,12 @@ export default function RetroPlanningPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div>
-          <h1 className="font-title text-2xl text-bright">Retro Planning</h1>
-          <p className="text-sm text-txt2 mt-0.5">Timeline view of project tasks and deadlines</p>
+          <h1 className="font-title text-2xl text-bright">{t("retro.title")}</h1>
+          <p className="text-sm text-txt2 mt-0.5">{t("retro.subtitle")}</p>
         </div>
         <select value={selectedProject || ""} onChange={(e) => selectProject(e.target.value || null)}
           className="bg-surface border border-border rounded-lg px-4 py-2 text-sm text-txt min-w-[200px]">
-          <option value="">Select a project...</option>
+          <option value="">{t("retro.selectProject")}</option>
           {projects.map((p) => (
             <option key={p.id} value={p.id}>{p.title}{p.deadline ? ` (due ${p.deadline})` : ""}</option>
           ))}
@@ -143,8 +145,8 @@ export default function RetroPlanningPage() {
         <div className="flex-1 flex items-center justify-center text-txt3">
           <div className="text-center">
             <p className="text-4xl mb-3">📊</p>
-            <p className="text-lg mb-1">Select a project</p>
-            <p className="text-sm">Choose a project from the dropdown to view its timeline</p>
+            <p className="text-lg mb-1">{t("retro.selectEmpty")}</p>
+            <p className="text-sm">{t("retro.selectHint")}</p>
           </div>
         </div>
       )}
@@ -164,18 +166,18 @@ export default function RetroPlanningPage() {
               <span className="text-bright font-medium">{project.title}</span>
             </div>
             <div className="w-px h-4 bg-border" />
-            <span className="text-txt3">{totalTasks} tasks</span>
-            <span className="text-txt3">{withDeadline} with deadlines</span>
+            <span className="text-txt3">{totalTasks} {t("common.tasks")}</span>
+            <span className="text-txt3">{withDeadline} {t("retro.withDeadlines")}</span>
             <div className="w-px h-4 bg-border" />
             <div className="flex items-center gap-2 flex-1 max-w-xs">
-              <span className="text-txt3">Progress:</span>
+              <span className="text-txt3">{t("retro.progress")}</span>
               <ProgressBar value={avgProgress} height={6} />
               <span className="text-xs font-mono" style={{ color: progressColor(avgProgress) }}>{avgProgress}%</span>
             </div>
             {project.deadline && (
               <>
                 <div className="w-px h-4 bg-border" />
-                <span className="text-txt3">Deadline:</span>
+                <span className="text-txt3">{t("retro.projectDeadline")}</span>
                 <span className="text-bright font-mono">{project.deadline}</span>
               </>
             )}
@@ -193,14 +195,14 @@ export default function RetroPlanningPage() {
               ))}
               {/* Today marker */}
               <div className="absolute top-0 h-full w-px bg-violet z-10" style={{ left: `${todayPos}%` }}>
-                <span className="absolute -top-0 left-1 text-[9px] text-violet2 font-mono whitespace-nowrap bg-surface2 px-1 rounded">TODAY</span>
+                <span className="absolute -top-0 left-1 text-[9px] text-violet2 font-mono whitespace-nowrap bg-surface2 px-1 rounded">{t("deadlines.todayBadge")}</span>
               </div>
             </div>
 
             {/* Task rows */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden">
               {tasks.length === 0 && (
-                <div className="text-center py-12 text-txt3 text-sm">No tasks in this project yet</div>
+                <div className="text-center py-12 text-txt3 text-sm">{t("retro.noTasks")}</div>
               )}
 
               {tasks.map((task) => {
@@ -306,7 +308,7 @@ export default function RetroPlanningPage() {
                   <div className="absolute top-0 h-full w-px bg-danger z-[1]" style={{ left: `${dateToPos(project.deadline)}%` }} />
                   <div className="absolute left-2 top-0 h-full flex items-center z-[4]">
                     <span className="text-xs text-danger font-medium bg-surface/90 px-2 py-0.5 rounded">
-                      🏁 Project Deadline: {project.deadline}
+                      {"🏁 " + t("retro.projectDeadline")} {project.deadline}
                     </span>
                   </div>
                 </div>
@@ -316,8 +318,8 @@ export default function RetroPlanningPage() {
 
           {/* Legend */}
           <div className="flex flex-wrap items-center gap-4 mt-3 text-[10px] text-txt3">
-            <div className="flex items-center gap-1"><div className="w-3 h-px bg-violet" /> Today</div>
-            {project.deadline && <div className="flex items-center gap-1"><div className="w-3 h-px bg-danger" /> Project deadline</div>}
+            <div className="flex items-center gap-1"><div className="w-3 h-px bg-violet" /> {t("retro.legendToday")}</div>
+            {project.deadline && <div className="flex items-center gap-1"><div className="w-3 h-px bg-danger" /> {t("retro.legendDeadline")}</div>}
             <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-acc" /> 0-20%</div>
             <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#e88833" }} /> 21-40%</div>
             <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: "#d4c03a" }} /> 41-60%</div>

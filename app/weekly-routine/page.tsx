@@ -11,9 +11,11 @@ import { useToast } from "@/components/Toast";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 import { useSettings } from "@/lib/hooks/useSettings";
 import { fetchWeeklyRoutineWithChecks } from "@/lib/queries";
+import { useLocale, dateLocale } from "@/lib/i18n/useLocale";
 
 export default function WeeklyRoutinePage() {
   const { toast } = useToast();
+  const { t, locale } = useLocale();
   const { userId, loading: authLoading } = useCurrentUser();
   const [tasks, setTasks] = useState<WeeklyRoutineTask[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
@@ -24,7 +26,7 @@ export default function WeeklyRoutinePage() {
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
 
-  useEffect(() => { document.title = "Comfy Board — Weekly Routine"; }, []);
+  useEffect(() => { document.title = `Comfy Board — ${t("weekly.title")}`; }, [t]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -36,7 +38,7 @@ export default function WeeklyRoutinePage() {
   const weekKey = getWeekKey(new Date());
   const monday = getMonday(new Date());
   const sunday = addDays(monday, 6);
-  const rangeLabel = `${monday.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${sunday.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+  const rangeLabel = `${monday.toLocaleDateString(dateLocale(locale), { month: "short", day: "numeric" })} – ${sunday.toLocaleDateString(dateLocale(locale), { month: "short", day: "numeric", year: "numeric" })}`;
 
   // Days left in week
   const now = new Date();
@@ -50,7 +52,7 @@ export default function WeeklyRoutinePage() {
       setTasks(await fetchWeeklyRoutineWithChecks(supabase, userId, weekKey));
     } catch (err) {
       console.error("Weekly routine load failed:", err);
-      toast("Failed to load weekly routine", "error");
+      toast(t("toast.failedToLoad", { error: String(err) }), "error");
     }
   }, [weekKey, userId, toast]);
 
@@ -79,7 +81,7 @@ export default function WeeklyRoutinePage() {
         .eq("week_key", weekKey));
     }
     if (error) {
-      toast("Failed to save: " + error.message, "error");
+      toast(t("toast.failedToSave", { error: error.message }), "error");
       setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, checked: !newChecked } : t)));
     }
   };
@@ -93,7 +95,7 @@ export default function WeeklyRoutinePage() {
         .from("weekly_routine_tasks")
         .update({ text: formText.trim(), est_minutes: formEst, day_of_week: formDay })
         .eq("id", editingTask.id);
-      if (error) { toast("Failed to save: " + error.message, "error"); return; }
+      if (error) { toast(t("toast.failedToSave", { error: error.message }), "error"); return; }
       setTasks((prev) => prev.map((t) => t.id === editingTask.id
         ? { ...t, text: formText.trim(), est_minutes: formEst, day_of_week: formDay } : t));
     } else {
@@ -104,7 +106,7 @@ export default function WeeklyRoutinePage() {
         day_of_week: formDay,
         sort_order: tasks.length,
       }).select().single();
-      if (error) { toast("Failed to save: " + error.message, "error"); return; }
+      if (error) { toast(t("toast.failedToSave", { error: error.message }), "error"); return; }
       if (newTask) setTasks((prev) => [...prev, { ...newTask as WeeklyRoutineTask, checked: false }]);
     }
 
@@ -153,7 +155,7 @@ export default function WeeklyRoutinePage() {
     if (!userId) return;
     const supabase = createClient();
     const { error } = await reorderRows(supabase, "weekly_routine_tasks", tasks.map((t) => t.id), userId);
-    if (error) toast("Failed to reorder: " + error, "error");
+    if (error) toast(t("toast.failedToReorder", { error: String(error) }), "error");
   };
 
   const moveItem = async (idx: number, dir: -1 | 1) => {
@@ -164,7 +166,7 @@ export default function WeeklyRoutinePage() {
     setTasks(next);
     if (!userId) return;
     const { error } = await reorderRows(createClient(), "weekly_routine_tasks", next.map((t) => t.id), userId);
-    if (error) toast("Failed to reorder: " + error, "error");
+    if (error) toast(t("toast.failedToReorder", { error: String(error) }), "error");
   };
 
   const checked = tasks.filter((t) => t.checked).length;
@@ -179,12 +181,12 @@ export default function WeeklyRoutinePage() {
 
   const enableMonthly = () => {
     setFeature("monthlyRoutine", true);
-    toast("Monthly routine added to sidebar!", "success");
+    toast(t("weekly.monthlyAdded"), "success");
   };
 
   const disableMonthly = () => {
     setFeature("monthlyRoutine", false);
-    toast("Monthly routine removed from sidebar", "info");
+    toast(t("weekly.monthlyRemoved"), "info");
   };
 
   return (
@@ -192,22 +194,22 @@ export default function WeeklyRoutinePage() {
       <div className="flex items-start justify-between mb-6">
         <div>
           <p className="text-xs text-txt3 uppercase tracking-wider mb-1">{rangeLabel} · {weekKey}</p>
-          <h1 className="font-title text-2xl text-bright mb-1">Weekly Routine</h1>
+          <h1 className="font-title text-2xl text-bright mb-1">{t("weekly.title")}</h1>
           <p className="text-sm text-txt2">
-            Tasks to complete this week
-            {daysLeft > 0 ? ` · ${daysLeft} day${daysLeft > 1 ? "s" : ""} left` : " · Last day!"}
+            {t("weekly.subtitle")}
+            {daysLeft > 0 ? ` · ${t("weekly.daysLeft", { n: daysLeft })}` : ` · ${t("weekly.lastDay")}`}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {!monthlyEnabled ? (
             <button onClick={enableMonthly}
               className="px-3 py-1.5 rounded-lg text-xs border border-border text-txt3 hover:border-violet hover:text-violet transition-colors">
-              Need a monthly planner?
+              {t("weekly.needMonthly")}
             </button>
           ) : (
             <button onClick={disableMonthly}
               className="px-3 py-1.5 rounded-lg text-xs border border-border text-txt3 hover:text-danger hover:border-danger/30 transition-colors">
-              Hide monthly routine
+              {t("weekly.hideMonthly")}
             </button>
           )}
         </div>
@@ -215,19 +217,19 @@ export default function WeeklyRoutinePage() {
 
       <div className="flex items-center gap-4 mb-4 text-sm">
         <div className="flex items-center gap-1.5">
-          <span className="text-txt3">Estimated:</span>
+          <span className="text-txt3">{t("common.estimated")}</span>
           <span className="text-bright font-mono">{formatMinutes(totalEst)}</span>
         </div>
         <div className="w-px h-4 bg-border" />
         <div className="flex items-center gap-1.5">
-          <span className="text-txt3">Remaining:</span>
+          <span className="text-txt3">{t("common.remaining")}</span>
           <span className="text-muted-acc2 font-mono">{formatMinutes(remainEst)}</span>
         </div>
       </div>
 
       <div className="mb-6">
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-sm text-txt2">{checked}/{total} completed</span>
+          <span className="text-sm text-txt2">{checked}/{total} {t("common.completed")}</span>
           <span className="text-sm font-mono text-muted-acc2">{pct}%</span>
         </div>
         <ProgressBar value={pct} height={10} />
@@ -235,7 +237,7 @@ export default function WeeklyRoutinePage() {
 
       <button onClick={openAdd}
         className="w-full border border-dashed border-border2 rounded-lg px-4 py-2.5 text-sm text-txt3 hover:border-violet hover:text-violet transition-colors mb-3">
-        ＋ Add Task
+        ＋ {t("weekly.addTask")}
       </button>
 
       <div className="space-y-2 mb-4">
@@ -269,7 +271,7 @@ export default function WeeklyRoutinePage() {
             <span className={cn("flex-1 text-sm", task.checked && "task-done")}>{task.text}</span>
             {task.day_of_week !== null && task.day_of_week !== undefined && (
               <span className="text-xs text-violet2 bg-violet/10 px-2 py-0.5 rounded-md font-medium shrink-0">
-                {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"][task.day_of_week]}
+                {[t("day.monday"),t("day.tuesday"),t("day.wednesday"),t("day.thursday"),t("day.friday"),t("day.saturday"),t("day.sunday")][task.day_of_week]}
               </span>
             )}
             {task.est_minutes > 0 && (
@@ -285,9 +287,9 @@ export default function WeeklyRoutinePage() {
               {menuOpen === task.id && (
                 <div className="absolute right-0 top-full mt-1 bg-surface2 border border-border rounded-lg shadow-xl py-1 w-32 z-20">
                   <button onClick={() => openEdit(task)}
-                    className="w-full text-left px-3 py-1.5 text-sm text-txt2 hover:bg-surface3 hover:text-txt">Edit</button>
+                    className="w-full text-left px-3 py-1.5 text-sm text-txt2 hover:bg-surface3 hover:text-txt">{t("common.edit")}</button>
                   <button onClick={() => { removeTask(task.id); setMenuOpen(null); }}
-                    className="w-full text-left px-3 py-1.5 text-sm text-danger hover:bg-surface3">Remove</button>
+                    className="w-full text-left px-3 py-1.5 text-sm text-danger hover:bg-surface3">{t("common.remove")}</button>
                 </div>
               )}
             </div>
@@ -296,24 +298,24 @@ export default function WeeklyRoutinePage() {
 
         {tasks.length === 0 && (
           <div className="text-center py-12 text-txt3">
-            <p className="text-lg mb-2">No weekly tasks yet</p>
-            <p className="text-sm">Add tasks that you need to complete each week</p>
+            <p className="text-lg mb-2">{t("weekly.empty")}</p>
+            <p className="text-sm">{t("weekly.emptyHint")}</p>
           </div>
         )}
       </div>
 
       <Modal open={modalOpen} onClose={() => { setModalOpen(false); setEditingTask(null); }}
-        title={editingTask ? "Edit Weekly Task" : "Add Weekly Task"}>
+        title={editingTask ? t("weekly.editTask") : t("weekly.addTaskModal")}>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm text-txt2 mb-1.5">Task name</label>
+            <label className="block text-sm text-txt2 mb-1.5">{t("weekly.taskName")}</label>
             <input type="text" value={formText} onChange={(e) => setFormText(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && saveTask()}
               className="w-full glass-field px-3 py-2 text-txt text-sm"
               placeholder="e.g. Review weekly goals" autoFocus />
           </div>
           <div>
-            <label className="block text-sm text-txt2 mb-1.5">Estimated time</label>
+            <label className="block text-sm text-txt2 mb-1.5">{t("weekly.estimatedTime")}</label>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1">
                 <input type="number" value={Math.floor(formEst / 60) || ""} onChange={(e) => { const h = parseInt(e.target.value) || 0; setFormEst(Math.max(0, h * 60 + (formEst % 60))); }}
@@ -330,14 +332,14 @@ export default function WeeklyRoutinePage() {
             </div>
           </div>
           <div>
-            <label className="block text-sm text-txt2 mb-1.5">Preferred day</label>
+            <label className="block text-sm text-txt2 mb-1.5">{t("weekly.preferredDay")}</label>
             <div className="flex flex-wrap gap-1.5">
               <button onClick={() => setFormDay(null)}
                 className={cn("px-2.5 py-1 rounded text-xs transition-colors",
                   formDay === null ? "bg-violet text-on-accent" : "bg-surface3 text-txt3 hover:text-txt")}>
-                Any
+                {t("weekly.any")}
               </button>
-              {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((d, i) => (
+              {[t("day.mon"),t("day.tue"),t("day.wed"),t("day.thu"),t("day.fri"),t("day.sat"),t("day.sun")].map((d, i) => (
                 <button key={d} onClick={() => setFormDay(i)}
                   className={cn("px-2.5 py-1 rounded text-xs transition-colors",
                     formDay === i ? "bg-violet text-on-accent" : "bg-surface3 text-txt3 hover:text-txt")}>
@@ -348,10 +350,10 @@ export default function WeeklyRoutinePage() {
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button onClick={() => { setModalOpen(false); setEditingTask(null); }}
-              className="px-4 py-2 rounded-lg text-sm text-txt2 hover:bg-surface3 transition-colors">Cancel</button>
+              className="px-4 py-2 rounded-lg text-sm text-txt2 hover:bg-surface3 transition-colors">{t("common.cancel")}</button>
             <button onClick={saveTask} disabled={!formText.trim()}
               className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent transition-colors disabled:opacity-50">
-              {editingTask ? "Save" : "Add"}
+              {editingTask ? t("common.save") : t("common.add")}
             </button>
           </div>
         </div>
