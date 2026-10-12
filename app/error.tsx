@@ -24,7 +24,7 @@ export default function ErrorBoundary({
         <div className="flex items-center justify-center gap-3">
           <button
             onClick={reset}
-            className="px-5 py-2.5 rounded-lg text-sm bg-violet hover:bg-violet-dim text-white transition-colors"
+            className="px-5 py-2.5 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent transition-colors"
           >
             Try again
           </button>

@@ -235,6 +235,16 @@ export default function RoadmapPage() {
     savePhases([...phases]);
   };
 
+  const moveMilestone = async (pi: number, mi: number, direction: number) => {
+    const newMi = mi + direction;
+    if (newMi < 0 || newMi >= phases[pi].milestones.length) return;
+    const p = [...phases];
+    const milestones = [...p[pi].milestones];
+    [milestones[mi], milestones[newMi]] = [milestones[newMi], milestones[mi]];
+    p[pi] = { ...p[pi], milestones };
+    savePhases(p);
+  };
+
   // Get subtask progress from project tasks
   const getSubtaskProgress = (subtaskId: string): number | null => {
     for (const t of projectTasks) {
@@ -287,7 +297,7 @@ export default function RoadmapPage() {
       )}
 
       {loading && (
-        <div className="flex items-center justify-center py-20">
+        <div className="flex items-center justify-center py-20" role="status" aria-label="Loading">
           <div className="w-8 h-8 border-2 border-violet border-t-transparent rounded-full animate-spin" />
         </div>
       )}
@@ -303,7 +313,7 @@ export default function RoadmapPage() {
                   className="text-[10px] font-bold uppercase tracking-[1.2px] text-txt3 bg-transparent border-b border-transparent focus:border-border2 focus:text-txt2 outline-none flex-1 py-1"
                   spellCheck={false} placeholder="Phase name..." />
                 <button onClick={() => deletePhase(pi)}
-                  className="text-[10px] px-2 py-1 rounded border border-border text-txt3 opacity-0 group-hover:opacity-100 hover:border-danger hover:text-danger transition-all">
+                  className="text-[10px] px-2 py-1 rounded border border-border text-txt3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 hover:border-danger hover:text-danger transition-all">
                   delete
                 </button>
               </div>
@@ -325,8 +335,9 @@ export default function RoadmapPage() {
                       onDragEnd={handleMsDragEnd}
                       className={cn("relative pb-5 last:pb-0", dragMilestone?.pi === pi && dragMilestone?.mi === mi && "opacity-50")}>
                       {/* Dot */}
-                      <div onClick={() => cycleStatus(pi, mi)}
-                        className={cn("absolute -left-[28px] top-[6px] w-3 h-3 rounded-full border-[2.5px] z-[2] cursor-pointer hover:scale-130 transition-transform", sc.dot)}
+                      <button type="button" onClick={() => cycleStatus(pi, mi)}
+                        aria-label={`Cycle milestone status (currently ${st})`}
+                        className={cn("absolute -left-[34px] top-[2px] w-6 h-6 rounded-full border-[2.5px] z-[2] cursor-pointer hover:scale-110 transition-transform", sc.dot)}
                         style={st === "active" ? { boxShadow: "0 0 0 4px rgba(124,111,255,0.12)" } : undefined} />
 
                       {/* Card */}
@@ -347,8 +358,20 @@ export default function RoadmapPage() {
                           {taskProgress !== null && (
                             <span className="text-[10px] font-mono text-txt3 ml-1">{taskProgress}%</span>
                           )}
-                          <div className="ml-auto flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
-                            <button onClick={() => deleteMilestone(pi, mi)}
+                          <div className="ml-auto flex gap-1 items-center opacity-0 group-hover/card:opacity-100 focus-within:opacity-100 transition-opacity">
+                            <div className="flex flex-col">
+                              <button type="button" aria-label="Move up" disabled={mi === 0}
+                                onClick={() => { moveMilestone(pi, mi, -1).catch(() => {}); }}
+                                className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                                <span aria-hidden="true" className="text-[10px]">▲</span>
+                              </button>
+                              <button type="button" aria-label="Move down" disabled={mi === phase.milestones.length - 1}
+                                onClick={() => { moveMilestone(pi, mi, 1).catch(() => {}); }}
+                                className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                                <span aria-hidden="true" className="text-[10px]">▼</span>
+                              </button>
+                            </div>
+                            <button type="button" onClick={() => deleteMilestone(pi, mi)} aria-label="Delete milestone"
                               className="w-6 h-6 rounded border border-border text-txt3 text-[11px] flex items-center justify-center hover:border-danger hover:text-danger transition-all">×</button>
                           </div>
                         </div>
@@ -400,8 +423,8 @@ export default function RoadmapPage() {
                                     <option key={s.id} value={s.id}>{s.name}</option>
                                   ))}
                                 </select>
-                                <button onClick={() => deleteCheck(pi, mi, ci)}
-                                  className="text-[10px] w-4 h-4 flex items-center justify-center text-txt3 hover:text-danger opacity-0 group-hover/ck:opacity-100 transition-opacity">×</button>
+                                <button type="button" onClick={() => deleteCheck(pi, mi, ci)} aria-label="Delete checklist item"
+                                  className="text-[10px] w-6 h-6 flex items-center justify-center text-txt3 hover:text-danger opacity-0 group-hover/ck:opacity-100 transition-opacity">×</button>
                               </div>
                             );
                           })}

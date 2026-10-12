@@ -98,7 +98,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen">
       {/* Nav */}
-      <nav className="flex items-center justify-between px-6 md:px-12 py-5 max-w-6xl mx-auto">
+      <nav aria-label="Site navigation" className="flex items-center justify-between px-6 md:px-12 py-5 max-w-6xl mx-auto">
         <span className="font-title text-xl font-semibold text-bright tracking-tight">
           Comfy Board
         </span>
@@ -112,13 +112,14 @@ export default function LandingPage() {
           <Link
             href="/login"
             className="text-sm font-medium px-4 py-2 rounded-xl transition-all"
-            style={{ background: "var(--accent)", color: "var(--bg)" }}
+            style={{ background: "var(--accent)", color: "var(--on-accent)" }}
           >
             Get started free
           </Link>
         </div>
       </nav>
 
+      <main>
       {/* Hero */}
       <section className="px-6 md:px-12 pt-16 md:pt-24 pb-20 max-w-6xl mx-auto">
         <div className="max-w-2xl">
@@ -136,7 +137,7 @@ export default function LandingPage() {
             <Link
               href="/login"
               className="text-base font-medium px-6 py-3 rounded-xl transition-all hover:scale-[1.02]"
-              style={{ background: "var(--accent)", color: "var(--bg)" }}
+              style={{ background: "var(--accent)", color: "var(--on-accent)" }}
             >
               Start for free
             </Link>
@@ -254,11 +255,12 @@ export default function LandingPage() {
         <Link
           href="/login"
           className="inline-block text-base font-medium px-8 py-3.5 rounded-xl transition-all hover:scale-[1.02]"
-          style={{ background: "var(--accent)", color: "var(--bg)" }}
+          style={{ background: "var(--accent)", color: "var(--on-accent)" }}
         >
           Get started free
         </Link>
       </section>
+      </main>
 
       {/* Footer */}
       <footer className="px-6 md:px-12 py-8 max-w-6xl mx-auto border-t border-border/30">

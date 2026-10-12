@@ -146,7 +146,7 @@ export default function DeadlinesPage() {
           <p className="text-sm text-txt2 mt-0.5">{deadlines.length} countdowns · {taskDeadlines.length} task deadlines</p>
         </div>
         <button onClick={() => setShowAllModal(true)}
-          className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-white transition-colors">
+          className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent transition-colors">
           Show All Deadlines
         </button>
       </div>
@@ -165,9 +165,9 @@ export default function DeadlinesPage() {
             <div key={d.id} className="bg-surface border border-border rounded-xl p-4 group card-float"
               style={{ borderLeftWidth: 3, borderLeftColor: color }}>
               <div className="flex items-start justify-between mb-2">
-                <h3 className={cn("text-sm font-medium", passed ? "text-txt3" : "text-bright")}>{d.label}</h3>
-                <button onClick={() => removeDeadline(d.id)}
-                  className="text-xs text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 transition-all">✕</button>
+                <h2 className={cn("text-sm font-medium", passed ? "text-txt3" : "text-bright")}>{d.label}</h2>
+                <button type="button" onClick={() => removeDeadline(d.id)} aria-label="Delete"
+                  className="text-xs text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all">✕</button>
               </div>
               <p className="font-mono text-lg font-bold mb-1" style={{ color }}>{text}</p>
               <p className="text-[10px] text-txt3">{dateStr}</p>
@@ -197,7 +197,7 @@ export default function DeadlinesPage() {
                 <h2 className="font-title text-lg text-bright">All Deadlines</h2>
                 <p className="text-xs text-txt3 mt-0.5">{allDeadlines.length} total · sorted by date</p>
               </div>
-              <button onClick={() => setShowAllModal(false)}
+              <button type="button" onClick={() => setShowAllModal(false)} aria-label="Close"
                 className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface3 text-txt3 hover:text-txt">✕</button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-1.5">

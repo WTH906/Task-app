@@ -800,6 +800,30 @@ export default function ProjectDetailPage() {
     if (error) toast("Failed to reorder: " + error, "error");
   };
 
+  const moveTaskItem = async (idx: number, direction: number) => {
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= tasks.length || !userId) return;
+    const nt = [...tasks];
+    [nt[idx], nt[newIdx]] = [nt[newIdx], nt[idx]];
+    setTasks(nt);
+    const supabase = createClient();
+    const { error } = await reorderRows(supabase, "project_tasks", nt.map((t) => t.id), userId);
+    if (error) toast("Failed to reorder: " + error, "error");
+  };
+
+  const moveSubItem = async (parentId: string, idx: number, direction: number) => {
+    const task = tasks.find((t) => t.id === parentId);
+    if (!task?.subtasks || !userId) return;
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= task.subtasks.length) return;
+    const newSubs = [...task.subtasks];
+    [newSubs[idx], newSubs[newIdx]] = [newSubs[newIdx], newSubs[idx]];
+    setTasks((prev) => prev.map((t) => t.id === parentId ? { ...t, subtasks: newSubs } : t));
+    const supabase = createClient();
+    const { error } = await reorderSubtasks(supabase, newSubs.map((s) => s.id), userId);
+    if (error) toast("Failed to reorder: " + error, "error");
+  };
+
   // Calculations
   // If task has subtasks, its est_minutes = sum of subtask est (already rolled up in DB)
   // If task has no subtasks, use its own est_minutes
@@ -1065,6 +1089,7 @@ export default function ProjectDetailPage() {
     handleSubDragStart, handleSubDragOver, handleSubDragEnd,
     archiveTask, archiveSubtask, monitorTask, duplicateSubtask,
     toggleTaskCheck, scheduleTask,
+    moveTaskItem, moveSubItem,
   };
 
   if (!project) {
@@ -1165,11 +1190,11 @@ export default function ProjectDetailPage() {
             <div className="w-px h-4 bg-border mx-1" />
 
             {/* Secondary: exports — icon-only with tooltips */}
-            <button onClick={saveAsTemplate} title="Save as template"
+            <button type="button" onClick={saveAsTemplate} title="Save as template" aria-label="Save as template"
               className="w-7 h-7 rounded-md flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface2 transition-colors">
               <Save size={13} />
             </button>
-            <button onClick={exportProject} title="Export JSON"
+            <button type="button" onClick={exportProject} title="Export JSON" aria-label="Export JSON"
               className="w-7 h-7 rounded-md flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface2 transition-colors">
               <Upload size={13} />
             </button>
@@ -1177,7 +1202,7 @@ export default function ProjectDetailPage() {
               className="w-7 h-7 rounded-md flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface2 transition-colors text-[10px] font-mono font-bold">
               CSV
             </button>
-            <button onClick={() => setGcalModalOpen(true)} title="Sync to Google Calendar"
+            <button type="button" onClick={() => setGcalModalOpen(true)} title="Sync to Google Calendar" aria-label="Sync to Google Calendar"
               className="w-7 h-7 rounded-md flex items-center justify-center text-txt3 hover:text-amber hover:bg-amber/10 transition-colors">
               <Calendar size={13} />
             </button>
@@ -1187,8 +1212,10 @@ export default function ProjectDetailPage() {
             {/* View toggle */}
             <div className="flex items-center bg-surface2/40 rounded-lg p-0.5">
               <button
+                type="button"
                 onClick={() => setViewMode("list")}
                 title="List view"
+                aria-label="List view"
                 className={cn(
                   "w-7 h-7 rounded-md flex items-center justify-center transition-colors",
                   viewMode === "list" ? "bg-surface text-bright shadow-sm" : "text-txt3 hover:text-txt"
@@ -1197,8 +1224,10 @@ export default function ProjectDetailPage() {
                 <List size={13} />
               </button>
               <button
+                type="button"
                 onClick={() => setViewMode("kanban")}
                 title="Kanban view"
+                aria-label="Kanban view"
                 className={cn(
                   "w-7 h-7 rounded-md flex items-center justify-center transition-colors",
                   viewMode === "kanban" ? "bg-surface text-bright shadow-sm" : "text-txt3 hover:text-txt"
@@ -1306,6 +1335,7 @@ export default function ProjectDetailPage() {
                 task={task}
                 project={{ id: projectId, title: project.title }}
                 idx={idx}
+                taskCount={tasks.length}
                 activeTaskId={activeTaskId}
                 elapsed={elapsed}
                 isExpanded={expandedTasks.has(task.id)}

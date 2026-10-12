@@ -116,6 +116,16 @@ export default function MonthlyRoutinePage() {
     await reorderRows(supabase, "monthly_routine_tasks", tasks.map((t) => t.id), userId);
   };
 
+  const moveItem = async (idx: number, dir: -1 | 1) => {
+    const target = idx + dir;
+    if (target < 0 || target >= tasks.length) return;
+    const next = [...tasks];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    setTasks(next);
+    if (!userId) return;
+    await reorderRows(createClient(), "monthly_routine_tasks", next.map((t) => t.id), userId);
+  };
+
   const checked = tasks.filter((t) => t.checked).length;
   const total = tasks.length;
   const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
@@ -153,7 +163,21 @@ export default function MonthlyRoutinePage() {
             onDragOver={(e) => handleDragOver(e, idx)} onDragEnd={handleDragEnd}
             className={cn("bg-surface border border-border rounded-lg px-4 py-3 flex items-center gap-3 group transition-all card-float",
               dragIdx === idx && "opacity-50 scale-[0.98]")}>
-            <span className="cursor-grab text-txt3 opacity-0 group-hover:opacity-100 select-none">⠿</span>
+            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+              <span className="cursor-grab text-txt3 select-none">⠿</span>
+              <div className="flex flex-col">
+                <button type="button" aria-label="Move up" disabled={idx === 0}
+                  onClick={() => { moveItem(idx, -1).catch(() => {}); }}
+                  className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                  <span aria-hidden="true" className="text-[10px]">▲</span>
+                </button>
+                <button type="button" aria-label="Move down" disabled={idx === tasks.length - 1}
+                  onClick={() => { moveItem(idx, 1).catch(() => {}); }}
+                  className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                  <span aria-hidden="true" className="text-[10px]">▼</span>
+                </button>
+              </div>
+            </div>
             <input type="checkbox" checked={task.checked || false} onChange={() => toggleCheck(task)}
               className="w-4 h-4 shrink-0 accent-violet" />
             <div className="flex-1 min-w-0">
@@ -171,9 +195,9 @@ export default function MonthlyRoutinePage() {
             )}
             <div className="relative">
               <button onClick={() => { setEditingTask(task); setFormText(task.text); setFormEst(task.est_minutes); setFormDateFrom(task.date_from); setFormDateTo(task.date_to); setModalOpen(true); }}
-                className="text-xs text-txt3 opacity-0 group-hover:opacity-100 hover:text-violet2 transition-all px-1">Edit</button>
-              <button onClick={() => deleteTask(task.id)}
-                className="text-xs text-txt3 opacity-0 group-hover:opacity-100 hover:text-danger transition-all px-1">✕</button>
+                className="text-xs text-txt3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 hover:text-violet2 transition-all px-1">Edit</button>
+              <button type="button" onClick={() => deleteTask(task.id)} aria-label="Delete"
+                className="text-xs text-txt3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 hover:text-danger transition-all px-1">✕</button>
             </div>
           </div>
         ))}
@@ -228,7 +252,7 @@ export default function MonthlyRoutinePage() {
           <div className="flex justify-end gap-2 pt-2">
             <button onClick={() => setModalOpen(false)} className="px-4 py-2 rounded-lg text-sm text-txt2 hover:bg-surface3">Cancel</button>
             <button onClick={saveTask} disabled={!formText.trim()}
-              className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-white disabled:opacity-50">Save</button>
+              className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent disabled:opacity-50">Save</button>
           </div>
         </div>
       </Modal>

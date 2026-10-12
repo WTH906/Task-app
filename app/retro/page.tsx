@@ -150,7 +150,7 @@ export default function RetroPlanningPage() {
       )}
 
       {loading && (
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center" role="status" aria-label="Loading">
           <div className="w-8 h-8 border-2 border-violet border-t-transparent rounded-full animate-spin" />
         </div>
       )}

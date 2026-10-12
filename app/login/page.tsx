@@ -68,7 +68,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <main className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-sm animate-fade-in">
         <div className="text-center mb-10">
           <h1 className="font-title text-4xl font-semibold text-bright tracking-tight">
@@ -86,25 +86,29 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm text-txt2 mb-1.5 font-medium">Email</label>
+              <label htmlFor="login-email" className="block text-sm text-txt2 mb-1.5 font-medium">Email</label>
               <input
+                id="login-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
                 className="glass-field px-3 py-2.5 text-sm"
                 placeholder="you@example.com"
               />
             </div>
             {!isForgot && (
               <div>
-                <label className="block text-sm text-txt2 mb-1.5 font-medium">Password</label>
+                <label htmlFor="login-password" className="block text-sm text-txt2 mb-1.5 font-medium">Password</label>
                 <input
+                  id="login-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={8}
+                  autoComplete={isSignUp ? "new-password" : "current-password"}
                   className="glass-field px-3 py-2.5 text-sm"
                   placeholder="••••••••"
                 />
@@ -112,13 +116,13 @@ export default function LoginPage() {
             )}
 
             {error && (
-              <p className="text-sm text-danger rounded-lg px-3 py-2"
+              <p role="alert" className="text-sm text-danger-text rounded-lg px-3 py-2"
                 style={{ background: "color-mix(in srgb, var(--glass-accent) 8%, transparent)" }}>
                 {error}
               </p>
             )}
             {message && (
-              <p className="text-sm text-green-acc rounded-lg px-3 py-2"
+              <p role="status" className="text-sm text-green-text rounded-lg px-3 py-2"
                 style={{ background: "color-mix(in srgb, #4caf50 10%, transparent)" }}>
                 {message}
               </p>
@@ -130,7 +134,7 @@ export default function LoginPage() {
               className="w-full font-medium rounded-xl px-4 py-2.5 text-sm transition-all disabled:opacity-50 cursor-pointer"
               style={{
                 background: "var(--accent)",
-                color: "var(--bg)",
+                color: "var(--on-accent)",
               }}
               onMouseEnter={(e) => e.currentTarget.style.background = "var(--accent2)"}
               onMouseLeave={(e) => e.currentTarget.style.background = "var(--accent)"}
@@ -157,6 +161,6 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

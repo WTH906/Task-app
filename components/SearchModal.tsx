@@ -95,33 +95,42 @@ export function SearchModal({ open, onClose }: { open: boolean; onClose: () => v
 
   return (
     <div className="fixed inset-0 z-[60] flex items-start justify-center pt-[15vh] p-4 modal-backdrop"
+      role="dialog" aria-modal="true" aria-label="Search"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="bg-surface2 border border-border rounded-xl max-w-lg w-full shadow-2xl overflow-hidden">
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-          <span className="text-txt3"><Search size={16} /></span>
+          <span className="text-txt3" aria-hidden="true"><Search size={16} /></span>
           <input ref={inputRef} type="text" value={query} onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKey} placeholder="Search projects, tasks, deadlines..."
+            role="combobox"
+            aria-expanded={results.length > 0}
+            aria-controls="search-results"
+            aria-activedescendant={results[selected] ? `search-result-${selected}` : undefined}
+            aria-autocomplete="list"
             className="flex-1 bg-transparent text-txt text-sm placeholder-txt3 outline-none" />
-          <kbd className="text-[10px] text-txt3 bg-surface3 px-1.5 py-0.5 rounded">ESC</kbd>
+          <kbd className="text-[10px] text-txt3 bg-surface3 px-1.5 py-0.5 rounded" aria-hidden="true">ESC</kbd>
         </div>
-        <div className="max-h-80 overflow-y-auto">
-          {searching && <p className="text-xs text-txt3 text-center py-4 animate-pulse">Searching...</p>}
+        <div id="search-results" role="listbox" aria-label="Search results" className="max-h-80 overflow-y-auto">
+          {searching && <p className="text-xs text-txt3 text-center py-4 animate-pulse" role="status">Searching...</p>}
           {!searching && query && results.length === 0 && (
-            <p className="text-xs text-txt3 text-center py-6">No results for &ldquo;{query}&rdquo;</p>
+            <p className="text-xs text-txt3 text-center py-6" role="status">No results for &ldquo;{query}&rdquo;</p>
           )}
           {results.map((r, i) => (
             <button key={`${r.type}-${r.id}`}
+              id={`search-result-${i}`}
+              role="option"
+              aria-selected={i === selected}
               onClick={() => handleNavigate(r.href)}
               onMouseEnter={() => setSelected(i)}
               className={`w-full text-left flex items-center gap-3 px-4 py-2.5 transition-colors ${
                 i === selected ? "bg-violet/10" : "hover:bg-surface3"
               }`}>
-              <span className="text-sm">{typeIcon[r.type]}</span>
+              <span className="text-sm" aria-hidden="true">{typeIcon[r.type]}</span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-bright truncate">{r.title}</p>
                 <p className="text-[11px] text-txt3 truncate">{r.subtitle}</p>
               </div>
-              {r.color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.color }} />}
+              {r.color && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: r.color }} aria-hidden="true" />}
             </button>
           ))}
         </div>

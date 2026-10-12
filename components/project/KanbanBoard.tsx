@@ -134,10 +134,38 @@ export function KanbanBoard({
                   className="rounded-lg border border-border bg-surface px-3 py-2.5 cursor-grab active:cursor-grabbing hover:border-violet/40 transition-colors group"
                 >
                   <div className="flex items-start gap-2">
-                    <GripVertical
-                      size={12}
-                      className="text-txt3 opacity-0 group-hover:opacity-60 mt-0.5 shrink-0 transition-opacity"
-                    />
+                    <div className="flex items-center gap-0.5 mt-0.5 shrink-0">
+                      <GripVertical
+                        size={12}
+                        className="text-txt3 opacity-0 group-hover:opacity-60 focus-within:opacity-60 transition-opacity"
+                      />
+                      <select
+                        aria-label={`Move ${task.name} to column`}
+                        value={key}
+                        onChange={(e) => {
+                          const targetCol = e.target.value as Column;
+                          if (targetCol === key) return;
+                          const progressMap: Record<Column, number> = { todo: 0, in_progress: 50, done: 100 };
+                          const subs = task.subtasks || [];
+                          if (subs.length > 0) {
+                            if (targetCol === "done") {
+                              for (const s of subs) { if (s.progress < 100) onSubtaskToggle(s.id, task.id, 100); }
+                            } else if (targetCol === "todo") {
+                              for (const s of subs) { if (s.progress > 0) onSubtaskToggle(s.id, task.id, 0); }
+                            } else if (targetCol === "in_progress" && subs.every((s) => s.progress === 0)) {
+                              onSubtaskToggle(subs[0].id, task.id, 50);
+                            }
+                          } else {
+                            onProgressChange(task.id, progressMap[targetCol]);
+                          }
+                        }}
+                        className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity bg-surface2 border border-border rounded text-[9px] text-txt3 px-1 py-0.5 w-[70px]"
+                      >
+                        {COLUMNS.map(({ key: colKey, label: colLabel }) => (
+                          <option key={colKey} value={colKey}>{colLabel}</option>
+                        ))}
+                      </select>
+                    </div>
                     <div className="flex-1 min-w-0">
                       <button
                         onClick={() => onTaskClick(task)}

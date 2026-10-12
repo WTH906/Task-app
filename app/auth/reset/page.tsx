@@ -58,7 +58,7 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <main className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <h1 className="font-title text-3xl text-bright mb-2">Comfy Board</h1>
@@ -75,38 +75,42 @@ export default function ResetPasswordPage() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm text-txt2 mb-1.5">New password</label>
+                <label htmlFor="reset-password" className="block text-sm text-txt2 mb-1.5">New password</label>
                 <input
+                  id="reset-password"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={8}
-                  className="w-full bg-surface2 border border-border rounded-lg px-3 py-2.5 text-txt placeholder-txt3 text-sm"
+                  autoComplete="new-password"
+                  className="w-full bg-surface2 border border-ctl rounded-lg px-3 py-2.5 text-txt placeholder-txt3 text-sm"
                   placeholder="••••••••"
                   autoFocus
                 />
               </div>
               <div>
-                <label className="block text-sm text-txt2 mb-1.5">Confirm password</label>
+                <label htmlFor="reset-confirm" className="block text-sm text-txt2 mb-1.5">Confirm password</label>
                 <input
+                  id="reset-confirm"
                   type="password"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   required
                   minLength={8}
-                  className="w-full bg-surface2 border border-border rounded-lg px-3 py-2.5 text-txt placeholder-txt3 text-sm"
+                  autoComplete="new-password"
+                  className="w-full bg-surface2 border border-ctl rounded-lg px-3 py-2.5 text-txt placeholder-txt3 text-sm"
                   placeholder="••••••••"
                 />
               </div>
 
-              {error && <p className="text-sm text-danger bg-danger/10 rounded-lg px-3 py-2">{error}</p>}
-              {message && <p className="text-sm text-green-acc bg-green-acc/10 rounded-lg px-3 py-2">{message}</p>}
+              {error && <p role="alert" className="text-sm text-danger-text bg-danger/10 rounded-lg px-3 py-2">{error}</p>}
+              {message && <p role="status" className="text-sm text-green-text bg-green-acc/10 rounded-lg px-3 py-2">{message}</p>}
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-violet hover:bg-violet-dim text-white font-medium rounded-lg px-4 py-2.5 text-sm transition-colors disabled:opacity-50"
+                className="w-full bg-violet hover:bg-violet-dim text-on-accent font-medium rounded-lg px-4 py-2.5 text-sm transition-colors disabled:opacity-50"
               >
                 {loading ? "Updating..." : "Update password"}
               </button>
@@ -114,6 +118,6 @@ export default function ResetPasswordPage() {
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 }

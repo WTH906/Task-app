@@ -70,7 +70,7 @@ function TagManager({ open, onClose, userId, tags, onSaved }: {
           <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)}
             className="w-10 h-10 rounded-lg border border-border bg-surface3 cursor-pointer" />
           <button onClick={addTag} disabled={!newName.trim()}
-            className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-white disabled:opacity-40">Add</button>
+            className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent disabled:opacity-40">Add</button>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {PRESET_COLORS.map(c => (
@@ -270,7 +270,7 @@ function DetailsModal({ open, onClose, contact, onCopy }: { open: boolean; onClo
         onClick={e => e.stopPropagation()}>
         <div className="glass-header flex items-center justify-between px-4 sm:px-6 py-4">
           <h2 className="text-lg font-semibold text-bright">{contact.name}</h2>
-          <button onClick={onClose} className="text-txt3 hover:text-txt text-xl leading-none">×</button>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-txt3 hover:text-txt text-xl leading-none">×</button>
         </div>
         <div className="p-4 sm:p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
@@ -419,7 +419,7 @@ export function ContactsPanel({ open, onClose, userId }: { open: boolean; onClos
           <span className="text-lg">📇</span>
           <h2 className="font-title text-lg text-bright flex-1">Contacts</h2>
           <span className="text-xs text-txt3 font-mono">{contacts.length}</span>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-txt3 hover:text-txt transition-colors">
+          <button type="button" onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-txt3 hover:text-txt transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -474,13 +474,15 @@ export function ContactsPanel({ open, onClose, userId }: { open: boolean; onClos
               <div key={contact.id} className="px-4 py-3 border-b border-border/30 hover:bg-surface2/50 transition-colors">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-sm font-semibold text-bright flex-1 truncate">{contact.name}</span>
-                  <button onClick={() => setDetailContact(contact)} title="Details"
+                  <button type="button" onClick={() => setDetailContact(contact)} title="Details" aria-label="Details"
                     className="w-7 h-7 rounded-md flex items-center justify-center text-xs shrink-0 transition-colors"
                     style={{ background: hasDetails ? "color-mix(in srgb, var(--accent) 13%, transparent)" : "transparent", color: hasDetails ? "var(--accent2)" : "var(--txt3)" }}>
                     ⓘ
                   </button>
                   <div className="relative">
                     <button data-cmenu="true" onClick={() => setMenuOpen(m => m === contact.id ? null : contact.id)}
+                      aria-expanded={menuOpen === contact.id}
+                      aria-label="Contact actions"
                       className="w-7 h-7 rounded-md flex items-center justify-center text-sm text-txt3 hover:bg-surface3 transition-colors">⋯</button>
                     {menuOpen === contact.id && (
                       <div data-cmenu="true" className="absolute right-0 top-full mt-1 bg-surface2 border border-border rounded-lg shadow-xl py-1 w-28 z-20">
@@ -494,16 +496,16 @@ export function ContactsPanel({ open, onClose, userId }: { open: boolean; onClos
                 </div>
                 <div className="flex items-center gap-3 text-xs text-txt3">
                   {contact.email && (
-                    <span className="truncate cursor-pointer hover:text-txt transition-colors" title="Click to copy"
+                    <button type="button" className="truncate cursor-pointer hover:text-txt transition-colors text-left" title="Click to copy"
                       onClick={() => { navigator.clipboard.writeText(contact.email); toast("Email copied", "success"); }}>
                       {contact.email}
-                    </span>
+                    </button>
                   )}
                   {contact.phone && (
-                    <span className="font-mono text-[11px] cursor-pointer hover:text-txt transition-colors shrink-0" title="Click to copy"
+                    <button type="button" className="font-mono text-[11px] cursor-pointer hover:text-txt transition-colors shrink-0" title="Click to copy"
                       onClick={() => { navigator.clipboard.writeText(contact.phone); toast("Phone copied", "success"); }}>
                       {contact.phone}
-                    </span>
+                    </button>
                   )}
                 </div>
                 {cTags.length > 0 && (

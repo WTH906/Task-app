@@ -91,15 +91,16 @@ export function InlineEdit({
 
   if (!editing) {
     return (
-      <span
+      <button
+        type="button"
         onClick={() => setEditing(true)}
-        className={`cursor-pointer hover:bg-surface3 rounded px-1 -mx-1 transition-colors ${
+        className={`cursor-pointer hover:bg-surface3 rounded px-1 -mx-1 transition-colors text-left ${
           !value ? "text-txt3 italic" : ""
         } ${className}`}
         title={title || "Click to edit"}
       >
         {value || placeholder}
-      </span>
+      </button>
     );
   }
 

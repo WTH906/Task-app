@@ -121,20 +121,20 @@ function WeeklyTimeSummary({ userId }: { userId: string }) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Clock size={16} className="text-violet2" />
-          <h3 className="text-sm font-semibold text-bright">Weekly Time</h3>
+          <h2 className="text-sm font-semibold text-bright">Weekly Time</h2>
         </div>
         <div className="flex items-center gap-1.5">
-          <button onClick={() => setWeekOffset(w => w - 1)} className="w-6 h-6 rounded flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface3"><ChevronLeft size={14} /></button>
+          <button type="button" onClick={() => setWeekOffset(w => w - 1)} aria-label="Previous week" className="w-6 h-6 rounded flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface3"><ChevronLeft size={14} /></button>
           <span className="text-xs text-txt2 min-w-[160px] text-center">{label}</span>
-          <button onClick={() => setWeekOffset(w => w + 1)} disabled={isThisWeek} className="w-6 h-6 rounded flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface3 disabled:opacity-30"><ChevronRight size={14} /></button>
+          <button type="button" onClick={() => setWeekOffset(w => w + 1)} disabled={isThisWeek} aria-label="Next week" className="w-6 h-6 rounded flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface3 disabled:opacity-30"><ChevronRight size={14} /></button>
           {logs.length > 0 && (
-            <button onClick={exportCSV} title="Export CSV" className="w-6 h-6 rounded flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface3 ml-1"><Download size={13} /></button>
+            <button type="button" onClick={exportCSV} title="Export CSV" aria-label="Export CSV" className="w-6 h-6 rounded flex items-center justify-center text-txt3 hover:text-txt hover:bg-surface3 ml-1"><Download size={13} /></button>
           )}
         </div>
       </div>
 
       {loading ? (
-        <div className="text-center py-6 text-txt3 text-xs">Loading...</div>
+        <div className="text-center py-6 text-txt3 text-xs" role="status">Loading...</div>
       ) : logs.length === 0 ? (
         <div className="text-center py-6">
           <p className="text-txt3 text-xs">No time tracked this week</p>
@@ -192,7 +192,7 @@ export default function StatsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen" role="status" aria-label="Loading">
         <div className="w-8 h-8 border-2 border-violet border-t-transparent rounded-full animate-spin" />
       </div>
     );

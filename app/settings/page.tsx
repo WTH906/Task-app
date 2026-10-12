@@ -33,7 +33,7 @@ export default function SettingsPage() {
   };
 
   if (!loaded || !draft) {
-    return <div className="p-8 text-txt3">Loading…</div>;
+    return <div className="p-8 text-txt3" role="status">Loading…</div>;
   }
 
   return (
@@ -103,7 +103,7 @@ export default function SettingsPage() {
             Discard
           </button>
           <button onClick={save} disabled={saving}
-            className="px-4 py-2 rounded-lg text-sm text-white disabled:opacity-50 transition-colors"
+            className="px-4 py-2 rounded-lg text-sm text-on-accent disabled:opacity-50 transition-colors"
             style={{ backgroundColor: "var(--accent)" }}>
             {saving ? "Saving…" : "Save changes"}
           </button>

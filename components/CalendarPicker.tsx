@@ -107,7 +107,7 @@ export function CalendarPicker({ value, onChange, className = "", label, variant
               return (
                 <button key={i} onClick={() => { onChange(dateStr); setOpen(false); }}
                   className={`w-8 h-8 text-xs rounded flex items-center justify-center transition-colors ${
-                    isSelected ? "bg-violet text-white font-bold"
+                    isSelected ? "bg-violet text-on-accent font-bold"
                     : isToday ? "bg-violet/20 text-violet2"
                     : "text-txt2 hover:bg-surface3"
                   }`}>{d}</button>

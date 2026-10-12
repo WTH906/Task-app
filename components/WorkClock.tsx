@@ -114,6 +114,8 @@ export function WorkClock({ userId, alwaysShow = true }: WorkClockProps) {
         background: isRunning ? "color-mix(in srgb, var(--accent) 12%, transparent)" : "transparent",
         color: isRunning ? "var(--accent2)" : "var(--txt3)",
       }}
+      aria-pressed={isRunning}
+      aria-label={isRunning ? "Clock out" : "Clock in"}
       title={isRunning ? "Clock out" : "Clock in"}
     >
       {isRunning ? (

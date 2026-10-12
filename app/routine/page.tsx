@@ -147,6 +147,17 @@ export default function RoutinePage() {
     if (error) toast("Failed to reorder: " + error, "error");
   };
 
+  const moveItem = async (idx: number, dir: -1 | 1) => {
+    const target = idx + dir;
+    if (target < 0 || target >= tasks.length) return;
+    const next = [...tasks];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    setTasks(next);
+    if (!userId) return;
+    const { error } = await reorderRows(createClient(), "routine_tasks", next.map((t) => t.id), userId);
+    if (error) toast("Failed to reorder: " + error, "error");
+  };
+
   const checked = tasks.filter((t) => t.checked).length;
   const total = tasks.length;
   const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
@@ -209,10 +220,22 @@ export default function RoutinePage() {
               task.checked && "opacity-60"
             )}
           >
-            {/* Drag handle */}
-            <span className="cursor-grab text-txt3 opacity-0 group-hover:opacity-100 transition-opacity select-none">
-              ⠿
-            </span>
+            {/* Drag handle + keyboard reorder */}
+            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+              <span className="cursor-grab text-txt3 select-none">⠿</span>
+              <div className="flex flex-col">
+                <button type="button" aria-label="Move up" disabled={idx === 0}
+                  onClick={() => { moveItem(idx, -1).catch(() => {}); }}
+                  className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                  <span aria-hidden="true" className="text-[10px]">▲</span>
+                </button>
+                <button type="button" aria-label="Move down" disabled={idx === tasks.length - 1}
+                  onClick={() => { moveItem(idx, 1).catch(() => {}); }}
+                  className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                  <span aria-hidden="true" className="text-[10px]">▼</span>
+                </button>
+              </div>
+            </div>
 
             {/* Checkbox */}
             <input
@@ -241,7 +264,10 @@ export default function RoutinePage() {
             {/* Menu */}
             <div className="relative">
               <button
+                type="button"
                 onClick={() => setMenuOpen(menuOpen === task.id ? null : task.id)}
+                aria-expanded={menuOpen === task.id}
+                aria-label="Task actions"
                 className="w-7 h-7 flex items-center justify-center rounded hover:bg-surface2 text-txt3 text-sm"
               >
                 ⋯

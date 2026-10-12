@@ -344,11 +344,24 @@ export function Sidebar({ user }: { user: User }) {
     setTemplates((prev) => prev.filter((t) => t.id !== id));
   };
 
+  const moveProject = async (idx: number, direction: number) => {
+    if (projectSort !== "custom") return;
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= projects.length) return;
+    const newProjects = [...projects];
+    [newProjects[idx], newProjects[newIdx]] = [newProjects[newIdx], newProjects[idx]];
+    setProjects(newProjects);
+    const supabase = createClient();
+    await reorderRows(supabase, "projects", newProjects.map((proj) => proj.id), user?.id ?? "");
+  };
+
   return (
     <>
       <button onClick={() => setOpen(!open)}
+        aria-label={open ? "Close menu" : "Open menu"}
+        aria-expanded={open}
         className="fixed top-3 left-3 z-50 md:hidden w-10 h-10 flex items-center justify-center bg-surface2 rounded-lg border border-border">
-        <span className="text-lg">{open ? <X size={20} /> : <Menu size={20} />}</span>
+        <span className="text-lg" aria-hidden="true">{open ? <X size={20} /> : <Menu size={20} />}</span>
       </button>
       {open && <div className="fixed inset-0 bg-black/50 z-30 md:hidden" onClick={() => setOpen(false)} />}
 
@@ -358,7 +371,7 @@ export function Sidebar({ user }: { user: User }) {
         than a floating control.
       */}
       {collapsed && (
-        <button id="sidebar-reveal" onClick={toggleCollapsed}
+        <button type="button" id="sidebar-reveal" onClick={toggleCollapsed}
           title="Show sidebar (Ctrl/⌘ B)"
           aria-label="Show sidebar"
           aria-expanded={false}
@@ -381,7 +394,7 @@ export function Sidebar({ user }: { user: User }) {
         overlay then reports as an error. `visibility` does the same job
         natively and doesn't care which React version is underneath.
       */}
-      <aside className={cn(
+      <aside aria-label="Sidebar" className={cn(
         "fixed top-0 left-0 h-full w-60 bg-surface border-r border-border z-40 flex flex-col transition-transform duration-200 motion-reduce:transition-none",
         !open && "-translate-x-full md:translate-x-0",
         // Desktop collapse reuses the same slide the mobile drawer already
@@ -392,8 +405,8 @@ export function Sidebar({ user }: { user: User }) {
       )}>
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-2">
-            <h1 className="font-title text-lg text-bright tracking-wide flex-1 truncate">Comfy Board</h1>
-            <button id="sidebar-hide" onClick={toggleCollapsed}
+            <h2 className="font-title text-lg text-bright tracking-wide flex-1 truncate">Comfy Board</h2>
+            <button type="button" id="sidebar-hide" onClick={toggleCollapsed}
               title="Hide sidebar (Ctrl/⌘ B)"
               aria-label="Hide sidebar"
               aria-expanded={true}
@@ -403,6 +416,8 @@ export function Sidebar({ user }: { user: User }) {
           </div>
           <div className="relative mt-1">
             <button onClick={() => setUserMenuOpen(!userMenuOpen)}
+              aria-expanded={userMenuOpen}
+              aria-label="User menu"
               className="flex items-center gap-2 text-xs text-txt3 hover:text-txt transition-colors w-full">
               <UserIcon size={13} />
               <span className="truncate flex-1 text-left">{user.email}</span>
@@ -455,11 +470,12 @@ export function Sidebar({ user }: { user: User }) {
           <kbd className="text-[9px] bg-surface3 px-1 py-0.5 rounded">⌘K</kbd>
         </button>
 
-        <nav className="flex-1 overflow-y-auto p-2 space-y-1 mt-1">
+        <nav aria-label="Main navigation" className="flex-1 overflow-y-auto p-2 space-y-1 mt-1">
           {navItems.map((item) => {
             const active = item.href === "/" ? pathname === "/" : (pathname === item.href || pathname.startsWith(item.href + "/"));
             return (
               <Link key={item.href} href={item.href} onClick={() => setOpen(false)}
+                aria-current={active ? "page" : undefined}
                 className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors",
                   active ? "" : "text-txt2 hover:bg-surface2 hover:text-txt")}
                 style={active ? {
@@ -481,11 +497,12 @@ export function Sidebar({ user }: { user: User }) {
             <div className="flex items-center gap-1">
               <button onClick={() => setProjectSort(s => s === "custom" ? "alpha" : s === "alpha" ? "deadline" : "custom")}
                 title={`Sort: ${projectSort}`}
-                className="text-[9px] text-txt3 hover:text-txt transition-colors px-1 py-0.5 rounded bg-surface3">
-                {projectSort === "custom" ? "⠿" : projectSort === "alpha" ? "AZ" : "📅"}
+                aria-label={`Sort projects: ${projectSort}`}
+                className="text-[9px] text-txt3 hover:text-txt transition-colors px-1.5 py-1 rounded bg-surface3 min-w-[24px] min-h-[24px] flex items-center justify-center">
+                <span aria-hidden="true">{projectSort === "custom" ? "⠿" : projectSort === "alpha" ? "AZ" : "📅"}</span>
               </button>
-              <button onClick={() => setImportOpen(true)} title="Import" className="text-txt3 hover:text-green-acc transition-colors p-0.5"><Download size={14} /></button>
-              <button onClick={() => { fetchTemplates(); setTemplateOpen(!templateOpen); }} title="Templates" className="text-txt3 hover:text-violet2 transition-colors p-0.5"><ClipboardCopy size={14} /></button>
+              <button type="button" onClick={() => setImportOpen(true)} title="Import" aria-label="Import" className="text-txt3 hover:text-green-acc transition-colors p-1 min-w-[24px] min-h-[24px] flex items-center justify-center"><Download size={14} /></button>
+              <button type="button" onClick={() => { fetchTemplates(); setTemplateOpen(!templateOpen); }} title="Templates" aria-expanded={templateOpen} aria-label="Templates" className="text-txt3 hover:text-violet2 transition-colors p-1 min-w-[24px] min-h-[24px] flex items-center justify-center"><ClipboardCopy size={14} /></button>
             </div>
           </div>
 
@@ -499,8 +516,8 @@ export function Sidebar({ user }: { user: User }) {
                     className="flex-1 text-left px-3 py-2 text-xs text-txt2 hover:bg-surface3 hover:text-violet2 truncate">
                     <ClipboardCopy size={12} className="shrink-0" /> {t.name}
                   </button>
-                  <button onClick={() => deleteTemplate(t.id)}
-                    className="px-2 py-2 text-xs text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 transition-all">✕</button>
+                  <button type="button" onClick={() => deleteTemplate(t.id)} aria-label="Delete template"
+                    className="px-2 py-2 text-xs text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all">✕</button>
                 </div>
               ))}
             </div>
@@ -520,67 +537,83 @@ export function Sidebar({ user }: { user: User }) {
             return sorted.map((p, idx) => {
             const active = pathname === `/projects/${p.id}`;
             return (
-              <div key={p.id}
-                draggable
-                onClick={() => { router.push(`/projects/${p.id}`); setOpen(false); }}
-                onDragStart={() => setDragProjectIdx(idx)}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  // Check if it's a task being dragged (from project page)
-                  if (e.dataTransfer.types.includes("task-id")) {
-                    setDropTargetId(p.id);
-                    e.dataTransfer.dropEffect = "move";
-                    return;
-                  }
-                  // Otherwise it's project reorder
-                  if (dragProjectIdx !== null && dragProjectIdx !== idx) {
-                    setProjects(prev => {
-                      const copy = [...prev];
-                      const [item] = copy.splice(dragProjectIdx, 1);
-                      copy.splice(idx, 0, item);
-                      return copy;
-                    });
-                    setDragProjectIdx(idx);
-                  }
-                }}
-                onDragLeave={() => setDropTargetId(null)}
-                onDrop={async (e) => {
-                  e.preventDefault();
-                  setDropTargetId(null);
-                  const taskId = e.dataTransfer.getData("task-id");
-                  const taskName = e.dataTransfer.getData("task-name");
-                  if (taskId && taskId.length > 10) {
-                    // Move task to this project
+              <div key={p.id} className="flex items-center group/proj">
+                <button type="button"
+                  draggable
+                  onClick={() => { router.push(`/projects/${p.id}`); setOpen(false); }}
+                  onDragStart={() => setDragProjectIdx(idx)}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    // Check if it's a task being dragged (from project page)
+                    if (e.dataTransfer.types.includes("task-id")) {
+                      setDropTargetId(p.id);
+                      e.dataTransfer.dropEffect = "move";
+                      return;
+                    }
+                    // Otherwise it's project reorder
+                    if (dragProjectIdx !== null && dragProjectIdx !== idx) {
+                      setProjects(prev => {
+                        const copy = [...prev];
+                        const [item] = copy.splice(dragProjectIdx, 1);
+                        copy.splice(idx, 0, item);
+                        return copy;
+                      });
+                      setDragProjectIdx(idx);
+                    }
+                  }}
+                  onDragLeave={() => setDropTargetId(null)}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    setDropTargetId(null);
+                    const taskId = e.dataTransfer.getData("task-id");
+                    const taskName = e.dataTransfer.getData("task-name");
+                    if (taskId && taskId.length > 10) {
+                      // Move task to this project
+                      const supabase = createClient();
+                      await supabase.from("project_tasks").update({ project_id: p.id }).eq("id", taskId);
+
+                      // Re-point the mirrored planner rows. Since migration v21
+                      // the project is carried by project_id alone, so this is a
+                      // single UPDATE — no text rewriting, and nothing can drift.
+                      await supabase.from("week_tasks")
+                        .update({ project_id: p.id })
+                        .eq("project_task_id", taskId).eq("user_id", user?.id ?? "");
+
+                      window.dispatchEvent(new CustomEvent("task-moved", { detail: { taskId, targetProject: p.title } }));
+                      toast(`"${taskName}" moved to ${p.title}`, "success");
+                    }
+                  }}
+                  onDragEnd={async () => {
+                    setDragProjectIdx(null);
+                    setDropTargetId(null);
                     const supabase = createClient();
-                    await supabase.from("project_tasks").update({ project_id: p.id }).eq("id", taskId);
-
-                    // Re-point the mirrored planner rows. Since migration v21
-                    // the project is carried by project_id alone, so this is a
-                    // single UPDATE — no text rewriting, and nothing can drift.
-                    await supabase.from("week_tasks")
-                      .update({ project_id: p.id })
-                      .eq("project_task_id", taskId).eq("user_id", user?.id ?? "");
-
-                    window.dispatchEvent(new CustomEvent("task-moved", { detail: { taskId, targetProject: p.title } }));
-                    toast(`"${taskName}" moved to ${p.title}`, "success");
-                  }
-                }}
-                onDragEnd={async () => {
-                  setDragProjectIdx(null);
-                  setDropTargetId(null);
-                  const supabase = createClient();
-                  // One RPC instead of N un-awaited updates (which never ran).
-                  const { error } = await reorderRows(
-                    supabase, "projects", projects.map((proj) => proj.id), user?.id ?? ""
-                  );
-                  if (error) toast("Failed to save order: " + error, "error");
-                }}
-                className={cn("flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors truncate cursor-grab select-none",
-                  active ? "" : "text-txt2 hover:bg-surface2 hover:text-txt",
-                  dropTargetId === p.id && "ring-2 ring-violet")}
-                style={active ? { backgroundColor: `${p.color || "#e05555"}20`, color: p.color || "#e05555" } : undefined}>
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color || "#e05555" }} />
-                <span className="truncate">{p.title}</span>
+                    // One RPC instead of N un-awaited updates (which never ran).
+                    const { error } = await reorderRows(
+                      supabase, "projects", projects.map((proj) => proj.id), user?.id ?? ""
+                    );
+                    if (error) toast("Failed to save order: " + error, "error");
+                  }}
+                  className={cn("flex-1 flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors truncate cursor-grab select-none text-left",
+                    active ? "" : "text-txt2 hover:bg-surface2 hover:text-txt",
+                    dropTargetId === p.id && "ring-2 ring-violet")}
+                  style={active ? { backgroundColor: `${p.color || "#e05555"}20`, color: p.color || "#e05555" } : undefined}>
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color || "#e05555" }} />
+                  <span className="truncate">{p.title}</span>
+                </button>
+                {projectSort === "custom" && (
+                  <div className="flex flex-col shrink-0 opacity-0 group-hover/proj:opacity-100 focus-within:opacity-100 transition-opacity">
+                    <button type="button" aria-label="Move up" disabled={idx === 0}
+                      onClick={() => { moveProject(idx, -1).catch(() => {}); }}
+                      className="p-0.5 min-w-[20px] min-h-[16px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                      <span aria-hidden="true" className="text-[9px]">▲</span>
+                    </button>
+                    <button type="button" aria-label="Move down" disabled={idx === sorted.length - 1}
+                      onClick={() => { moveProject(idx, 1).catch(() => {}); }}
+                      className="p-0.5 min-w-[20px] min-h-[16px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                      <span aria-hidden="true" className="text-[9px]">▼</span>
+                    </button>
+                  </div>
+                )}
               </div>
             );
           });
@@ -601,6 +634,7 @@ export function Sidebar({ user }: { user: User }) {
               return next;
             });
           }}
+            aria-expanded={toolsOpen}
             className="flex items-center w-full px-3 py-2 text-[11px] uppercase tracking-wider text-txt3 hover:text-txt transition-colors">
             <ChevronDown size={12} className={cn("transition-transform mr-1.5", !toolsOpen && "-rotate-90")} />
             Tools
@@ -667,7 +701,7 @@ export function Sidebar({ user }: { user: User }) {
               border: "1px solid var(--border)",
               boxShadow: "0 24px 48px rgba(0,0,0,0.4)",
             }}>
-            <h3 className="text-lg font-semibold text-bright mb-4">New Project</h3>
+            <h2 className="text-lg font-semibold text-bright mb-4">New Project</h2>
             <input
               autoFocus
               value={newProjectName}
@@ -680,7 +714,7 @@ export function Sidebar({ user }: { user: User }) {
               <button onClick={() => { setNewProjectOpen(false); pendingTemplateRef.current = null; }}
                 className="px-4 py-2 text-sm text-txt3 hover:text-txt transition-colors">Cancel</button>
               <button onClick={handleProjectModalSubmit} disabled={!newProjectName.trim()}
-                className="px-4 py-2 text-sm bg-violet text-white rounded-lg hover:opacity-90 disabled:opacity-40 transition-colors">Create</button>
+                className="px-4 py-2 text-sm bg-violet text-on-accent rounded-lg hover:opacity-90 disabled:opacity-40 transition-colors">Create</button>
             </div>
           </div>
         </>

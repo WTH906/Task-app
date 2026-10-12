@@ -356,6 +356,19 @@ export default function DashboardPage() {
     localStorage.setItem("dashboard-card-order", JSON.stringify(cardOrder));
   };
 
+  const moveCard = async (idx: number, direction: number) => {
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= visibleCards.length) return;
+    const fromId = visibleCards[idx];
+    const toId = visibleCards[newIdx];
+    const newOrder = [...cardOrder];
+    const fromPos = newOrder.indexOf(fromId);
+    const toPos = newOrder.indexOf(toId);
+    [newOrder[fromPos], newOrder[toPos]] = [newOrder[toPos], newOrder[fromPos]];
+    setCardOrder(newOrder);
+    localStorage.setItem("dashboard-card-order", JSON.stringify(newOrder));
+  };
+
   // ── Card render functions ──────────────────────────────────
 
   /** Which feature each dashboard card belongs to. */
@@ -587,7 +600,7 @@ export default function DashboardPage() {
                         <span className="text-[10px] font-mono" style={{ color: progressColor(t.progress) }}>{t.progress}%</span>
                       </div>
                     </div>
-                    <input type="date" className="bg-surface3 border border-border rounded px-2 py-1 text-xs text-txt opacity-0 group-hover:opacity-100 transition-opacity"
+                    <input type="date" className="bg-surface3 border border-border rounded px-2 py-1 text-xs text-txt opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
                       onChange={async (e) => {
                         const newDate = e.target.value;
                         if (!newDate) return;
@@ -596,7 +609,7 @@ export default function DashboardPage() {
                         setOverdueTasks((prev) => prev.filter((x) => x.id !== t.id));
                       }} />
                     <Link href={`/projects/${t.project_id}`}
-                      className="text-xs text-txt3 hover:text-bright opacity-0 group-hover:opacity-100 transition-opacity">→</Link>
+                      className="text-xs text-txt3 hover:text-bright opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">→</Link>
                   </div>
                 );
               })}
@@ -696,11 +709,26 @@ export default function DashboardPage() {
         onDragOver={(e) => handleCardDragOver(e, idx)}
         onDragEnd={handleCardDragEnd}
         className={cn(
-          "transition-all",
+          "transition-all group/card relative",
           dragCardIdx === idx && "opacity-50 scale-[0.98]",
           dragCardIdx !== null && dragCardIdx !== idx && "cursor-move"
         )}
       >
+        <div className="absolute -left-1 top-1/2 -translate-y-1/2 z-10 flex items-center gap-0.5 opacity-0 group-hover/card:opacity-100 focus-within:opacity-100 transition-opacity">
+          <span className="cursor-grab text-txt3 select-none">⠿</span>
+          <div className="flex flex-col">
+            <button type="button" aria-label="Move up" disabled={idx === 0}
+              onClick={() => { moveCard(idx, -1).catch(() => {}); }}
+              className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+              <span aria-hidden="true" className="text-[10px]">▲</span>
+            </button>
+            <button type="button" aria-label="Move down" disabled={idx === visibleCards.length - 1}
+              onClick={() => { moveCard(idx, 1).catch(() => {}); }}
+              className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+              <span aria-hidden="true" className="text-[10px]">▼</span>
+            </button>
+          </div>
+        </div>
         {content}
       </div>
     );

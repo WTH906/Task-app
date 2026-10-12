@@ -243,7 +243,7 @@ export function ImportModal({ open, onClose, userId, onComplete }: ImportModalPr
             <p className="text-xs text-txt3 mt-0.5">Drag & drop JSON files or click to browse</p>
           </div>
           {!importing && (
-            <button onClick={handleClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface3 text-txt3 hover:text-txt">✕</button>
+            <button type="button" onClick={handleClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface3 text-txt3 hover:text-txt">✕</button>
           )}
         </div>
 
@@ -289,7 +289,7 @@ export function ImportModal({ open, onClose, userId, onComplete }: ImportModalPr
                   "text-txt2"
                 }>{line}</p>
               ))}
-              {importing && <p className="text-txt3 animate-pulse">Working...</p>}
+              {importing && <p className="text-txt3 animate-pulse" role="status">Working...</p>}
             </div>
           )}
         </div>
@@ -300,7 +300,7 @@ export function ImportModal({ open, onClose, userId, onComplete }: ImportModalPr
               <button onClick={() => { setLog([]); setDone(false); }}
                 className="text-xs text-txt3 hover:text-violet2 transition-colors">Import more</button>
               <button onClick={handleClose}
-                className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-white transition-colors">Done</button>
+                className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent transition-colors">Done</button>
             </>
           ) : (
             <span className="text-xs text-txt3">{importing ? "Importing..." : "Supports multiple files"}</span>

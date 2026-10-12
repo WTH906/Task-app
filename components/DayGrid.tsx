@@ -390,6 +390,7 @@ export function DayGrid({
                     <span className="text-[10px] text-txt3 font-mono shrink-0">{formatDuration(est)}</span>
                   ) : null}
                   <button
+                    type="button"
                     onClick={() => onOpenPicker(t)}
                     title="Give this a time"
                     aria-label={`Schedule ${stripTag(t)}`}
@@ -404,7 +405,7 @@ export function DayGrid({
                     onClick={() => onDelete(t.id)}
                     title="Remove from this day"
                     aria-label={`Remove ${stripTag(t)}`}
-                    className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-txt3 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-danger transition-all"
+                    className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-txt3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 focus:opacity-100 hover:text-danger transition-all"
                   >
                     ✕
                   </button>
@@ -608,9 +609,10 @@ export function DayGrid({
                       </span>
                     </span>
                     <button
+                      type="button"
                       onClick={(e) => { e.stopPropagation(); onOpenPicker(t); }}
                       aria-label={`Change the time for ${stripTag(t)}`}
-                      className="shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 text-txt3 hover:text-txt transition-opacity"
+                      className="shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 focus:opacity-100 text-txt3 hover:text-txt transition-opacity"
                     >
                       <Clock size={11} />
                     </button>
@@ -632,7 +634,7 @@ export function DayGrid({
                         title="Drag to change when it starts"
                         className={cn(
                           "absolute top-0 left-0 right-0 h-[5px] cursor-ns-resize transition-opacity",
-                          isResizing ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                          isResizing ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
                         )}
                         style={{ background: accent }}
                       />
@@ -641,7 +643,7 @@ export function DayGrid({
                         title="Drag to change when it ends"
                         className={cn(
                           "absolute bottom-0 left-0 right-0 h-[5px] cursor-ns-resize transition-opacity",
-                          isResizing ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                          isResizing ? "opacity-100" : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
                         )}
                         style={{ background: accent }}
                       />

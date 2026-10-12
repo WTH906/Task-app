@@ -45,12 +45,15 @@ export interface TaskActions {
    * the one the checkbox is showing — so unticking yesterday would tick today.
    */
   toggleTaskCheck: (id: string, periodKey: string) => void;
+  moveTaskItem: (idx: number, direction: number) => Promise<void>;
+  moveSubItem: (parentId: string, idx: number, direction: number) => Promise<void>;
 }
 
 interface TaskItemProps {
   task: ProjectTask;
   project: { id: string; title: string };
   idx: number;
+  taskCount: number;
   activeTaskId: string | null;
   elapsed: Record<string, number>;
   isExpanded: boolean;
@@ -70,7 +73,7 @@ interface TaskItemProps {
 }
 
 export function TaskItem({
-  task, project, idx, activeTaskId, elapsed,
+  task, project, idx, taskCount, activeTaskId, elapsed,
   isExpanded, menuOpen, setMenuOpen, subMenuOpen, setSubMenuOpen,
   dragSubIdx, dragSubParent, userId, checkedPeriods, actions,
   onDragStart, onDragOver, onDragEnd,
@@ -81,7 +84,7 @@ export function TaskItem({
   // clear it. Always show the control for a timer that's actually running.
   const showTimers = has("timers");
   const isActive = activeTaskId === task.id;
-  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [menuDir, setMenuDir] = useState<"above" | "below">("below");
 
   // ── Repeating tasks ──────────────────────────────────────────────────
   //
@@ -109,9 +112,8 @@ export function TaskItem({
   const openMenuAt = (e: React.MouseEvent, id: string, setter: (v: string | null) => void, otherSetter: (v: string | null) => void) => {
     e.stopPropagation();
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const menuH = 200; // approximate max menu height
-    const top = rect.bottom + menuH > window.innerHeight ? rect.top - menuH : rect.bottom + 4;
-    setMenuPos({ top: Math.max(8, top), left: Math.min(rect.right - 160, window.innerWidth - 170) });
+    const menuH = 200;
+    setMenuDir(rect.bottom + menuH > window.innerHeight ? "above" : "below");
     setter(setter === setMenuOpen ? (menuOpen === id ? null : id) : (subMenuOpen === id ? null : id));
     otherSetter(null);
   };
@@ -132,7 +134,21 @@ export function TaskItem({
       }}>
         {/* Row 1: drag + play + name */}
         <div className="flex items-center gap-2 px-3 py-2.5">
-          <span className="cursor-grab text-txt3 hover:text-txt select-none">⠿</span>
+          <div className="flex items-center gap-0.5">
+            <span className="cursor-grab text-txt3 hover:text-txt select-none">⠿</span>
+            <div className="flex flex-col">
+              <button type="button" aria-label="Move up" disabled={idx === 0}
+                onClick={() => { actions.moveTaskItem(idx, -1).catch(() => {}); }}
+                className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                <span aria-hidden="true" className="text-[10px]">▲</span>
+              </button>
+              <button type="button" aria-label="Move down" disabled={idx === taskCount - 1}
+                onClick={() => { actions.moveTaskItem(idx, 1).catch(() => {}); }}
+                className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                <span aria-hidden="true" className="text-[10px]">▼</span>
+              </button>
+            </div>
+          </div>
           <input
             type="checkbox"
             checked={isDone}
@@ -151,6 +167,7 @@ export function TaskItem({
           />
           {(showTimers || isActive) && (
             <button
+              type="button"
               onClick={() => actions.toggleTimer(task.id)}
               aria-label={isActive ? `Pause timer for ${task.name}` : `Start timer for ${task.name}`}
               className={cn(
@@ -261,22 +278,23 @@ export function TaskItem({
 
           {(task.subtasks?.length || 0) > 0 && (
             <button onClick={() => {
-              const s = new Set<string>();
-              // Copy existing and toggle
               actions.setExpandedTasks((prev) => { const n = new Set(prev); n.has(task.id) ? n.delete(task.id) : n.add(task.id); return n; });
-            }} className="text-txt3 hover:text-txt transition-colors">
-              {isExpanded ? "▾" : "▸"} {task.subtasks?.length}
+            }}
+              aria-expanded={isExpanded}
+              aria-label={`${isExpanded ? "Collapse" : "Expand"} subtasks`}
+              className="text-txt3 hover:text-txt transition-colors">
+              <span aria-hidden="true">{isExpanded ? "▾" : "▸"}</span> {task.subtasks?.length}
             </button>
           )}
 
           {/* Menu */}
           <div className="relative">
-            <button onClick={(e) => openMenuAt(e, task.id, setMenuOpen, setSubMenuOpen)}
+            <button type="button" onClick={(e) => openMenuAt(e, task.id, setMenuOpen, setSubMenuOpen)}
               aria-label={`Actions for ${task.name}`}
+              aria-expanded={menuOpen === task.id}
               className="w-6 h-6 flex items-center justify-center rounded hover:bg-surface2 text-txt3">⋯</button>
-            {menuOpen === task.id && menuPos && (
-              <div data-ctx-menu className="fixed glass-popover py-1 w-40 z-[100]"
-                style={{ top: menuPos.top, left: menuPos.left }}>
+            {menuOpen === task.id && (
+              <div data-ctx-menu className={cn("absolute right-0 glass-popover py-1 w-40 z-[100]", menuDir === "above" ? "bottom-full mb-1" : "top-full mt-1")}>
                 <button onClick={() => { actions.openEditModal(task, "task"); setMenuOpen(null); }}
                   className="w-full text-left px-3 py-1.5 text-sm text-glass-text hover:bg-white/5">Edit</button>
                 {(task.subtasks?.length || 0) < 10 && (
@@ -324,7 +342,21 @@ export function TaskItem({
                 )}
                 style={sub.monitoring ? { borderLeft: "3px solid #f59e0b", paddingLeft: "9px" } : undefined}
               >
-                <span className="cursor-grab text-txt3 opacity-30 hover:opacity-100 select-none text-[10px]">⠿</span>
+                <div className="flex items-center gap-0.5">
+                  <span className="cursor-grab text-txt3 opacity-30 hover:opacity-100 select-none text-[10px]">⠿</span>
+                  <div className="flex flex-col">
+                    <button type="button" aria-label="Move subtask up" disabled={subIdx === 0}
+                      onClick={() => { actions.moveSubItem(task.id, subIdx, -1).catch(() => {}); }}
+                      className="p-0.5 min-w-[20px] min-h-[16px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                      <span aria-hidden="true" className="text-[9px]">▲</span>
+                    </button>
+                    <button type="button" aria-label="Move subtask down" disabled={subIdx === (task.subtasks?.length || 1) - 1}
+                      onClick={() => { actions.moveSubItem(task.id, subIdx, 1).catch(() => {}); }}
+                      className="p-0.5 min-w-[20px] min-h-[16px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                      <span aria-hidden="true" className="text-[9px]">▼</span>
+                    </button>
+                  </div>
+                </div>
                 <input
                   type="checkbox"
                   checked={sub.progress >= 100}
@@ -334,7 +366,7 @@ export function TaskItem({
                   title={sub.progress >= 100 ? "Mark as incomplete" : "Mark as complete"}
                 />
                 {(showTimers || activeTaskId === `sub:${sub.id}`) && (
-                  <button onClick={() => actions.toggleTimer(`sub:${sub.id}`)}
+                  <button type="button" onClick={() => actions.toggleTimer(`sub:${sub.id}`)}
                     aria-label={activeTaskId === `sub:${sub.id}` ? `Pause timer for ${sub.name}` : `Start timer for ${sub.name}`}
                     className={cn("w-6 h-6 rounded flex items-center justify-center text-[10px] shrink-0 transition-colors",
                       activeTaskId === `sub:${sub.id}` ? "bg-green-acc/20 text-green-acc" : "bg-surface3 text-txt3 hover:text-red-acc"
@@ -386,12 +418,12 @@ export function TaskItem({
                   onRemoved={async () => { const s = createClient(); await s.from("subtasks").update({ file_url: null, file_name: null }).eq("id", sub.id); actions.updateSubtaskLocal(task.id, sub.id, { file_url: null, file_name: null }); }}
                 />}
                 <div className="relative">
-                  <button onClick={(e) => openMenuAt(e, sub.id, setSubMenuOpen, setMenuOpen)}
+                  <button type="button" onClick={(e) => openMenuAt(e, sub.id, setSubMenuOpen, setMenuOpen)}
                     aria-label={`Actions for ${sub.name}`}
+                    aria-expanded={subMenuOpen === sub.id}
                     className="w-6 h-6 flex items-center justify-center rounded hover:bg-surface3 text-txt3 text-[10px]">⋯</button>
-                  {subMenuOpen === sub.id && menuPos && (
-                    <div data-ctx-menu className="fixed glass-popover py-1 w-40 z-[100]"
-                      style={{ top: menuPos.top, left: menuPos.left }}>
+                  {subMenuOpen === sub.id && (
+                    <div data-ctx-menu className={cn("absolute right-0 glass-popover py-1 w-40 z-[100]", menuDir === "above" ? "bottom-full mb-1" : "top-full mt-1")}>
                       <button onClick={() => { actions.openEditModal(sub, "subtask", task.id); setSubMenuOpen(null); }}
                         className="w-full text-left px-3 py-1.5 text-xs text-glass-text hover:bg-white/5">Edit</button>
                       <button onClick={() => { actions.duplicateSubtask(sub, task.id); setSubMenuOpen(null); }}

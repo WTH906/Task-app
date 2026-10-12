@@ -156,6 +156,17 @@ export default function WeeklyRoutinePage() {
     if (error) toast("Failed to reorder: " + error, "error");
   };
 
+  const moveItem = async (idx: number, dir: -1 | 1) => {
+    const target = idx + dir;
+    if (target < 0 || target >= tasks.length) return;
+    const next = [...tasks];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    setTasks(next);
+    if (!userId) return;
+    const { error } = await reorderRows(createClient(), "weekly_routine_tasks", next.map((t) => t.id), userId);
+    if (error) toast("Failed to reorder: " + error, "error");
+  };
+
   const checked = tasks.filter((t) => t.checked).length;
   const total = tasks.length;
   const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
@@ -238,7 +249,21 @@ export default function WeeklyRoutinePage() {
               dragIdx === idx && "opacity-50 scale-[0.98]",
               task.checked && "opacity-60"
             )}>
-            <span className="cursor-grab text-txt3 opacity-0 group-hover:opacity-100 transition-opacity select-none">⠿</span>
+            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+              <span className="cursor-grab text-txt3 select-none">⠿</span>
+              <div className="flex flex-col">
+                <button type="button" aria-label="Move up" disabled={idx === 0}
+                  onClick={() => { moveItem(idx, -1).catch(() => {}); }}
+                  className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                  <span aria-hidden="true" className="text-[10px]">▲</span>
+                </button>
+                <button type="button" aria-label="Move down" disabled={idx === tasks.length - 1}
+                  onClick={() => { moveItem(idx, 1).catch(() => {}); }}
+                  className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                  <span aria-hidden="true" className="text-[10px]">▼</span>
+                </button>
+              </div>
+            </div>
             <input type="checkbox" checked={task.checked || false} onChange={() => toggleCheck(task)}
               className="accent-violet" />
             <span className={cn("flex-1 text-sm", task.checked && "task-done")}>{task.text}</span>
@@ -253,7 +278,9 @@ export default function WeeklyRoutinePage() {
               </span>
             )}
             <div className="relative">
-              <button onClick={() => setMenuOpen(menuOpen === task.id ? null : task.id)}
+              <button type="button" onClick={() => setMenuOpen(menuOpen === task.id ? null : task.id)}
+                aria-expanded={menuOpen === task.id}
+                aria-label="Task actions"
                 className="w-7 h-7 flex items-center justify-center rounded hover:bg-surface2 text-txt3 text-sm">⋯</button>
               {menuOpen === task.id && (
                 <div className="absolute right-0 top-full mt-1 bg-surface2 border border-border rounded-lg shadow-xl py-1 w-32 z-20">
@@ -307,13 +334,13 @@ export default function WeeklyRoutinePage() {
             <div className="flex flex-wrap gap-1.5">
               <button onClick={() => setFormDay(null)}
                 className={cn("px-2.5 py-1 rounded text-xs transition-colors",
-                  formDay === null ? "bg-violet text-white" : "bg-surface3 text-txt3 hover:text-txt")}>
+                  formDay === null ? "bg-violet text-on-accent" : "bg-surface3 text-txt3 hover:text-txt")}>
                 Any
               </button>
               {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((d, i) => (
                 <button key={d} onClick={() => setFormDay(i)}
                   className={cn("px-2.5 py-1 rounded text-xs transition-colors",
-                    formDay === i ? "bg-violet text-white" : "bg-surface3 text-txt3 hover:text-txt")}>
+                    formDay === i ? "bg-violet text-on-accent" : "bg-surface3 text-txt3 hover:text-txt")}>
                   {d}
                 </button>
               ))}
@@ -323,7 +350,7 @@ export default function WeeklyRoutinePage() {
             <button onClick={() => { setModalOpen(false); setEditingTask(null); }}
               className="px-4 py-2 rounded-lg text-sm text-txt2 hover:bg-surface3 transition-colors">Cancel</button>
             <button onClick={saveTask} disabled={!formText.trim()}
-              className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-white transition-colors disabled:opacity-50">
+              className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent transition-colors disabled:opacity-50">
               {editingTask ? "Save" : "Add"}
             </button>
           </div>

@@ -113,8 +113,8 @@ export function FileAttachment({
           title={fileName}>
           {opening ? "Opening…" : fileName}
         </button>
-        <button onClick={(e) => { e.stopPropagation(); handleRemove(); }}
-          className="text-txt3 hover:text-danger transition-colors opacity-0 group-hover:opacity-100" title="Remove file">✕</button>
+        <button type="button" onClick={(e) => { e.stopPropagation(); handleRemove(); }}
+          aria-label="Remove file" className="text-txt3 hover:text-danger transition-colors opacity-0 group-hover:opacity-100 focus-within:opacity-100" title="Remove file">✕</button>
       </div>
     );
   }

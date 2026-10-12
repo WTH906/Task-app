@@ -11,9 +11,10 @@ import { cleanDeadline, detectFileType } from "@/lib/import-helpers";
 import { reorderRows } from "@/lib/db-helpers";
 import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 import { fetchProjects, fetchTemplates } from "@/lib/queries";
-import { ClipboardCopy, Download, MoreHorizontal } from "lucide-react";
+import { ArrowUpDown, ClipboardCopy, Download, MoreHorizontal } from "lucide-react";
 
 type ProjectStats = { total: number; done: number; progress: number };
+type SortMode = "manual" | "alpha-asc" | "alpha-desc" | "progress-asc" | "progress-desc";
 
 export default function ProjectsPage() {
   const { userId } = useCurrentUser();
@@ -25,6 +26,8 @@ export default function ProjectsPage() {
   const [importLog, setImportLog] = useState<string[]>([]);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [secondaryOpen, setSecondaryOpen] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>("manual");
+  const [sortOpen, setSortOpen] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -64,7 +67,7 @@ export default function ProjectsPage() {
       setTemplates(tmpls);
       await loadStats(supabase, projs.map((p) => p.id));
     };
-    load();
+    load().catch(() => {});
   }, [userId]);
 
   const notifySidebar = () => window.dispatchEvent(new Event("projects-changed"));
@@ -476,6 +479,17 @@ export default function ProjectsPage() {
     notifySidebar();
   };
 
+  const moveItem = async (idx: number, direction: number) => {
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= projects.length || sortMode !== "manual" || !userId) return;
+    const newList = [...projects];
+    [newList[idx], newList[newIdx]] = [newList[newIdx], newList[idx]];
+    setProjects(newList);
+    const supabase = createClient();
+    await reorderRows(supabase, "projects", newList.map((p) => p.id), userId);
+    notifySidebar();
+  };
+
   const deleteProject = async (e: React.MouseEvent, id: string, title: string) => {
     e.stopPropagation();
     if (!confirm(`Delete project "${title}"?`)) return;
@@ -485,12 +499,29 @@ export default function ProjectsPage() {
     notifySidebar();
   };
 
+  const SORT_OPTIONS: { key: SortMode; label: string }[] = [
+    { key: "manual", label: "Manual order" },
+    { key: "alpha-asc", label: "A → Z" },
+    { key: "alpha-desc", label: "Z → A" },
+    { key: "progress-asc", label: "Unfinished first" },
+    { key: "progress-desc", label: "Finished first" },
+  ];
+
+  const sortedProjects = sortMode === "manual" ? projects : [...projects].sort((a, b) => {
+    if (sortMode === "alpha-asc") return a.title.localeCompare(b.title);
+    if (sortMode === "alpha-desc") return b.title.localeCompare(a.title);
+    const pa = (stats[a.id]?.progress ?? 0);
+    const pb = (stats[b.id]?.progress ?? 0);
+    if (sortMode === "progress-asc") return pa - pb;
+    return pb - pa;
+  });
+
   return (
     <div className="page-shell">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="font-title text-2xl text-bright">Projects</h1>
-          <p className="text-sm text-txt2 mt-1">{projects.length} project{projects.length !== 1 ? "s" : ""} · drag to reorder</p>
+          <p className="text-sm text-txt2 mt-1">{projects.length} project{projects.length !== 1 ? "s" : ""}{sortMode === "manual" ? " · drag to reorder" : ""}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={createProject}
@@ -499,8 +530,45 @@ export default function ProjectsPage() {
           </button>
           <div className="relative">
             <button
+              type="button"
+              onClick={() => setSortOpen((v) => !v)}
+              title="Sort projects"
+              aria-label="Sort projects"
+              aria-expanded={sortOpen}
+              className={cn(
+                "w-9 h-9 rounded-lg flex items-center justify-center bg-surface border border-border text-txt3 hover:text-txt hover:border-border2 transition-colors",
+                sortMode !== "manual" && "text-violet border-violet/40",
+              )}
+            >
+              <ArrowUpDown size={16} />
+            </button>
+            {sortOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setSortOpen(false)} />
+                <div className="absolute right-0 top-full mt-1 z-20 bg-surface border border-border rounded-lg shadow-lg py-1 min-w-[170px]">
+                  {SORT_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.key}
+                      onClick={() => { setSortMode(opt.key); setSortOpen(false); }}
+                      className={cn(
+                        "w-full text-left px-3 py-2 text-sm transition-colors flex items-center gap-2",
+                        sortMode === opt.key ? "text-violet bg-violet/5 font-medium" : "text-txt2 hover:bg-surface2 hover:text-txt",
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          <div className="relative">
+            <button
+              type="button"
               onClick={() => setSecondaryOpen((v) => !v)}
               title="More actions"
+              aria-label="More actions"
+              aria-expanded={secondaryOpen}
               className="w-9 h-9 rounded-lg flex items-center justify-center bg-surface border border-border text-txt3 hover:text-txt hover:border-border2 transition-colors"
             >
               <MoreHorizontal size={16} />
@@ -517,7 +585,7 @@ export default function ProjectsPage() {
                   </button>
                   <label className="w-full text-left px-3 py-2 text-sm text-txt2 hover:bg-surface2 hover:text-txt transition-colors flex items-center gap-2 cursor-pointer">
                     <Download size={13} /> Import
-                    <input ref={importRef} type="file" accept=".json,.csv" multiple onChange={(e) => { setSecondaryOpen(false); handleImport(e); }} className="hidden" />
+                    <input ref={importRef} type="file" accept=".json,.csv" multiple onChange={(e) => { setSecondaryOpen(false); handleImport(e).catch(() => {}); }} className="hidden" />
                   </label>
                 </div>
               </>
@@ -527,17 +595,18 @@ export default function ProjectsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {projects.map((p, idx) => {
+        {sortedProjects.map((p, idx) => {
           const s = stats[p.id] || { total: 0, done: 0, progress: 0 };
           const deadlineDays = p.deadline
             ? Math.ceil((new Date(p.deadline + "T23:59:00").getTime() - Date.now()) / (1000 * 60 * 60 * 24))
             : null;
+          const isDraggable = sortMode === "manual";
 
           return (
-            <div key={p.id} draggable
-              onDragStart={() => handleDragStart(idx)}
-              onDragOver={(e) => handleDragOver(e, idx)}
-              onDragEnd={handleDragEnd}
+            <div key={p.id} draggable={isDraggable}
+              onDragStart={isDraggable ? () => handleDragStart(idx) : undefined}
+              onDragOver={isDraggable ? (e) => handleDragOver(e, idx) : undefined}
+              onDragEnd={isDraggable ? handleDragEnd : undefined}
               onClick={() => router.push(`/projects/${p.id}`)}
               className={cn(
                 "bg-surface border border-border rounded-xl p-4 text-left hover:border-border2 transition-all group cursor-pointer card-float overflow-hidden",
@@ -547,11 +616,27 @@ export default function ProjectsPage() {
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <span className="cursor-grab text-txt3 opacity-0 group-hover:opacity-100 transition-opacity select-none shrink-0">⠿</span>
-                  <h3 className="text-bright font-medium group-hover:text-red-acc transition-colors truncate">{p.title}</h3>
+                  {isDraggable && (
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity shrink-0">
+                      <span className="cursor-grab text-txt3 select-none">⠿</span>
+                      <div className="flex flex-col">
+                        <button type="button" aria-label="Move up" disabled={idx === 0}
+                          onClick={(e) => { e.stopPropagation(); moveItem(idx, -1).catch(() => {}); }}
+                          className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                          <span aria-hidden="true" className="text-[10px]">▲</span>
+                        </button>
+                        <button type="button" aria-label="Move down" disabled={idx === sortedProjects.length - 1}
+                          onClick={(e) => { e.stopPropagation(); moveItem(idx, 1).catch(() => {}); }}
+                          className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                          <span aria-hidden="true" className="text-[10px]">▼</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  <h2 className="text-bright font-medium group-hover:text-red-acc transition-colors truncate">{p.title}</h2>
                 </div>
-                <button onClick={(e) => deleteProject(e, p.id, p.title)}
-                  className="text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 transition-all text-sm shrink-0">✕</button>
+                <button type="button" onClick={(e) => deleteProject(e, p.id, p.title)} aria-label="Delete project"
+                  className="text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all text-sm shrink-0">✕</button>
               </div>
 
               <div className="mt-2.5 ml-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
@@ -610,7 +695,7 @@ export default function ProjectsPage() {
           ))}
         </div>
         <div className="flex justify-end mt-4">
-          <button onClick={() => setImportModalOpen(false)} className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-white">Done</button>
+          <button onClick={() => setImportModalOpen(false)} className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent">Done</button>
         </div>
       </Modal>
 
@@ -627,12 +712,12 @@ export default function ProjectsPage() {
             return (
               <div key={t.id} className="flex items-center justify-between bg-surface border border-border rounded-lg px-4 py-3 group">
                 <div className="flex-1 min-w-0">
-                  <h4 className="text-sm text-bright font-medium truncate">{t.name}</h4>
+                  <h3 className="text-sm text-bright font-medium truncate">{t.name}</h3>
                   <p className="text-xs text-txt3">{taskCount} task{taskCount !== 1 ? "s" : ""}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={() => loadTemplate(t)} className="px-3 py-1.5 rounded-lg text-xs bg-violet/10 text-violet2 hover:bg-violet/20">Use</button>
-                  <button onClick={() => deleteTemplate(t.id)} className="text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 transition-all text-sm">✕</button>
+                  <button type="button" onClick={() => deleteTemplate(t.id)} aria-label="Delete template" className="text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all text-sm">✕</button>
                 </div>
               </div>
             );

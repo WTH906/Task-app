@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import {
-  BookOpen, CalendarDays, Timer, ListChecks, Folder, Zap, Gauge, SlidersHorizontal,
+  BookOpen, CalendarDays, Timer, ListChecks, Folder, Zap, Gauge, SlidersHorizontal, Accessibility,
 } from "lucide-react";
 
 /**
@@ -22,6 +22,7 @@ const SECTIONS = [
   { id: "capture", label: "Capturing things", icon: <Zap size={15} /> },
   { id: "time", label: "Time and estimates", icon: <Gauge size={15} /> },
   { id: "tuning", label: "Making it yours", icon: <SlidersHorizontal size={15} /> },
+  { id: "accessibility", label: "Accessibility", icon: <Accessibility size={15} /> },
 ];
 
 export default function GuidePage() {
@@ -202,11 +203,54 @@ export default function GuidePage() {
               Switching a feature off only hides it. Nothing is deleted, and turning it back on
               restores exactly what was there.
             </p>
-            <p className="text-sm text-txt2 leading-relaxed">
+            <p className="text-sm text-txt2 leading-relaxed mb-3">
               A few things worth trying once you&apos;re settled: drag dashboard cards to reorder
               them, drag a task onto a project in the sidebar to move it, and use{" "}
               <kbd className="bg-surface3 px-1.5 py-0.5 rounded text-xs">⌘K</kbd> to search
               everything at once.
+            </p>
+          </section>
+
+          <section id="accessibility" className="scroll-mt-6">
+            <h2 className="font-title text-lg text-bright mb-3">Accessibility</h2>
+            <p className="text-sm text-txt2 leading-relaxed mb-4">
+              Comfy Board is built to work with screen readers, keyboard navigation and other
+              assistive technology.
+            </p>
+            <div className="space-y-3 mb-4">
+              <div className="p-4 rounded-xl bg-surface border border-border">
+                <p className="text-sm text-bright mb-2">Keyboard reorder</p>
+                <p className="text-xs text-txt3 leading-relaxed">
+                  Every list that supports drag-to-reorder also has{" "}
+                  <span className="text-txt">▲</span> and <span className="text-txt">▼</span> buttons
+                  that appear on hover or focus. Use them to move items up and down without a mouse.
+                  This works in routines, project tasks, subtasks, the planner, the sidebar and the
+                  dashboard.
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-surface border border-border">
+                <p className="text-sm text-bright mb-2">Keyboard shortcuts</p>
+                <p className="text-xs text-txt3 leading-relaxed">
+                  <kbd className="bg-surface3 px-1.5 py-0.5 rounded text-[11px]">A</kbd> to
+                  quick-add a task from anywhere.{" "}
+                  <kbd className="bg-surface3 px-1.5 py-0.5 rounded text-[11px]">⌘K</kbd> or{" "}
+                  <kbd className="bg-surface3 px-1.5 py-0.5 rounded text-[11px]">Ctrl+K</kbd> to
+                  search. <kbd className="bg-surface3 px-1.5 py-0.5 rounded text-[11px]">Esc</kbd> to
+                  close any modal or panel.
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-surface border border-border">
+                <p className="text-sm text-bright mb-2">Screen readers</p>
+                <p className="text-xs text-txt3 leading-relaxed">
+                  Interactive controls are labelled, dropdown states are announced, search uses a
+                  standard combobox pattern, and confirmation dialogs trap focus until dismissed.
+                  All loading states are announced as live regions.
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-txt2 leading-relaxed">
+              If something isn&apos;t working with your assistive technology, please let us know —
+              accessibility is an ongoing effort.
             </p>
           </section>
 

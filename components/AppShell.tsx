@@ -101,8 +101,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <SettingsProvider userId={user.id}>
           <QueryErrorListener />
           <div className="min-h-screen">
+            <a href="#main-content" className="skip-link">Skip to content</a>
             <Sidebar user={user} />
-            <main className="app-main min-h-screen animate-fade-in">
+            <main id="main-content" className="app-main min-h-screen animate-fade-in">
               {children}
             </main>
             <ContactsPanel open={contactsOpen} onClose={() => setContactsOpen(false)} userId={user.id} />

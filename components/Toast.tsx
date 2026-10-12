@@ -27,26 +27,34 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const toast = useCallback((message: string, type: "success" | "error" | "info" = "info") => {
     const id = nextId++;
     setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4000);
+    if (type !== "error") {
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 4000);
+    }
   }, []);
 
   return (
     <ToastContext.Provider value={{ toast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-[100] space-y-2 pointer-events-none">
+      <div
+        className="fixed bottom-4 right-4 z-[100] space-y-2"
+        role="status"
+        aria-live="polite"
+        aria-atomic="false"
+      >
         {toasts.map((t) => (
           <div key={t.id}
+            role={t.type === "error" ? "alert" : undefined}
             className={cn(
-              "pointer-events-auto px-4 py-2.5 rounded-lg text-sm shadow-xl border animate-fade-in max-w-xs",
-              t.type === "success" && "bg-green-acc/15 border-green-acc/30 text-green-acc",
-              t.type === "error" && "bg-red-500/15 border-red-500/30 text-red-400",
-              t.type === "info" && "bg-violet/15 border-violet/30 text-violet2",
+              "px-4 py-2.5 rounded-lg text-sm shadow-xl border animate-fade-in max-w-xs cursor-pointer",
+              t.type === "success" && "bg-green-acc/15 border-green-acc/30 text-green-text",
+              t.type === "error" && "bg-red-500/15 border-red-500/30 text-red-text",
+              t.type === "info" && "bg-violet/15 border-violet/30 text-violet2-text",
             )}
             onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
           >
-            <span className="mr-2">
+            <span className="mr-2" aria-hidden="true">
               {t.type === "success" ? "✓" : t.type === "error" ? "✕" : "ℹ"}
             </span>
             {t.message}

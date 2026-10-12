@@ -118,14 +118,14 @@ export function MonitoringPanel({ open, onClose, userId }: { open: boolean; onCl
           <Clock size={16} className="text-amber" />
           <h2 className="font-title text-lg text-bright flex-1">Monitoring</h2>
           <span className="text-xs text-txt3 font-mono">{items.length}</span>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-txt3 hover:text-txt">
+          <button type="button" onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface2 text-txt3 hover:text-txt">
             <X size={18} />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="text-center py-16 text-txt3 text-xs">Loading...</div>
+            <div className="text-center py-16 text-txt3 text-xs" role="status">Loading...</div>
           ) : items.length === 0 ? (
             <div className="text-center py-16 text-txt3">
               <p className="text-2xl mb-2">✓</p>
@@ -148,7 +148,7 @@ export function MonitoringPanel({ open, onClose, userId }: { open: boolean; onCl
                         <button onClick={() => goToTask(item)} className="text-xs font-medium text-bright flex-1 truncate text-left hover:text-violet2 transition-colors" title="Go to project">
                           {item.task_name}
                         </button>
-                        <button onClick={() => resolve(item.id)} title="Mark as resolved"
+                        <button type="button" onClick={() => resolve(item.id)} title="Mark as resolved" aria-label="Mark as resolved"
                           className="w-6 h-6 rounded flex items-center justify-center text-txt3 hover:text-green-acc hover:bg-green-acc/10 transition-colors shrink-0">
                           <CheckCircle size={14} />
                         </button>

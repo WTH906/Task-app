@@ -142,7 +142,18 @@ export default function YearlyRoutinePage() {
     if (error) console.error("[yearly-routine:reorder]", error);
   };
 
-  if (loading || dataLoading) return <div className="p-8 text-txt3">Loading...</div>;
+  const moveItem = async (idx: number, dir: -1 | 1) => {
+    const target = idx + dir;
+    if (target < 0 || target >= tasks.length) return;
+    const next = [...tasks];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    setTasks(next);
+    if (!userId) return;
+    const { error } = await reorderRows(createClient(), "yearly_routine_tasks", next.map((t) => t.id), userId);
+    if (error) console.error("[yearly-routine:reorder]", error);
+  };
+
+  if (loading || dataLoading) return <div className="p-8 text-txt3" role="status">Loading...</div>;
 
   const done = tasks.filter(t => t.checked).length;
   const total = tasks.length;
@@ -197,7 +208,21 @@ export default function YearlyRoutinePage() {
                 "flex items-center gap-3 bg-surface border rounded-lg px-4 py-3 group card-float transition-colors",
                 isCurrentPeriod && !task.checked ? "border-violet/50" : "border-border",
                 dragIdx === idx && "opacity-50 scale-[0.98]")}>
-              <span className="cursor-grab text-txt3 opacity-0 group-hover:opacity-100 select-none">⠿</span>
+              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                <span className="cursor-grab text-txt3 select-none">⠿</span>
+                <div className="flex flex-col">
+                  <button type="button" aria-label="Move up" disabled={idx === 0}
+                    onClick={() => { moveItem(idx, -1).catch(() => {}); }}
+                    className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                    <span aria-hidden="true" className="text-[10px]">▲</span>
+                  </button>
+                  <button type="button" aria-label="Move down" disabled={idx === tasks.length - 1}
+                    onClick={() => { moveItem(idx, 1).catch(() => {}); }}
+                    className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                    <span aria-hidden="true" className="text-[10px]">▼</span>
+                  </button>
+                </div>
+              </div>
               <input type="checkbox" checked={task.checked || false} onChange={() => toggleCheck(task)}
                 className="w-4 h-4 shrink-0 accent-violet" />
               <div className="flex-1 min-w-0">
@@ -215,9 +240,9 @@ export default function YearlyRoutinePage() {
               )}
               <div className="relative">
                 <button onClick={() => openEdit(task)}
-                  className="text-xs text-txt3 opacity-0 group-hover:opacity-100 hover:text-violet2 transition-all px-1">Edit</button>
-                <button onClick={() => deleteTask(task.id)}
-                  className="text-xs text-txt3 opacity-0 group-hover:opacity-100 hover:text-danger transition-all px-1">✕</button>
+                  className="text-xs text-txt3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 hover:text-violet2 transition-all px-1">Edit</button>
+                <button type="button" onClick={() => deleteTask(task.id)} aria-label="Delete"
+                  className="text-xs text-txt3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 hover:text-danger transition-all px-1">✕</button>
               </div>
             </div>
           );
@@ -281,7 +306,7 @@ export default function YearlyRoutinePage() {
           <div className="flex justify-end gap-2 pt-2">
             <button onClick={closeModal} className="px-4 py-2 rounded-lg text-sm text-txt3 hover:bg-surface3">Cancel</button>
             <button onClick={saveTask} disabled={!formText.trim()}
-              className="px-4 py-2 rounded-lg text-sm bg-violet text-white hover:opacity-90 disabled:opacity-40">
+              className="px-4 py-2 rounded-lg text-sm bg-violet text-on-accent hover:opacity-90 disabled:opacity-40">
               {editingTask ? "Save" : "Add Task"}
             </button>
           </div>

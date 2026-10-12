@@ -26,6 +26,11 @@ export function ProgressBar({ value, height = 8, showLabel = false, label }: Pro
       <div
         className="w-full bg-surface3 rounded-full overflow-hidden"
         style={{ height }}
+        role="progressbar"
+        aria-valuenow={Math.round(clamped)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={label || "Progress"}
       >
         <div
           className="h-full rounded-full transition-all duration-300"

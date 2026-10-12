@@ -389,8 +389,9 @@ export default function WeekPage() {
             </button>
           </div>
           {showRoutines && (
-            <button onClick={toggleHideRoutine}
+            <button type="button" onClick={toggleHideRoutine}
               title={hideRoutine ? "Show routine tasks" : "Hide routine tasks"}
+              aria-label={hideRoutine ? "Show routine tasks" : "Hide routine tasks"}
               className={cn("px-2 py-1.5 rounded-lg border text-xs flex items-center gap-1 transition-colors",
                 hideRoutine ? "border-border text-txt3 hover:text-violet2 hover:border-border2" : "border-violet/30 bg-violet/10 text-violet2")}>
               <RefreshCw size={11} />
@@ -403,8 +404,8 @@ export default function WeekPage() {
               <div className="relative">
                 <button onClick={goToday}
                   className="px-3 py-1.5 rounded-lg bg-violet/10 border border-violet/30 text-sm text-violet2 hover:bg-violet/20">Today</button>
-                <button onClick={() => setJumpPickerOpen(!jumpPickerOpen)}
-                  className="ml-1 px-2 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt3 hover:text-txt hover:border-border2" title="Jump to date"><CalendarDays size={14} /></button>
+                <button type="button" onClick={() => setJumpPickerOpen(!jumpPickerOpen)}
+                  className="ml-1 px-2 py-1.5 rounded-lg bg-surface border border-border text-sm text-txt3 hover:text-txt hover:border-border2" title="Jump to date" aria-label="Jump to date"><CalendarDays size={14} /></button>
                 {jumpPickerOpen && (
                   <div className="absolute top-full mt-1 right-0 z-50 bg-surface2 border border-border rounded-lg shadow-xl p-2">
                     <input type="date" autoFocus
@@ -475,10 +476,10 @@ export default function WeekPage() {
                   isToday ? "border-violet shadow-lg shadow-violet/10" : "border-border hover:border-border2")}>
                 <div className="mb-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider cursor-pointer" style={{ color }}
+                    <button type="button" className="text-xs font-bold uppercase tracking-wider cursor-pointer" style={{ color }}
                       onClick={() => router.push(`/week/${dateKey}`)}>
                       {DAY_NAMES_FULL[dayNum].slice(0, 3)}
-                    </span>
+                    </button>
                     {/*
                       Peek at this day's hours without leaving the week. Only
                       offered when the scheduler is on — with it off there is
@@ -486,6 +487,7 @@ export default function WeekPage() {
                     */}
                     {showScheduler && (
                       <button
+                        type="button"
                         onClick={(e) => { e.stopPropagation(); setGridDate(dateKey); }}
                         title={`Hours for ${DAY_NAMES_FULL[dayNum]} ${date.getDate()}`}
                         aria-label={`Open the hour grid for ${DAY_NAMES_FULL[dayNum]} ${date.getDate()}`}
@@ -539,11 +541,19 @@ export default function WeekPage() {
                           disabled={isPending(t.id)}
                           aria-label={body}
                           className="mt-0.5 w-3.5 h-3.5" style={{ accentColor: projColor || color }} />
-                        <span className={cn("leading-tight", t.done && "line-through text-txt3 opacity-60", t.project_id && "cursor-pointer hover:underline")}
-                          onClick={() => { if (t.project_id) router.push(`/projects/${t.project_id}`); }}>
-                          {isSub && <span className="text-txt3 mr-0.5" aria-hidden>↳</span>}
-                          {body}
-                        </span>
+                        {t.project_id ? (
+                          <button type="button"
+                            className={cn("leading-tight cursor-pointer hover:underline text-left", t.done && "line-through text-txt3 opacity-60")}
+                            onClick={() => router.push(`/projects/${t.project_id}`)}>
+                            {isSub && <span className="text-txt3 mr-0.5" aria-hidden>↳</span>}
+                            {body}
+                          </button>
+                        ) : (
+                          <span className={cn("leading-tight", t.done && "line-through text-txt3 opacity-60")}>
+                            {isSub && <span className="text-txt3 mr-0.5" aria-hidden>↳</span>}
+                            {body}
+                          </span>
+                        )}
                       </div>
                     );
                   })}
@@ -682,10 +692,10 @@ export default function WeekPage() {
               const isPast = dateKey < today;
               return (
                 <div key={dateKey} className="mb-4">
-                  <h3 className={cn("text-xs font-medium mb-2 uppercase tracking-wider",
+                  <h2 className={cn("text-xs font-medium mb-2 uppercase tracking-wider",
                     isToday ? "text-violet2" : isPast ? "text-danger" : "text-txt3")}>
                     {isToday ? "Today" : label} {isPast && !isToday && "· overdue"}
-                  </h3>
+                  </h2>
                   <div className="space-y-1.5">
                     {dayTasks.map((t) => (
                       <div key={t.id} className="bg-surface border border-border rounded-lg px-3 py-2 flex items-center gap-3 group"
@@ -704,7 +714,7 @@ export default function WeekPage() {
 
             {undated.length > 0 && (
               <div className="mb-4">
-                <h3 className="text-xs font-medium mb-2 uppercase tracking-wider text-txt3">Unscheduled</h3>
+                <h2 className="text-xs font-medium mb-2 uppercase tracking-wider text-txt3">Unscheduled</h2>
                 <div className="space-y-1.5">
                   {undated.map((t) => (
                     <div key={t.id} className="bg-surface border border-border rounded-lg px-3 py-2 flex items-center gap-3 group"

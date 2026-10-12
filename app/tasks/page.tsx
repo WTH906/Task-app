@@ -149,6 +149,16 @@ export default function TaskListPage() {
     await reorderRows(supabase, "quick_tasks", tasks.map((t) => t.id), userId);
   };
 
+  const moveItem = async (idx: number, direction: number) => {
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= tasks.length || sortDir !== "manual" || !userId) return;
+    const newTasks = [...tasks];
+    [newTasks[idx], newTasks[newIdx]] = [newTasks[newIdx], newTasks[idx]];
+    setTasks(newTasks);
+    const supabase = createClient();
+    await reorderRows(supabase, "quick_tasks", newTasks.map((t) => t.id), userId);
+  };
+
   // Stats
   const totalTasks = tasks.length;
   const criticalCount = tasks.filter((t) => t.priority >= 4).length;
@@ -227,7 +237,7 @@ export default function TaskListPage() {
         </div>
         <div className="flex justify-end">
           <button onClick={addTask} disabled={!newName.trim()}
-            className="px-5 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-white disabled:opacity-50 transition-colors">
+            className="px-5 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent disabled:opacity-50 transition-colors">
             Add Task
           </button>
         </div>
@@ -258,7 +268,21 @@ export default function TaskListPage() {
               }}>
               <div className="flex items-start gap-3">
                 {sortDir === "manual" && (
-                  <span className="cursor-grab text-txt3 opacity-30 group-hover:opacity-100 transition-opacity select-none mt-0.5 shrink-0">⠿</span>
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity mt-0.5 shrink-0">
+                    <span className="cursor-grab text-txt3 select-none">⠿</span>
+                    <div className="flex flex-col">
+                      <button type="button" aria-label="Move up" disabled={idx === 0}
+                        onClick={() => { moveItem(idx, -1).catch(() => {}); }}
+                        className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                        <span aria-hidden="true" className="text-[10px]">▲</span>
+                      </button>
+                      <button type="button" aria-label="Move down" disabled={idx === sortedTasks.length - 1}
+                        onClick={() => { moveItem(idx, 1).catch(() => {}); }}
+                        className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                        <span aria-hidden="true" className="text-[10px]">▼</span>
+                      </button>
+                    </div>
+                  </div>
                 )}
 
                 <div className="flex-1 min-w-0">
@@ -288,8 +312,8 @@ export default function TaskListPage() {
                         className="bg-transparent border-none text-[10px] text-violet2 w-[105px] outline-none cursor-pointer"
                         title="Calendar date" />
                       {task.date_key && (
-                        <button onClick={(e) => { e.stopPropagation(); updateTask(task.id, "date_key", ""); setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, date_key: null } : t)); }}
-                          className="text-violet2/50 hover:text-violet2 text-[10px]">✕</button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); updateTask(task.id, "date_key", ""); setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, date_key: null } : t)); }}
+                          aria-label="Clear date" className="text-violet2/50 hover:text-violet2 text-[10px]">✕</button>
                       )}
                     </label>
                     <label className={cn("text-[10px] px-1.5 py-0.5 rounded inline-flex items-center gap-1 cursor-pointer",
@@ -325,14 +349,14 @@ export default function TaskListPage() {
                 {/* Priority changer */}
                 <select value={task.priority}
                   onChange={(e) => updateTask(task.id, "priority", parseInt(e.target.value))}
-                  className="bg-transparent border-none text-[10px] text-txt3 opacity-0 group-hover:opacity-100 transition-opacity w-8 shrink-0">
+                  className="bg-transparent border-none text-[10px] text-txt3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity w-8 shrink-0">
                   {[1,2,3,4,5].map((p) => <option key={p} value={p}>{p}</option>)}
                 </select>
 
                 <GCalButton title={task.name} date={task.date_key || task.deadline} description={task.notes} />
 
                 <button onClick={() => setConfirmId(task.id)}
-                  className="text-xs px-2.5 py-1.5 rounded-lg border text-txt3 opacity-0 group-hover:opacity-100 hover:border-green-acc hover:text-green-acc hover:bg-green-acc/10 transition-all shrink-0"
+                  className="text-xs px-2.5 py-1.5 rounded-lg border text-txt3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 hover:border-green-acc hover:text-green-acc hover:bg-green-acc/10 transition-all shrink-0"
                   style={{ borderColor: pc.border + "40" }}>
                   Done ✓
                 </button>

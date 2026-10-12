@@ -140,7 +140,7 @@ export function GCalSyncModal({
             <h2 className="font-title text-bright text-lg flex items-center gap-2"><Calendar size={18} /> Sync to Google Calendar</h2>
             <p className="text-xs text-txt3 mt-0.5">Click any item to create a calendar event</p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface3 text-txt3 hover:text-txt">✕</button>
+          <button type="button" onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface3 text-txt3 hover:text-txt">✕</button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">

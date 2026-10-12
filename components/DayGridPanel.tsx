@@ -188,7 +188,7 @@ export function DayGridPanel({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-16">
+      <div className="flex items-center justify-center py-16" role="status" aria-label="Loading">
         <div className="w-6 h-6 border-2 border-violet border-t-transparent rounded-full animate-spin" />
       </div>
     );

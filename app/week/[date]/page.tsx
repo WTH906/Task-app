@@ -373,6 +373,16 @@ export default function DayDetailPage() {
     await reorderRows(supabase, "week_tasks", tasks.map((t) => t.id), userId);
   };
 
+  const moveItem = async (idx: number, direction: number) => {
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= tasks.length || !userId) return;
+    const newTasks = [...tasks];
+    [newTasks[idx], newTasks[newIdx]] = [newTasks[newIdx], newTasks[idx]];
+    setTasks(newTasks);
+    const supabase = createClient();
+    await reorderRows(supabase, "week_tasks", newTasks.map((t) => t.id), userId);
+  };
+
   const prevDay = formatDate(addDays(dateObj, -1));
   const nextDay = formatDate(addDays(dateObj, 1));
 
@@ -488,9 +498,21 @@ export default function DayDetailPage() {
                 : undefined}
               title={task.project_id ? projectTitleById[task.project_id] : undefined}
             >
-              <span className="cursor-grab text-txt3 opacity-0 group-hover:opacity-100 select-none text-xs">
-                ⠿
-              </span>
+              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                <span className="cursor-grab text-txt3 select-none text-xs">⠿</span>
+                <div className="flex flex-col">
+                  <button type="button" aria-label="Move up" disabled={idx === 0}
+                    onClick={() => { moveItem(idx, -1).catch(() => {}); }}
+                    className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                    <span aria-hidden="true" className="text-[10px]">▲</span>
+                  </button>
+                  <button type="button" aria-label="Move down" disabled={idx === tasks.length - 1}
+                    onClick={() => { moveItem(idx, 1).catch(() => {}); }}
+                    className="p-0.5 min-w-[24px] min-h-[20px] flex items-center justify-center text-txt3 hover:text-violet2 disabled:opacity-30 transition-colors rounded">
+                    <span aria-hidden="true" className="text-[10px]">▼</span>
+                  </button>
+                </div>
+              </div>
               <input
                 type="checkbox"
                 checked={task.done}
@@ -514,17 +536,20 @@ export default function DayDetailPage() {
               */}
               {!task.rescheduled_to && (
                 <button
+                  type="button"
                   onClick={() => openPicker(task)}
                   title="Move to another day"
                   aria-label={`Move ${stripTag(task)} to another day`}
-                  className="text-txt3 hover:text-amber opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all text-sm"
+                  className="text-txt3 hover:text-amber opacity-0 group-hover:opacity-100 focus-within:opacity-100 focus:opacity-100 transition-all text-sm"
                 >
                   <CalendarDays size={14} />
                 </button>
               )}
               <button
+                type="button"
                 onClick={() => deleteTask(task.id)}
-                className="text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 transition-all text-sm"
+                aria-label="Delete"
+                className="text-txt3 hover:text-danger opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all text-sm"
               >
                 ✕
               </button>
@@ -591,7 +616,7 @@ export default function DayDetailPage() {
             className="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-sm text-txt placeholder-txt3" />
           <button onClick={addTask}
             disabled={!newTask.trim() || (linkType === "subtask" && !linkParentTask)}
-            className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-white disabled:opacity-50 transition-colors">
+            className="px-4 py-2 rounded-lg text-sm bg-violet hover:bg-violet-dim text-on-accent disabled:opacity-50 transition-colors">
             Add
           </button>
         </div>

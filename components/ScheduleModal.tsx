@@ -219,7 +219,7 @@ export function ScheduleModal({
             <button
               onClick={() => run(commit(), "schedule:save")}
               disabled={!!problem || saving}
-              className="px-4 py-2 rounded-lg text-sm bg-violet text-white hover:opacity-90 disabled:opacity-40 transition-opacity"
+              className="px-4 py-2 rounded-lg text-sm bg-violet text-on-accent hover:opacity-90 disabled:opacity-40 transition-opacity"
             >
               {saving ? "Saving..." : "Save"}
             </button>
